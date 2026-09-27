@@ -33,8 +33,34 @@ export function createServer(): { app: express.Application; server: http.Server 
   // Static media storage
   app.use('/media', express.static(config.storage.mediaDir));
 
-  // Swagger Documentation
+  // Swagger Documentation (Support both /docs and /api/docs as per PRD)
   app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+  app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
+  // Optional API Key Authentication Middleware (PRD Section 21)
+  app.use('/api/v1', (req: Request, res: Response, next: NextFunction) => {
+    if (!config.server.apiKey) return next();
+    // Allow public read on swagger or health
+    if (req.path === '/health' || req.path === '/status') return next();
+
+    const authHeader = req.headers.authorization;
+    const apiKeyHeader = req.headers['x-api-key'];
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : apiKeyHeader;
+
+    if (!token || token !== config.server.apiKey) {
+      res.status(401).json({ success: false, code: 'UNAUTHORIZED', message: 'Invalid or missing API key' });
+      return;
+    }
+    next();
+  });
+
+  // Health and Status Endpoints (PRD Section 20)
+  app.get('/api/v1/health', (req: Request, res: Response) => {
+    res.json({ success: true, status: 'ok', timestamp: Date.now() });
+  });
+  app.get('/api/v1/status', (req: Request, res: Response) => {
+    res.redirect('/api/v1/system/status');
+  });
 
   // API Routes
   app.use('/api/v1/sessions', sessionRouter);

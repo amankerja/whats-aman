@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import os from 'os';
 import { backupService } from '../../core/services/backup.service';
 import { sessionManager } from '../../core/engine/session.manager';
+import { AuditService } from '../../core/services/audit.service';
 import { config } from '../../config';
 
 export const systemRouter = Router();
@@ -48,4 +49,11 @@ systemRouter.post('/backup', async (req: Request, res: Response, next: NextFunct
 systemRouter.get('/backups', (req: Request, res: Response) => {
   const backups = backupService.listBackups();
   res.json({ success: true, data: backups });
+});
+
+// GET /api/v1/system/audit - List audit logs (PRD Section 24 & 34)
+systemRouter.get('/audit', (req: Request, res: Response) => {
+  const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 100;
+  const logs = AuditService.getRecent(limit);
+  res.json({ success: true, data: logs });
 });
