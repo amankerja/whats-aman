@@ -4,14 +4,18 @@ import { initializeDatabaseSchema } from './core/database/schema';
 import { sessionManager } from './core/engine/session.manager';
 import { messageService } from './core/services/message.service';
 import { automationService } from './core/services/automation.service';
+import { campaignService } from './core/services/campaign.service';
+import { webhookService } from './core/services/webhook.service';
+import { chatFlowService } from './core/services/chatflow.service';
+import { integrationService } from './core/services/integration.service';
 import { createServer } from './api/server';
 import { closeDatabase } from './core/database/connection';
 
 async function bootstrap() {
   console.log(`
 =====================================================
-          WHATSAPP LOCAL HUB v1.0.0
-   Portable WhatsApp Automation & Management Hub
+          WhatsAman v1.0.0
+   WhatsApp Dashboard by Aman Kerja Studio
 =====================================================
 Mode       : ${config.isPortable ? 'Portable (Zero Setup)' : 'Installed'}
 Storage    : ${config.storage.baseDir}
@@ -28,13 +32,22 @@ Swagger UI : http://${config.server.host}:${config.server.port}/docs
     // 2. Initialize Message Persistence Service
     messageService.initialize();
 
-    // 3. Initialize Automation Rule Service
+    // 3. Initialize Automation Rule Service & Chatflow Engine
     automationService.initialize();
+    chatFlowService.initialize();
 
-    // 3. Initialize Session Manager (Scans stored sessions & auto-reconnects)
+    // 4. Initialize Outbound Webhook Dispatcher & Third-Party Webhook Ingestion
+    webhookService.initialize();
+    integrationService.initialize();
+
+    // 5. Initialize Session Manager (Scans stored sessions & auto-reconnects)
     await sessionManager.initialize();
 
-    // 4. Start HTTP & WebSocket Server
+    // 6. Recover Interrupted Campaigns & Initialize Scheduled Watcher (30s interval)
+    campaignService.recoverInterruptedCampaigns();
+    campaignService.startScheduledCampaignWatcher(30000);
+
+    // 7. Start HTTP & WebSocket Server
     const { server } = createServer();
 
     server.listen(config.server.port, config.server.host, () => {

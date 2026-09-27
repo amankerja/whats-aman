@@ -19,6 +19,11 @@ export interface CampaignRecord {
   delivered_count: number;
   read_count: number;
   failed_count: number;
+  is_recurring?: number;
+  cron_expression?: string;
+  next_run_at?: number;
+  max_runs?: number;
+  runs_count?: number;
   created_at: number;
   updated_at: number;
 }
@@ -52,18 +57,26 @@ export class CampaignRepository {
     rateLimitPerMin?: number;
     randomDelayMin?: number;
     randomDelayMax?: number;
+    status?: CampaignRecord['status'];
+    isRecurring?: boolean;
+    cronExpression?: string;
+    nextRunAt?: number;
+    maxRuns?: number;
   }): void {
     const now = Date.now();
+    const initialStatus = data.status || (data.scheduleAt ? 'SCHEDULED' : 'DRAFT');
     const stmt = this.db.prepare(`
       INSERT INTO campaigns (
         id, session_id, name, template_text, media_path, media_type,
         schedule_at, rate_limit_per_minute, random_delay_min, random_delay_max,
         status, total_recipients, sent_count, delivered_count, read_count, failed_count,
+        is_recurring, cron_expression, next_run_at, max_runs, runs_count,
         created_at, updated_at
       ) VALUES (
         @id, @session_id, @name, @template_text, @media_path, @media_type,
         @schedule_at, @rate_limit_per_minute, @random_delay_min, @random_delay_max,
-        'DRAFT', 0, 0, 0, 0, 0,
+        @status, 0, 0, 0, 0, 0,
+        @is_recurring, @cron_expression, @next_run_at, @max_runs, 0,
         @created_at, @updated_at
       )
     `);
@@ -79,9 +92,25 @@ export class CampaignRepository {
       rate_limit_per_minute: data.rateLimitPerMin || 20,
       random_delay_min: data.randomDelayMin || 5,
       random_delay_max: data.randomDelayMax || 15,
+      status: initialStatus,
+      is_recurring: data.isRecurring ? 1 : 0,
+      cron_expression: data.cronExpression || null,
+      next_run_at: data.nextRunAt || null,
+      max_runs: data.maxRuns || 0,
       created_at: now,
       updated_at: now
     });
+  }
+
+  public findDueScheduledCampaigns(now: number): CampaignRecord[] {
+    const stmt = this.db.prepare(`
+      SELECT * FROM campaigns
+      WHERE status = 'SCHEDULED'
+        AND schedule_at IS NOT NULL
+        AND schedule_at <= ?
+      ORDER BY schedule_at ASC
+    `);
+    return stmt.all(now) as CampaignRecord[];
   }
 
   public addRecipients(campaignId: string, recipients: Array<{ phone: string; name?: string; variables?: Record<string, string> }>): void {
@@ -124,9 +153,42 @@ export class CampaignRepository {
     return stmt.all() as CampaignRecord[];
   }
 
+  public findByStatus(status: CampaignRecord['status']): CampaignRecord[] {
+    const stmt = this.db.prepare('SELECT * FROM campaigns WHERE status = ? ORDER BY created_at ASC');
+    return stmt.all(status) as CampaignRecord[];
+  }
+
   public updateCampaignStatus(id: string, status: CampaignRecord['status']): void {
     const stmt = this.db.prepare('UPDATE campaigns SET status = ?, updated_at = ? WHERE id = ?');
     stmt.run(status, Date.now(), id);
+  }
+
+  public resetRecipientsForRecurring(campaignId: string, nextScheduleAt: number, nextRunAt?: number): void {
+    const now = Date.now();
+    const resetRecipientsStmt = this.db.prepare(`
+      UPDATE campaign_recipients 
+      SET status = 'QUEUED', error_message = NULL, sent_at = NULL, delivered_at = NULL, read_at = NULL
+      WHERE campaign_id = ?
+    `);
+    const updateCampaignStmt = this.db.prepare(`
+      UPDATE campaigns 
+      SET status = 'SCHEDULED',
+          schedule_at = ?,
+          next_run_at = ?,
+          runs_count = runs_count + 1,
+          sent_count = 0,
+          failed_count = 0,
+          delivered_count = 0,
+          read_count = 0,
+          updated_at = ?
+      WHERE id = ?
+    `);
+
+    const tx = this.db.transaction(() => {
+      resetRecipientsStmt.run(campaignId);
+      updateCampaignStmt.run(nextScheduleAt, nextRunAt || null, now, campaignId);
+    });
+    tx();
   }
 
   public getNextQueuedRecipients(campaignId: string, limit = 10): CampaignRecipientRecord[] {

@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "WhatsApp Local Hub",
+  "productName": "WhatsAman",
   "version": "1.0.0",
-  "identifier": "com.whatsapplocalhub.app",
+  "identifier": "studio.amankerja.whatsaman",
   "build": {
     "frontendDist": "../ui/dist",
     "devUrl": "http://localhost:5173",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "WhatsApp Local Hub — Portable Automation Platform",
+        "title": "WhatsAman — WhatsApp Dashboard by Aman Kerja Studio",
         "width": 1280,
         "height": 820,
         "minWidth": 980,

@@ -34,7 +34,10 @@ export interface AppEvents {
   'groups.upsert': { sessionId: string; groups: Array<{ jid: string; name: string; memberCount: number }> };
 
   // Campaign events
-  'campaign.updated': { campaignId: string; status: string; sent: number; total: number; failed: number };
+  'campaign.updated': { campaignId: string; status: string; sent: number; total: number; failed: number; message?: string };
+
+  // Anti-blocking risk events
+  'session.risk_alert': { sessionId: string; riskScore: number; reason: string };
 
   // Automation events
   'automation.triggered': { ruleId: string; ruleName: string; sessionId: string; messageId: string };

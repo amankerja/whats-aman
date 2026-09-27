@@ -53,15 +53,15 @@ groupRouter.get('/:jid/export', async (req: Request, res: Response, next: NextFu
   }
 });
 
-// POST /api/v1/groups/:jid/import-to-contacts - Save all members directly into contacts table
-groupRouter.post('/:jid/import-to-contacts', async (req: Request, res: Response, next: NextFunction) => {
+// POST /api/v1/groups/:jid/import-to-contacts or /api/v1/groups/import-to-contacts
+const handleGroupImportToContacts = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { sessionId } = req.body;
-    if (!sessionId) {
-      res.status(400).json({ success: false, message: 'sessionId is required' });
+    const jid = String(req.params.jid || req.body.jid || '');
+    if (!sessionId || !jid) {
+      res.status(400).json({ success: false, message: 'sessionId and jid are required' });
       return;
     }
-    const jid = String(req.params.jid);
     const result = await groupService.importGroupMembersToContacts(String(sessionId), jid);
     res.json({
       success: true,
@@ -71,4 +71,6 @@ groupRouter.post('/:jid/import-to-contacts', async (req: Request, res: Response,
   } catch (err) {
     next(err);
   }
-});
+};
+groupRouter.post('/import-to-contacts', handleGroupImportToContacts);
+groupRouter.post('/:jid/import-to-contacts', handleGroupImportToContacts);

@@ -8,11 +8,25 @@ ui/dist/
 
 # Local sensitive runtime data
 data/sessions/*/auth/
+data/sessions/*/
+data/database.sqlite
 data/database.sqlite-shm
 data/database.sqlite-wal
+data/media/
 logs/
 *.log
 
 # Environment
 .env
 .env.local
+
+# Binary executables
+*.exe
+*.bat
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/

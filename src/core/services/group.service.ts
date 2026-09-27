@@ -1,13 +1,49 @@
 import xlsx from 'xlsx';
 import { sessionManager } from '../engine/session.manager';
 import { contactRepository } from '../database/repositories/contact.repository';
+import { getDatabase } from '../database/connection';
 import { GroupInfo } from '../engine/engine.interface';
 import { logger } from '../../utils/logger';
 
 export class GroupService {
   public async getGroups(sessionId: string): Promise<GroupInfo[]> {
     const session = sessionManager.getSession(sessionId);
-    return await session.getGroups();
+    const groups = await session.getGroups();
+
+    // Cache groups into local database for instant chat name resolution
+    try {
+      const db = getDatabase();
+      const stmt = db.prepare(`
+        INSERT INTO groups (id, session_id, jid, name, topic, owner_jid, member_count, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(session_id, jid) DO UPDATE SET
+          name = excluded.name,
+          topic = excluded.topic,
+          owner_jid = excluded.owner_jid,
+          member_count = excluded.member_count,
+          updated_at = excluded.updated_at
+      `);
+
+      const tx = db.transaction((items: GroupInfo[]) => {
+        for (const g of items) {
+          stmt.run(
+            `${sessionId}_${g.jid}`,
+            sessionId,
+            g.jid,
+            g.name,
+            g.topic || null,
+            g.ownerJid || null,
+            g.memberCount || 0,
+            Date.now()
+          );
+        }
+      });
+      tx(groups);
+    } catch (err: any) {
+      logger.warn({ sessionId, err: err?.message }, 'Failed to cache groups in database');
+    }
+
+    return groups;
   }
 
   public async getGroupMetadata(sessionId: string, groupJid: string): Promise<GroupInfo> {

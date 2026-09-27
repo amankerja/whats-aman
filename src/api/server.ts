@@ -20,6 +20,11 @@ import { groupRouter } from './routes/group.routes';
 import { campaignRouter } from './routes/campaign.routes';
 import { automationRouter } from './routes/automation.routes';
 import { systemRouter } from './routes/system.routes';
+import { crmRouter } from './routes/crm.routes';
+import { templateRouter } from './routes/template.routes';
+import { webhookRouter } from './routes/webhook.routes';
+import { chatFlowRouter } from './routes/chatflow.routes';
+import { integrationRouter } from './routes/integration.routes';
 
 export function createServer(): { app: express.Application; server: http.Server } {
   const app = express();
@@ -70,6 +75,11 @@ export function createServer(): { app: express.Application; server: http.Server 
   app.use('/api/v1/campaigns', campaignRouter);
   app.use('/api/v1/automation', automationRouter);
   app.use('/api/v1/system', systemRouter);
+  app.use('/api/v1/crm', crmRouter);
+  app.use('/api/v1/templates', templateRouter);
+  app.use('/api/v1/webhooks', webhookRouter);
+  app.use('/api/v1/chatflows', chatFlowRouter);
+  app.use('/api/v1/integrations', integrationRouter);
 
   // Serve Frontend UI static files if built
   const uiDistPath = path.resolve(process.cwd(), 'ui', 'dist');

@@ -13,6 +13,8 @@ export function getDatabase(): Database.Database {
     dbInstance.pragma('journal_mode = WAL');
     dbInstance.pragma('foreign_keys = ON');
     dbInstance.pragma('synchronous = NORMAL');
+    dbInstance.pragma('busy_timeout = 5000');
+    dbInstance.pragma('cache_size = -64000');
   }
   return dbInstance;
 }

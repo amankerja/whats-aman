@@ -62,6 +62,14 @@ export class SessionManager {
     return adapter;
   }
 
+  public hasSession(sessionId: string): boolean {
+    return this.sessions.has(sessionId);
+  }
+
+  public findSession(sessionId: string): IWhatsAppEngine | undefined {
+    return this.sessions.get(sessionId);
+  }
+
   public getSession(sessionId: string): IWhatsAppEngine {
     const session = this.sessions.get(sessionId);
     if (!session) {
@@ -87,6 +95,11 @@ export class SessionManager {
     await session.disconnect();
   }
 
+  public async logoutSession(sessionId: string): Promise<void> {
+    const session = this.getSession(sessionId);
+    await session.logout();
+  }
+
   public async deleteSession(sessionId: string): Promise<void> {
     const session = this.getSession(sessionId);
     await session.logout();
@@ -98,6 +111,14 @@ export class SessionManager {
       fs.rmSync(sessionDir, { recursive: true, force: true });
     }
     logger.info({ sessionId }, 'Session deleted completely');
+  }
+
+  public async getProfilePictureUrl(sessionId: string, jid?: string, forceRefresh = false): Promise<string | null> {
+    const session = this.getSession(sessionId);
+    if (session.getProfilePictureUrl) {
+      return await session.getProfilePictureUrl(jid, forceRefresh);
+    }
+    return null;
   }
 }
 

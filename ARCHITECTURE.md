@@ -1,6 +1,6 @@
-# WhatsApp Local Hub — Technical Architecture Specification
+# WhatsAman — Technical Architecture Specification
 
-> **Portable WhatsApp Automation Platform**  
+> **WhatsApp Dashboard by Aman Kerja Studio**  
 > *Satu platform terintegrasi dengan Single WhatsApp Engine, SQLite mandiri, REST API terstandarisasi, dan dashboard modern untuk Windows Portable.*
 
 ---
@@ -105,26 +105,32 @@ WhatsAppLocalHub/
 │   │   │   └── event.types.ts
 │   │   ├── database/           # SQLite Database & Repositories
 │   │   │   ├── connection.ts
-│   │   │   ├── migrations/
+│   │   │   ├── schema.ts
 │   │   │   └── repositories/
+│   │   │       ├── contact.repository.ts
+│   │   │       ├── crm.repository.ts
+│   │   │       ├── automation.repository.ts
+│   │   │       └── ...
 │   │   └── services/           # Service & Business Logic Layer
 │   │       ├── session.service.ts
 │   │       ├── message.service.ts
 │   │       ├── contact.service.ts
+│   │       ├── crm.service.ts          # AMAN CHAT Follow-up & Sales Funnel Engine
 │   │       ├── group.service.ts
-│   │       ├── campaign.service.ts
-│   │       ├── automation.service.ts
+│   │       ├── campaign.service.ts     # Broadcast Engine (Spintax, Rate Control, 1x Retry)
+│   │       ├── automation.service.ts   # Smart Bot, Auto-reply, Jam Kerja & Cooldown
 │   │       └── backup.service.ts
-│   ├── api/                    # REST API Layer (Gaya WAHA)
+│   ├── api/                    # REST API Layer (Gaya WAHA & AMAN CHAT)
 │   │   ├── server.ts
 │   │   ├── middlewares/
 │   │   ├── routes/
 │   │   │   ├── session.routes.ts
 │   │   │   ├── message.routes.ts
 │   │   │   ├── contact.routes.ts
+│   │   │   ├── crm.routes.ts           # CRM Tasks, Sequences, Funnel Analytics
 │   │   │   ├── group.routes.ts
 │   │   │   ├── campaign.routes.ts
-│   │   │   ├── automation.routes.ts
+│   │   │   ├── automation.routes.ts    # Rules & Bot Business Hours Config
 │   │   │   └── system.routes.ts
 │   │   └── swagger.ts          # OpenAPI documentation
 │   └── index.ts                # Application Entry Point

@@ -1,4 +1,4 @@
-# WhatsApp Local Hub (Portable WhatsApp Automation Platform)
+# WhatsAman (WhatsApp Dashboard by Aman Kerja Studio)
 
 > **Platform Terpadu Otomatisasi & Manajemen WhatsApp Multi-Akun**  
 > Perpaduan fitur terbaik dari **Baileys (Core Engine)**, **WAHA (REST API & Webhooks)**, dan **OpenWA (Tools & Automation)** yang dikemas menjadi satu aplikasi lokal mandiri, sangat ringan, dan **100% portabel di Windows**.

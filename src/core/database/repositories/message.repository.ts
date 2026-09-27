@@ -8,6 +8,7 @@ export interface MessageRecord {
   chat_jid: string;
   sender_jid: string;
   from_me: number;
+  push_name?: string;
   content_text?: string;
   media_type?: string;
   media_url?: string;
@@ -25,10 +26,10 @@ export class MessageRepository {
   public save(msg: NormalizedMessage, status: MessageRecord['status'] = 'SENT'): void {
     const stmt = this.db.prepare(`
       INSERT OR REPLACE INTO messages (
-        id, session_id, message_id, chat_jid, sender_jid, from_me,
+        id, session_id, message_id, chat_jid, sender_jid, from_me, push_name,
         content_text, media_type, media_url, caption, status, timestamp, created_at
       ) VALUES (
-        @id, @session_id, @message_id, @chat_jid, @sender_jid, @from_me,
+        @id, @session_id, @message_id, @chat_jid, @sender_jid, @from_me, @push_name,
         @content_text, @media_type, @media_url, @caption, @status, @timestamp, @created_at
       )
     `);
@@ -40,6 +41,7 @@ export class MessageRepository {
       chat_jid: msg.chatJid,
       sender_jid: msg.senderJid,
       from_me: msg.fromMe ? 1 : 0,
+      push_name: msg.pushName || null,
       content_text: msg.text || null,
       media_type: msg.mediaType || null,
       media_url: msg.mediaUrl || null,
@@ -57,42 +59,98 @@ export class MessageRepository {
     stmt.run(status, sessionId, messageId);
   }
 
-  public findByChat(sessionId: string, chatJid: string, limit = 100, offset = 0): MessageRecord[] {
+  public findByMessageId(sessionId: string, messageId: string): MessageRecord | undefined {
+    const stmt = this.db.prepare('SELECT * FROM messages WHERE session_id = ? AND message_id = ?');
+    return stmt.get(sessionId, messageId) as MessageRecord | undefined;
+  }
+
+  public findByChat(sessionId: string, chatJid: string | string[], limit = 100, offset = 0): MessageRecord[] {
+    const jids = Array.isArray(chatJid) ? chatJid : [chatJid];
+    const placeholders = jids.map(() => '?').join(',');
     const stmt = this.db.prepare(`
       SELECT * FROM (
         SELECT * FROM messages
-        WHERE session_id = ? AND chat_jid = ?
+        WHERE session_id = ? AND chat_jid IN (${placeholders})
         ORDER BY timestamp DESC
         LIMIT ? OFFSET ?
       ) ORDER BY timestamp ASC
     `);
-    return stmt.all(sessionId, chatJid, limit, offset) as MessageRecord[];
+    return stmt.all(sessionId, ...jids, limit, offset) as MessageRecord[];
   }
 
   public findRecentChats(sessionId: string, limit = 50): Array<{
     chat_jid: string;
     last_message: string;
+    last_from_me: number;
+    last_status: string;
     timestamp: number;
     name?: string;
     push_name?: string;
     unread_count?: number;
   }> {
     const stmt = this.db.prepare(`
+      WITH RankedMessages AS (
+        SELECT 
+          m.*,
+          ROW_NUMBER() OVER(PARTITION BY m.chat_jid ORDER BY m.timestamp DESC) as rn
+        FROM messages m
+        WHERE m.session_id = ? AND m.chat_jid != 'status@broadcast' AND m.chat_jid NOT LIKE '%@broadcast'
+      ),
+      ContactPushNames AS (
+        SELECT 
+          chat_jid,
+          push_name as peer_push_name,
+          ROW_NUMBER() OVER(PARTITION BY chat_jid ORDER BY timestamp DESC) as prn
+        FROM messages
+        WHERE session_id = ? AND from_me = 0 AND push_name IS NOT NULL AND TRIM(push_name) != ''
+      )
       SELECT 
-        m.chat_jid,
-        m.content_text as last_message,
-        MAX(m.timestamp) as timestamp,
-        c.name as name,
-        c.push_name as push_name,
-        SUM(CASE WHEN m.from_me = 0 AND m.status != 'READ' THEN 1 ELSE 0 END) as unread_count
-      FROM messages m
-      LEFT JOIN contacts c ON c.session_id = m.session_id AND c.jid = m.chat_jid
-      WHERE m.session_id = ?
-      GROUP BY m.chat_jid
-      ORDER BY timestamp DESC
+        rm.chat_jid,
+        COALESCE(
+          rm.content_text,
+          rm.caption,
+          CASE 
+            WHEN rm.media_type = 'image' THEN '📷 Foto'
+            WHEN rm.media_type = 'video' THEN '🎥 Video'
+            WHEN rm.media_type = 'audio' THEN '🎵 Pesan suara'
+            WHEN rm.media_type = 'document' THEN '📄 Dokumen'
+            WHEN rm.media_type = 'sticker' THEN 'Stiker'
+            ELSE 'Pesan'
+          END
+        ) as last_message,
+        rm.from_me as last_from_me,
+        rm.status as last_status,
+        rm.timestamp as timestamp,
+        COALESCE(
+          g.name,
+          c.name,
+          c.push_name,
+          CASE WHEN rm.chat_jid NOT LIKE '%@g.us' THEN cpn.peer_push_name ELSE NULL END
+        ) as name,
+        CASE 
+          WHEN rm.chat_jid LIKE '%@g.us' THEN NULL 
+          ELSE COALESCE(c.push_name, cpn.peer_push_name) 
+        END as push_name,
+        COALESCE(unreads.unread_count, 0) as unread_count
+      FROM RankedMessages rm
+      LEFT JOIN contacts c ON c.session_id = rm.session_id AND c.jid = rm.chat_jid
+      LEFT JOIN groups g ON g.session_id = rm.session_id AND g.jid = rm.chat_jid
+      LEFT JOIN (
+        SELECT chat_jid, peer_push_name
+        FROM ContactPushNames
+        WHERE prn = 1
+      ) cpn ON cpn.chat_jid = rm.chat_jid
+      LEFT JOIN (
+        SELECT chat_jid, COUNT(*) as unread_count
+        FROM messages
+        WHERE session_id = ? AND from_me = 0 AND status != 'READ'
+        GROUP BY chat_jid
+      ) unreads ON unreads.chat_jid = rm.chat_jid
+      WHERE rm.rn = 1
+      ORDER BY rm.timestamp DESC
       LIMIT ?
     `);
-    return stmt.all(sessionId, limit) as any;
+    return stmt.all(sessionId, sessionId, sessionId, limit) as any;
   }
 }
 

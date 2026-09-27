@@ -64,6 +64,17 @@ sessionRouter.post('/:id/disconnect', async (req: Request, res: Response, next: 
   }
 });
 
+// POST /api/v1/sessions/:id/logout - Log out from WhatsApp
+sessionRouter.post('/:id/logout', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = String(req.params.id);
+    await sessionManager.logoutSession(id);
+    res.json({ success: true, message: 'Session logged out' });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // DELETE /api/v1/sessions/:id - Delete session completely
 sessionRouter.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -71,6 +82,88 @@ sessionRouter.delete('/:id', async (req: Request, res: Response, next: NextFunct
     await sessionManager.deleteSession(id);
     sessionRepository.delete(id);
     res.json({ success: true, message: 'Session deleted' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/v1/sessions/:id/avatar - Direct image stream or redirect
+sessionRouter.get('/:id/avatar', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const sessionId = String(req.params.id);
+    const jid = req.query.jid ? String(req.query.jid) : undefined;
+    const forceRefresh = req.query.refresh === 'true' || req.query.refresh === '1';
+    const url = await sessionManager.getProfilePictureUrl(sessionId, jid, forceRefresh);
+
+    if (!url) {
+      res.status(404).json({ success: false, message: 'Avatar not found' });
+      return;
+    }
+
+    try {
+      const imgRes = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
+        }
+      });
+      if (imgRes.ok) {
+        const buffer = Buffer.from(await imgRes.arrayBuffer());
+        const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        res.send(buffer);
+        return;
+      }
+    } catch {
+      // fallback to redirect
+    }
+
+    res.redirect(url);
+  } catch (err) {
+    res.status(404).json({ success: false, message: 'Avatar not found' });
+  }
+});
+
+// GET /api/v1/sessions/:id/profile-picture - Get avatar URL JSON
+sessionRouter.get('/:id/profile-picture', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const sessionId = String(req.params.id);
+    const jid = req.query.jid ? String(req.query.jid) : undefined;
+    const forceRefresh = req.query.refresh === 'true' || req.query.refresh === '1';
+    const url = await sessionManager.getProfilePictureUrl(sessionId, jid, forceRefresh);
+    res.json({ success: true, data: { url } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/v1/sessions/:id/profile-picture/batch - Get avatar URLs in batch
+sessionRouter.post('/:id/profile-picture/batch', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const sessionId = String(req.params.id);
+    const { jids } = req.body;
+    if (!Array.isArray(jids)) {
+      res.status(400).json({ success: false, message: 'jids array required' });
+      return;
+    }
+
+    const session = sessionManager.getSession(sessionId);
+    const result: Record<string, string | null> = {};
+
+    await Promise.all(
+      jids.map(async (j: string) => {
+        if (typeof j === 'string') {
+          try {
+            result[j] = session.getProfilePictureUrl ? await session.getProfilePictureUrl(j) : null;
+          } catch {
+            result[j] = null;
+          }
+        }
+      })
+    );
+
+    res.json({ success: true, data: result });
   } catch (err) {
     next(err);
   }

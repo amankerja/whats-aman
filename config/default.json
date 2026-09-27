@@ -13,7 +13,7 @@
     "exportsDir": "./data/exports"
   },
   "whatsapp": {
-    "defaultBrowser": ["WhatsApp Local Hub", "Desktop", "1.0.0"],
+    "defaultBrowser": ["WhatsAman", "Desktop", "1.0.0"],
     "syncFullHistory": false,
     "qrCodeTimeoutMs": 60000,
     "reconnectMaxRetries": 5

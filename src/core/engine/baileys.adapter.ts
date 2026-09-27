@@ -18,11 +18,16 @@ import {
   SessionMetadata,
   SendTextOptions,
   SendMediaOptions,
+  SendLocationOptions,
+  SendContactOptions,
+  SendPollOptions,
   ContactInfo,
   GroupInfo
 } from './engine.interface';
 import { ConnectionStatus, NormalizedMessage } from '../events/event.types';
 import { eventBus } from '../events/event-bus';
+import { contactRepository } from '../database/repositories/contact.repository';
+import { sessionRepository } from '../database/repositories/session.repository';
 import { logger } from '../../utils/logger';
 import { config } from '../../config';
 import { EngineError, NotFoundError } from '../../utils/errors';
@@ -42,6 +47,7 @@ export class BaileysAdapter implements IWhatsAppEngine {
 
   private authPath: string;
   private metaPath: string;
+  private profilePicCache: Map<string, { url: string | null; timestamp: number }> = new Map();
 
   constructor(sessionId: string, sessionName?: string) {
     this.sessionId = sessionId;
@@ -102,6 +108,14 @@ export class BaileysAdapter implements IWhatsAppEngine {
 
   public async connect(options?: { usePairingCode?: boolean; phoneNumber?: string }): Promise<void> {
     this.isExplicitDisconnect = false;
+    if (this.socket) {
+      try {
+        this.socket.end(undefined);
+      } catch (err) {
+        // ignore
+      }
+      this.socket = null;
+    }
     this.updateStatus('CONNECTING');
 
     try {
@@ -121,6 +135,45 @@ export class BaileysAdapter implements IWhatsAppEngine {
 
       // Save credentials whenever updated
       this.socket.ev.on('creds.update', saveCreds);
+
+      // Handle WhatsApp Phonebook Contact Sync
+      this.socket.ev.on('contacts.upsert', (newContacts) => {
+        for (const c of newContacts) {
+          if (!c.id) continue;
+          if (c.id.endsWith('@s.whatsapp.net') || c.id.endsWith('@c.us')) {
+            const phone = c.id.split('@')[0];
+            const name = c.name || c.notify || c.verifiedName;
+            if (/^\d{7,16}$/.test(phone)) {
+              contactRepository.upsert({
+                sessionId: this.sessionId,
+                jid: c.id,
+                phone,
+                name: name || undefined,
+                pushName: c.notify || undefined
+              });
+            }
+          }
+        }
+      });
+
+      this.socket.ev.on('contacts.update', (updatedContacts) => {
+        for (const c of updatedContacts) {
+          if (!c.id) continue;
+          if (c.id.endsWith('@s.whatsapp.net') || c.id.endsWith('@c.us')) {
+            const phone = c.id.split('@')[0];
+            const name = c.name || c.notify || c.verifiedName;
+            if (/^\d{7,16}$/.test(phone)) {
+              contactRepository.upsert({
+                sessionId: this.sessionId,
+                jid: c.id,
+                phone,
+                name: name || undefined,
+                pushName: c.notify || undefined
+              });
+            }
+          }
+        }
+      });
 
       // Handle Pairing Code if requested
       if (options?.usePairingCode && options.phoneNumber && !this.socket.authState.creds.registered) {
@@ -211,6 +264,57 @@ export class BaileysAdapter implements IWhatsAppEngine {
         }
       });
 
+      // Sync contacts received from WhatsApp
+      this.socket.ev.on('contacts.upsert', (contacts) => {
+        for (const contact of contacts) {
+          if (!contact.id) continue;
+          let phone: string | undefined = undefined;
+          if (contact.id.endsWith('@s.whatsapp.net') || contact.id.endsWith('@c.us')) {
+            phone = contact.id.split('@')[0];
+          } else if (contact.id.endsWith('@lid')) {
+            phone = this.resolveLidToPhone(contact.id);
+          }
+          if (phone && /^\d{7,16}$/.test(phone)) {
+            contactRepository.upsert({
+              sessionId: this.sessionId,
+              jid: `${phone}@s.whatsapp.net`,
+              name: contact.name || contact.notify || undefined,
+              pushName: contact.notify || undefined,
+              phone
+            });
+          }
+        }
+      });
+
+      // Handle Incoming Messages & Sync History
+      this.socket.ev.on('messaging-history.set', async (history) => {
+        logger.info({ sessionId: this.sessionId, chatsCount: history.chats?.length, msgsCount: history.messages?.length }, 'Syncing messaging history from WhatsApp');
+        if (history.messages) {
+          for (const msg of history.messages) {
+            if (!msg.message) continue;
+            const normalized = await this.normalizeMessage(msg);
+            if (normalized) {
+              eventBus.emit('message.received', { sessionId: this.sessionId, message: normalized });
+            }
+          }
+        }
+        if (history.contacts) {
+          for (const c of history.contacts) {
+            if (!c.id) continue;
+            const phone = c.id.split('@')[0];
+            if (/^\d{7,16}$/.test(phone)) {
+              contactRepository.upsert({
+                sessionId: this.sessionId,
+                jid: c.id,
+                name: c.name || undefined,
+                pushName: c.notify || undefined,
+                phone
+              });
+            }
+          }
+        }
+      });
+
       // Handle Incoming Messages
       this.socket.ev.on('messages.upsert', async (m) => {
         if (m.type !== 'notify') return;
@@ -218,7 +322,7 @@ export class BaileysAdapter implements IWhatsAppEngine {
         for (const msg of m.messages) {
           if (!msg.message) continue;
 
-          const normalized = this.normalizeMessage(msg);
+          const normalized = await this.normalizeMessage(msg);
           if (normalized) {
             eventBus.emit('message.received', { sessionId: this.sessionId, message: normalized });
           }
@@ -308,7 +412,7 @@ export class BaileysAdapter implements IWhatsAppEngine {
       throw new EngineError('Failed to send text message');
     }
 
-    const normalized = this.normalizeMessage(sent);
+    const normalized = await this.normalizeMessage(sent);
     eventBus.emit('message.sent', { sessionId: this.sessionId, message: normalized });
     return normalized;
   }
@@ -327,10 +431,18 @@ export class BaileysAdapter implements IWhatsAppEngine {
 
     let buffer: Buffer;
     if (typeof mediaPathOrBuffer === 'string') {
-      if (!fs.existsSync(mediaPathOrBuffer)) {
-        throw new NotFoundError(`Media file not found at: ${mediaPathOrBuffer}`);
+      if (mediaPathOrBuffer.startsWith('http://') || mediaPathOrBuffer.startsWith('https://')) {
+        const res = await fetch(mediaPathOrBuffer);
+        if (!res.ok) {
+          throw new EngineError(`Failed to fetch media from URL: ${res.statusText}`);
+        }
+        buffer = Buffer.from(await res.arrayBuffer());
+      } else {
+        if (!fs.existsSync(mediaPathOrBuffer)) {
+          throw new NotFoundError(`Media file not found at: ${mediaPathOrBuffer}`);
+        }
+        buffer = fs.readFileSync(mediaPathOrBuffer);
       }
-      buffer = fs.readFileSync(mediaPathOrBuffer);
     } else {
       buffer = mediaPathOrBuffer;
     }
@@ -368,9 +480,148 @@ export class BaileysAdapter implements IWhatsAppEngine {
       throw new EngineError('Failed to send media message');
     }
 
-    const normalized = this.normalizeMessage(sent);
+    const sentId = sent.key.id || `${Date.now()}`;
+    let ext = 'bin';
+    if (options.type === 'image') ext = 'jpg';
+    else if (options.type === 'video') ext = 'mp4';
+    else if (options.type === 'audio') ext = 'ogg';
+    else if (options.type === 'sticker') ext = 'webp';
+    else if (options.fileName?.includes('.')) ext = options.fileName.split('.').pop() || 'bin';
+
+    const mediaFileName = `${sentId}.${ext}`;
+    const filePath = path.join(config.storage.mediaDir, mediaFileName);
+    try {
+      if (!fs.existsSync(filePath)) {
+        fs.writeFileSync(filePath, buffer);
+      }
+    } catch {
+      // ignore
+    }
+
+    const normalized = await this.normalizeMessage(sent);
+    normalized.mediaUrl = `/media/${mediaFileName}`;
     eventBus.emit('message.sent', { sessionId: this.sessionId, message: normalized });
     return normalized;
+  }
+
+  public async sendLocation(
+    to: string,
+    latitude: number,
+    longitude: number,
+    options?: { name?: string; address?: string }
+  ): Promise<NormalizedMessage> {
+    if (!this.socket || this.status !== 'CONNECTED') {
+      throw new EngineError(`Session ${this.sessionId} is not connected`);
+    }
+
+    const jid = this.formatJid(to);
+    const sent = await this.socket.sendMessage(jid, {
+      location: {
+        degreesLatitude: latitude,
+        degreesLongitude: longitude,
+        name: options?.name,
+        address: options?.address
+      }
+    });
+
+    if (!sent) {
+      throw new EngineError('Failed to send location message');
+    }
+
+    const normalized = await this.normalizeMessage(sent);
+    normalized.mediaType = 'location';
+    eventBus.emit('message.sent', { sessionId: this.sessionId, message: normalized });
+    return normalized;
+  }
+
+  public async sendContact(
+    to: string,
+    contact: { name: string; phone: string; organization?: string },
+    options?: SendContactOptions
+  ): Promise<NormalizedMessage> {
+    if (!this.socket || this.status !== 'CONNECTED') {
+      throw new EngineError(`Session ${this.sessionId} is not connected`);
+    }
+
+    const jid = this.formatJid(to);
+    const cleanPhone = contact.phone.replace(/[^0-9]/g, '');
+    const orgLine = contact.organization ? `ORG:${contact.organization};\n` : '';
+    const vcard =
+      'BEGIN:VCARD\n' +
+      'VERSION:3.0\n' +
+      `FN:${contact.name}\n` +
+      orgLine +
+      `TEL;type=CELL;type=VOICE;waid=${cleanPhone}:${contact.phone}\n` +
+      'END:VCARD';
+
+    const sent = await this.socket.sendMessage(
+      jid,
+      {
+        contacts: {
+          displayName: contact.name,
+          contacts: [{ vcard }]
+        }
+      },
+      {
+        quoted: options?.quotedMessageId ? ({ key: { id: options.quotedMessageId } } as any) : undefined
+      }
+    );
+
+    if (!sent) {
+      throw new EngineError('Failed to send contact vCard');
+    }
+
+    const normalized = await this.normalizeMessage(sent);
+    normalized.mediaType = 'contact';
+    eventBus.emit('message.sent', { sessionId: this.sessionId, message: normalized });
+    return normalized;
+  }
+
+  public async sendPoll(
+    to: string,
+    poll: { name: string; values: string[]; selectableCount?: number },
+    options?: SendPollOptions
+  ): Promise<NormalizedMessage> {
+    if (!this.socket || this.status !== 'CONNECTED') {
+      throw new EngineError(`Session ${this.sessionId} is not connected`);
+    }
+
+    if (!poll.name || !poll.values || poll.values.length < 2) {
+      throw new EngineError('Poll must have a question (name) and at least 2 options (values)');
+    }
+
+    const jid = this.formatJid(to);
+    const sent = await this.socket.sendMessage(
+      jid,
+      {
+        poll: {
+          name: poll.name,
+          values: poll.values,
+          selectableCount: poll.selectableCount || 1
+        }
+      },
+      {
+        quoted: options?.quotedMessageId ? ({ key: { id: options.quotedMessageId } } as any) : undefined
+      }
+    );
+
+    if (!sent) {
+      throw new EngineError('Failed to send poll message');
+    }
+
+    const normalized = await this.normalizeMessage(sent);
+    eventBus.emit('message.sent', { sessionId: this.sessionId, message: normalized });
+    return normalized;
+  }
+
+  public async sendPresence(to: string, type: 'composing' | 'recording' | 'paused' | 'available' | 'unavailable' = 'composing'): Promise<void> {
+    if (!this.socket || this.status !== 'CONNECTED') return;
+    try {
+      const jid = this.formatJid(to);
+      await this.socket.sendPresenceUpdate(type as any, jid);
+    } catch (err: any) {
+      logger.debug({ sessionId: this.sessionId, to, type, err: err?.message }, 'Presence update skipped/failed');
+    }
   }
 
   public async getContacts(): Promise<ContactInfo[]> {
@@ -427,9 +678,34 @@ export class BaileysAdapter implements IWhatsAppEngine {
     }
   }
 
+  public resolveLidToPhone(lid: string): string | undefined {
+    if (!lid) return undefined;
+    const cleanLid = lid.replace('@lid', '').trim();
+    const filePath = path.join(this.authPath, `lid-mapping-${cleanLid}_reverse.json`);
+    if (fs.existsSync(filePath)) {
+      try {
+        const raw = fs.readFileSync(filePath, 'utf-8');
+        const phone = JSON.parse(raw);
+        if (typeof phone === 'string' && phone.length > 5) return phone;
+      } catch {
+        // ignore
+      }
+    }
+    return undefined;
+  }
+
   private updateStatus(newStatus: ConnectionStatus): void {
     this.status = newStatus;
     this.saveMetadata();
+    sessionRepository.upsert({
+      id: this.sessionId,
+      name: this.sessionName,
+      status: newStatus,
+      phone_number: this.phoneNumber,
+      qr_code: this.qrCode,
+      pairing_code: this.pairingCode,
+      last_connected_at: this.lastConnectedAt
+    });
     eventBus.emit('session.status', { sessionId: this.sessionId, status: newStatus });
   }
 
@@ -439,11 +715,28 @@ export class BaileysAdapter implements IWhatsAppEngine {
     return `${clean}@s.whatsapp.net`;
   }
 
-  private normalizeMessage(msg: WAMessage): NormalizedMessage {
-    const content = msg.message;
+  private async normalizeMessage(msg: WAMessage): Promise<NormalizedMessage> {
+    let content: any = msg.message;
+
+    // Unwrap ephemeral, view-once, and wrapped messages
+    while (
+      content?.ephemeralMessage?.message ||
+      content?.viewOnceMessage?.message ||
+      content?.viewOnceMessageV2?.message ||
+      content?.documentWithCaptionMessage?.message
+    ) {
+      content =
+        content.ephemeralMessage?.message ||
+        content.viewOnceMessage?.message ||
+        content.viewOnceMessageV2?.message ||
+        content.documentWithCaptionMessage?.message;
+    }
+
     let text: string | undefined;
     let mediaType: NormalizedMessage['mediaType'];
     let caption: string | undefined;
+    let mediaUrl: string | undefined;
+    let ext = 'bin';
 
     if (content?.conversation) {
       text = content.conversation;
@@ -452,14 +745,61 @@ export class BaileysAdapter implements IWhatsAppEngine {
     } else if (content?.imageMessage) {
       mediaType = 'image';
       caption = content.imageMessage.caption || undefined;
+      ext = 'jpg';
     } else if (content?.videoMessage) {
       mediaType = 'video';
       caption = content.videoMessage.caption || undefined;
+      ext = 'mp4';
     } else if (content?.audioMessage) {
       mediaType = 'audio';
+      ext = content.audioMessage.ptt ? 'ogg' : 'mp3';
     } else if (content?.documentMessage) {
       mediaType = 'document';
-      caption = content.documentMessage.caption || undefined;
+      caption = content.documentMessage.caption || content.documentMessage.fileName || undefined;
+      const fileName = content.documentMessage.fileName || '';
+      ext = fileName.includes('.') ? fileName.split('.').pop() || 'pdf' : 'pdf';
+    } else if (content?.stickerMessage) {
+      mediaType = 'sticker';
+      ext = 'webp';
+    } else if (content?.buttonsResponseMessage?.selectedDisplayText) {
+      text = content.buttonsResponseMessage.selectedDisplayText;
+    } else if (content?.templateButtonReplyMessage?.selectedDisplayText) {
+      text = content.templateButtonReplyMessage.selectedDisplayText;
+    } else if (content?.locationMessage) {
+      mediaType = 'location';
+      const locName = [content.locationMessage.name, content.locationMessage.address].filter(Boolean).join(', ');
+      text = locName ? `📍 Lokasi: ${locName}` : `📍 Lokasi (${content.locationMessage.degreesLatitude}, ${content.locationMessage.degreesLongitude})`;
+    } else if (content?.contactMessage?.displayName) {
+      text = `👤 Kontak: ${content.contactMessage.displayName}`;
+    }
+
+    const msgId = msg.key.id || `${Date.now()}`;
+
+    // Download media buffer if media message and socket available
+    if (mediaType && this.socket) {
+      try {
+        const mediaFileName = `${msgId}.${ext}`;
+        const filePath = path.join(config.storage.mediaDir, mediaFileName);
+        if (!fs.existsSync(filePath)) {
+          const buffer = await downloadMediaMessage(
+            msg,
+            'buffer',
+            {},
+            {
+              logger: pino({ level: 'silent' }),
+              reuploadRequest: this.socket.updateMediaMessage
+            }
+          );
+          if (buffer && buffer.length > 0) {
+            fs.writeFileSync(filePath, buffer);
+            mediaUrl = `/media/${mediaFileName}`;
+          }
+        } else {
+          mediaUrl = `/media/${mediaFileName}`;
+        }
+      } catch (err: any) {
+        logger.warn({ sessionId: this.sessionId, msgId, err: err?.message || 'Download failed' }, 'Failed to download incoming media');
+      }
     }
 
     const timestamp = typeof msg.messageTimestamp === 'number'
@@ -467,7 +807,7 @@ export class BaileysAdapter implements IWhatsAppEngine {
       : Date.now();
 
     return {
-      id: msg.key.id || `${Date.now()}`,
+      id: msgId,
       sessionId: this.sessionId,
       chatJid: msg.key.remoteJid || '',
       senderJid: msg.key.participant || msg.key.remoteJid || '',
@@ -475,9 +815,108 @@ export class BaileysAdapter implements IWhatsAppEngine {
       pushName: msg.pushName || undefined,
       text,
       mediaType,
+      mediaUrl,
       caption,
       timestamp
     };
+  }
+
+  public async getProfilePictureUrl(targetJid?: string, forceRefresh = false): Promise<string | null> {
+    if (!this.socket) {
+      return null;
+    }
+
+    try {
+      let jid = targetJid?.trim();
+      if (!jid) {
+        jid = this.socket.user?.id;
+      }
+      if (!jid) return null;
+
+      // Clean device ID if present (e.g. 628123:4@s.whatsapp.net -> 628123@s.whatsapp.net)
+      if (jid.includes(':') && jid.includes('@')) {
+        jid = jid.replace(/:[0-9]+@/, '@');
+      }
+
+      // Handle pure phone numbers
+      if (/^\+?\d+$/.test(jid)) {
+        jid = `${jid.replace('+', '')}@s.whatsapp.net`;
+      }
+
+      // Check cache first
+      if (!forceRefresh) {
+        const cached = this.profilePicCache.get(jid);
+        if (cached) {
+          // If we found a valid URL, cache for 15 minutes
+          if (cached.url && Date.now() - cached.timestamp < 15 * 60 * 1000) {
+            return cached.url;
+          }
+          // If previous attempt returned null, throttle for only 15 seconds before retrying
+          if (!cached.url && Date.now() - cached.timestamp < 15 * 1000) {
+            return null;
+          }
+        }
+      }
+
+      let url: string | undefined = undefined;
+
+      // 1. If Newsletter / Channel, fetch metadata from Baileys newsletterMetadata
+      if (jid.endsWith('@newsletter')) {
+        try {
+          const meta: any = await (this.socket as any).newsletterMetadata?.('jid', jid);
+          const directPath = meta?.thread_metadata?.picture?.direct_path || meta?.thread_metadata?.preview?.direct_path;
+          if (directPath) {
+            url = directPath.startsWith('http') ? directPath : `https://pps.whatsapp.net${directPath}`;
+          }
+        } catch {
+          // ignore and fall back to standard lookup
+        }
+      }
+
+      // 2. If LID, attempt resolution to phone number first
+      if (!url && jid.endsWith('@lid')) {
+        let resolvedPhone = this.resolveLidToPhone(jid);
+        if (!resolvedPhone) {
+          const cleanLid = jid.replace('@lid', '').trim();
+          const contact = contactRepository.findByJid(this.sessionId, jid) || contactRepository.findByPhone(this.sessionId, cleanLid);
+          if (contact?.phone) {
+            resolvedPhone = contact.phone;
+          }
+        }
+
+        if (resolvedPhone) {
+          const phoneJid = `${resolvedPhone}@s.whatsapp.net`;
+          try {
+            url = await this.socket.profilePictureUrl(phoneJid, 'image');
+          } catch {
+            try {
+              url = await this.socket.profilePictureUrl(phoneJid, 'preview');
+            } catch {
+              // ignore
+            }
+          }
+        }
+      }
+
+      // 3. Query direct JID (handles groups @g.us, contacts @s.whatsapp.net, or direct LIDs)
+      if (!url) {
+        try {
+          url = await this.socket.profilePictureUrl(jid, 'image');
+        } catch {
+          try {
+            url = await this.socket.profilePictureUrl(jid, 'preview');
+          } catch {
+            // no picture or blocked
+          }
+        }
+      }
+
+      const finalUrl = url || null;
+      this.profilePicCache.set(jid, { url: finalUrl, timestamp: Date.now() });
+      return finalUrl;
+    } catch {
+      return null;
+    }
   }
 
   private cleanupAuthFiles(): void {

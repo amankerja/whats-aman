@@ -77,7 +77,7 @@ export const config: AppConfig = {
     exportsDir
   },
   whatsapp: {
-    browser: ['WhatsApp Local Hub', 'Desktop', '1.0.0'],
+    browser: ['WhatsAman', 'Desktop', '1.0.0'],
     syncFullHistory: false,
     qrCodeTimeoutMs: 60000,
     reconnectMaxRetries: 5
