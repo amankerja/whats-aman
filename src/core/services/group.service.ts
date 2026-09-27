@@ -1,5 +1,6 @@
 import xlsx from 'xlsx';
 import { sessionManager } from '../engine/session.manager';
+import { contactRepository } from '../database/repositories/contact.repository';
 import { GroupInfo } from '../engine/engine.interface';
 import { logger } from '../../utils/logger';
 
@@ -30,6 +31,25 @@ export class GroupService {
 
     logger.info({ sessionId, groupJid, memberCount: rows.length }, 'Exported group members to Excel');
     return { buffer, groupName: group.name };
+  }
+
+  public async importGroupMembersToContacts(sessionId: string, groupJid: string): Promise<{ count: number; groupName: string }> {
+    const group = await this.getGroupMetadata(sessionId, groupJid);
+    let count = 0;
+    for (const p of group.participants) {
+      if (!p.phone || p.phone.length < 7) continue;
+      const cleanPhone = p.phone.replace(/[^0-9]/g, '');
+      contactRepository.upsert({
+        sessionId,
+        jid: `${cleanPhone}@s.whatsapp.net`,
+        phone: cleanPhone,
+        name: `Member ${group.name}`,
+        tags: ['Grup', group.name]
+      });
+      count++;
+    }
+    logger.info({ sessionId, groupJid, count }, 'Imported group members to contacts');
+    return { count, groupName: group.name };
   }
 }
 

@@ -69,6 +69,16 @@ export class CampaignService {
     logger.info({ campaignId }, 'Campaign paused');
   }
 
+  public deleteCampaign(campaignId: string): void {
+    this.activeLoops.set(campaignId, false);
+    campaignRepository.deleteCampaign(campaignId);
+    logger.info({ campaignId }, 'Campaign deleted');
+  }
+
+  public getRecipients(campaignId: string, limit = 100) {
+    return campaignRepository.getCampaignRecipients(campaignId, limit);
+  }
+
   private async runCampaignLoop(camp: CampaignRecord): Promise<void> {
     let sentInBatch = 0;
 

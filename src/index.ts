@@ -2,6 +2,7 @@ import { config } from './config';
 import { logger } from './utils/logger';
 import { initializeDatabaseSchema } from './core/database/schema';
 import { sessionManager } from './core/engine/session.manager';
+import { messageService } from './core/services/message.service';
 import { automationService } from './core/services/automation.service';
 import { createServer } from './api/server';
 import { closeDatabase } from './core/database/connection';
@@ -24,7 +25,10 @@ Swagger UI : http://${config.server.host}:${config.server.port}/docs
     // 1. Initialize SQLite Database Schema
     initializeDatabaseSchema();
 
-    // 2. Initialize Automation Rule Service
+    // 2. Initialize Message Persistence Service
+    messageService.initialize();
+
+    // 3. Initialize Automation Rule Service
     automationService.initialize();
 
     // 3. Initialize Session Manager (Scans stored sessions & auto-reconnects)

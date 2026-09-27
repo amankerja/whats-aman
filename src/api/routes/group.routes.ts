@@ -52,3 +52,23 @@ groupRouter.get('/:jid/export', async (req: Request, res: Response, next: NextFu
     next(err);
   }
 });
+
+// POST /api/v1/groups/:jid/import-to-contacts - Save all members directly into contacts table
+groupRouter.post('/:jid/import-to-contacts', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { sessionId } = req.body;
+    if (!sessionId) {
+      res.status(400).json({ success: false, message: 'sessionId is required' });
+      return;
+    }
+    const jid = String(req.params.jid);
+    const result = await groupService.importGroupMembersToContacts(String(sessionId), jid);
+    res.json({
+      success: true,
+      message: `Berhasil menyimpan ${result.count} nomor anggota grup "${result.groupName}" ke Kontak`,
+      count: result.count
+    });
+  } catch (err) {
+    next(err);
+  }
+});

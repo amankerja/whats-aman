@@ -84,3 +84,26 @@ campaignRouter.post('/:id/pause', (req: Request, res: Response, next: NextFuncti
     next(err);
   }
 });
+
+// GET /api/v1/campaigns/:id/recipients - Get recipients list with statuses
+campaignRouter.get('/:id/recipients', (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = String(req.params.id);
+    const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 100;
+    const recipients = campaignService.getRecipients(id, limit);
+    res.json({ success: true, data: recipients });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// DELETE /api/v1/campaigns/:id - Delete campaign
+campaignRouter.delete('/:id', (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = String(req.params.id);
+    campaignService.deleteCampaign(id);
+    res.json({ success: true, message: 'Campaign deleted' });
+  } catch (err) {
+    next(err);
+  }
+});

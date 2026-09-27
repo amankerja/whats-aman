@@ -1,5 +1,7 @@
 import { sessionManager } from '../engine/session.manager';
 import { messageRepository } from '../database/repositories/message.repository';
+import { contactRepository } from '../database/repositories/contact.repository';
+import { eventBus } from '../events/event-bus';
 import { NormalizedMessage } from '../events/event.types';
 import { ValidationError, NotFoundError } from '../../utils/errors';
 import { logger } from '../../utils/logger';
@@ -24,6 +26,35 @@ export interface SendMediaMessageDto {
 }
 
 export class MessageService {
+  private isInitialized = false;
+
+  public initialize(): void {
+    if (this.isInitialized) return;
+
+    // Automatically persist all incoming messages to SQLite
+    eventBus.on('message.received', ({ sessionId, message }) => {
+      messageRepository.save(message, 'DELIVERED');
+
+      // Auto-save/update contact in SQLite
+      if (!message.fromMe && message.senderJid) {
+        const cleanPhone = message.senderJid.replace(/[^0-9]/g, '');
+        contactRepository.upsert({
+          sessionId,
+          jid: message.chatJid,
+          phone: cleanPhone,
+          pushName: message.pushName
+        });
+      }
+    });
+
+    // Automatically update message status on receipts (SENT, DELIVERED, READ)
+    eventBus.on('message.ack', ({ sessionId, messageId, status }) => {
+      messageRepository.updateStatus(sessionId, messageId, status);
+    });
+
+    this.isInitialized = true;
+    logger.info('Message Service event persistence listener initialized');
+  }
   public async sendText(dto: SendTextMessageDto): Promise<NormalizedMessage> {
     if (!dto.to || !dto.text?.trim()) {
       throw new ValidationError('Recipient (to) and text message are required');

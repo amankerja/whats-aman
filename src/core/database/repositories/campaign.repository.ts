@@ -169,6 +169,25 @@ export class CampaignRepository {
       this.db.prepare('UPDATE campaigns SET failed_count = failed_count + 1 WHERE id = (SELECT campaign_id FROM campaign_recipients WHERE id = ?)').run(id);
     }
   }
+
+  public getCampaignRecipients(campaignId: string, limit = 100): CampaignRecipientRecord[] {
+    const stmt = this.db.prepare(`
+      SELECT * FROM campaign_recipients
+      WHERE campaign_id = ?
+      ORDER BY rowid ASC
+      LIMIT ?
+    `);
+    const rows = stmt.all(campaignId, limit) as any[];
+    return rows.map((r) => ({
+      ...r,
+      variables: JSON.parse(r.variables || '{}')
+    }));
+  }
+
+  public deleteCampaign(id: string): void {
+    this.db.prepare('DELETE FROM campaign_recipients WHERE campaign_id = ?').run(id);
+    this.db.prepare('DELETE FROM campaigns WHERE id = ?').run(id);
+  }
 }
 
 export const campaignRepository = new CampaignRepository();

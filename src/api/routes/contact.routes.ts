@@ -57,6 +57,22 @@ contactRouter.post('/opt-out', (req: Request, res: Response, next: NextFunction)
   }
 });
 
+// DELETE /api/v1/contacts/:phone - Delete contact
+contactRouter.delete('/:phone', (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { sessionId } = req.query;
+    const phone = req.params.phone;
+    if (!sessionId) {
+      res.status(400).json({ success: false, message: 'sessionId is required' });
+      return;
+    }
+    contactService.deleteContact(String(sessionId), String(phone));
+    res.json({ success: true, message: 'Contact deleted' });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST /api/v1/contacts/import - Import contacts from Excel / CSV
 contactRouter.post('/import', upload.single('file'), (req: Request, res: Response, next: NextFunction) => {
   try {

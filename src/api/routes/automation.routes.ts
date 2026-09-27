@@ -34,6 +34,29 @@ automationRouter.post('/', (req: Request, res: Response, next: NextFunction) => 
   }
 });
 
+// PUT /api/v1/automation/:id/toggle - Toggle rule active status
+automationRouter.put('/:id/toggle', (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const rule = automationRepository.findAll().find((r) => r.id === id);
+  if (!rule) {
+    res.status(404).json({ success: false, message: 'Rule not found' });
+    return;
+  }
+  automationRepository.upsert({
+    id: rule.id,
+    sessionId: rule.session_id,
+    name: rule.name,
+    conditions: rule.conditions,
+    actions: rule.actions,
+    isActive: !rule.is_active
+  });
+  res.json({
+    success: true,
+    message: `Rule ${!rule.is_active ? 'diaktifkan' : 'dinonaktifkan'}`,
+    isActive: !rule.is_active
+  });
+});
+
 // DELETE /api/v1/automation/:id - Delete rule
 automationRouter.delete('/:id', (req: Request, res: Response) => {
   const id = String(req.params.id);

@@ -103,6 +103,12 @@ export class ContactRepository {
       opt_out: Boolean(row.opt_out)
     };
   }
+
+  public delete(sessionId: string, phone: string): void {
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    const stmt = this.db.prepare('DELETE FROM contacts WHERE session_id = ? AND phone = ?');
+    stmt.run(sessionId, cleanPhone);
+  }
 }
 
 export const contactRepository = new ContactRepository();

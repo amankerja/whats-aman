@@ -41,6 +41,10 @@ export class ContactService {
     });
   }
 
+  public deleteContact(sessionId: string, phone: string): void {
+    contactRepository.delete(sessionId, phone);
+  }
+
   public importFromBuffer(sessionId: string, buffer: Buffer, filename: string): number {
     const workbook = xlsx.read(buffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];

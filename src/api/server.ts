@@ -54,11 +54,11 @@ export function createServer(): { app: express.Application; server: http.Server 
     next();
   });
 
-  // Health and Status Endpoints (PRD Section 20)
-  app.get('/api/v1/health', (req: Request, res: Response) => {
+  // Health and Status Endpoints (PRD Section 20 - Support both root and /api/v1 paths)
+  app.get(['/health', '/api/v1/health'], (req: Request, res: Response) => {
     res.json({ success: true, status: 'ok', timestamp: Date.now() });
   });
-  app.get('/api/v1/status', (req: Request, res: Response) => {
+  app.get(['/status', '/api/v1/status'], (req: Request, res: Response) => {
     res.redirect('/api/v1/system/status');
   });
 
@@ -76,7 +76,14 @@ export function createServer(): { app: express.Application; server: http.Server 
   if (fs.existsSync(uiDistPath)) {
     app.use(express.static(uiDistPath));
     app.use((req, res, next) => {
-      if (req.method !== 'GET' || req.path.startsWith('/api') || req.path.startsWith('/docs') || req.path.startsWith('/media')) {
+      if (
+        req.method !== 'GET' ||
+        req.path.startsWith('/api') ||
+        req.path.startsWith('/docs') ||
+        req.path.startsWith('/media') ||
+        req.path === '/health' ||
+        req.path === '/status'
+      ) {
         return next();
       }
       res.sendFile(path.join(uiDistPath, 'index.html'));

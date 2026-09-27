@@ -57,22 +57,38 @@ export class MessageRepository {
     stmt.run(status, sessionId, messageId);
   }
 
-  public findByChat(sessionId: string, chatJid: string, limit = 50, offset = 0): MessageRecord[] {
+  public findByChat(sessionId: string, chatJid: string, limit = 100, offset = 0): MessageRecord[] {
     const stmt = this.db.prepare(`
-      SELECT * FROM messages
-      WHERE session_id = ? AND chat_jid = ?
-      ORDER BY timestamp DESC
-      LIMIT ? OFFSET ?
+      SELECT * FROM (
+        SELECT * FROM messages
+        WHERE session_id = ? AND chat_jid = ?
+        ORDER BY timestamp DESC
+        LIMIT ? OFFSET ?
+      ) ORDER BY timestamp ASC
     `);
     return stmt.all(sessionId, chatJid, limit, offset) as MessageRecord[];
   }
 
-  public findRecentChats(sessionId: string, limit = 50): Array<{ chat_jid: string; last_message: string; timestamp: number }> {
+  public findRecentChats(sessionId: string, limit = 50): Array<{
+    chat_jid: string;
+    last_message: string;
+    timestamp: number;
+    name?: string;
+    push_name?: string;
+    unread_count?: number;
+  }> {
     const stmt = this.db.prepare(`
-      SELECT chat_jid, content_text as last_message, MAX(timestamp) as timestamp
-      FROM messages
-      WHERE session_id = ?
-      GROUP BY chat_jid
+      SELECT 
+        m.chat_jid,
+        m.content_text as last_message,
+        MAX(m.timestamp) as timestamp,
+        c.name as name,
+        c.push_name as push_name,
+        SUM(CASE WHEN m.from_me = 0 AND m.status != 'READ' THEN 1 ELSE 0 END) as unread_count
+      FROM messages m
+      LEFT JOIN contacts c ON c.session_id = m.session_id AND c.jid = m.chat_jid
+      WHERE m.session_id = ?
+      GROUP BY m.chat_jid
       ORDER BY timestamp DESC
       LIMIT ?
     `);

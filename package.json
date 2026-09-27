@@ -4,13 +4,13 @@
   "description": "Portable WhatsApp Automation & Management Platform",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "concurrently -n \"CORE,UI\" -c \"cyan,green\" \"npm run dev:backend\" \"npm run dev:ui\"",
+    "dev:backend": "tsx watch src/index.ts",
+    "dev:ui": "npm --prefix ui run dev",
+    "dev:tauri": "tauri dev",
     "build": "tsc",
     "start": "node dist/index.js",
-    "ui:dev": "npm --prefix ui run dev",
     "ui:build": "npm --prefix ui run build",
-    "tauri": "tauri",
-    "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"
   },
   "keywords": [],
@@ -43,6 +43,7 @@
     "@types/qrcode": "^1.5.6",
     "@types/swagger-ui-express": "^4.1.8",
     "@types/ws": "^8.18.1",
+    "concurrently": "^10.0.5",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   }
