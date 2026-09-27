@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+ui/node_modules/
+
+# Build outputs
+dist/
+ui/dist/
+
+# Local sensitive runtime data
+data/sessions/*/auth/
+data/database.sqlite-shm
+data/database.sqlite-wal
+logs/
+*.log
+
+# Environment
+.env
+.env.local

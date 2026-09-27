@@ -1,0 +1,1422 @@
+PRODUCT REQUIREMENTS DOCUMENT (PRD)
+WhatsApp Local Hub
+Codename: WAHub
+Version: 1.0
+Status: Product Definition
+Target Platform: Windows Desktop / Portable
+Date: 2026-09-27
+
+============================================================
+1. PRODUCT VISION
+============================================================
+
+WhatsApp Local Hub adalah aplikasi desktop/portable local-first
+untuk mengelola satu atau beberapa akun WhatsApp dari satu
+dashboard.
+
+Konsep produk menggabungkan:
+- Baileys: WhatsApp connectivity/core engine
+- WAHA: API, session management, webhook, OpenAPI concepts
+- OpenWA: automation dan utility concepts
+
+Ketiga proyek tidak dijalankan sebagai tiga server terpisah.
+Produk menggunakan satu Application Core dengan Baileys sebagai
+WhatsApp engine.
+
+Arsitektur tingkat tinggi:
+
+Desktop UI
+    |
+    v
+Application Core
+    |
+    +--> Session Manager
+    +--> Message Service
+    +--> Contact Service
+    +--> Campaign Engine
+    +--> Automation Engine
+    +--> Webhook/Event Bus
+    +--> REST API
+    |
+    +--> Baileys Engine
+    |
+    +--> SQLite
+    |
+    v
+WhatsApp
+
+============================================================
+2. SOURCE PROJECT REFERENCES
+============================================================
+
+Baileys:
+https://github.com/WhiskeySockets/Baileys.git
+
+WAHA:
+https://github.com/devlikeapro/waha.git
+
+OpenWA:
+https://github.com/rmyndharis/OpenWA.git
+
+Catatan:
+- Source project di atas menjadi referensi arsitektur/fitur.
+- Implementasi akhir harus memiliki boundary dan lifecycle sendiri.
+- Jangan menjalankan ketiga project sebagai tiga backend terpisah.
+- Kompatibilitas protokol WhatsApp dapat berubah sehingga adapter
+  harus dibuat modular dan mudah diperbarui.
+
+============================================================
+3. PROBLEM STATEMENT
+============================================================
+
+Pengguna yang ingin menjalankan sistem WhatsApp automation sering
+harus menggabungkan WhatsApp engine, database, API, webhook,
+dashboard, automation, session manager, dan server.
+
+Hal tersebut membuat instalasi dan maintenance menjadi rumit.
+
+WhatsApp Local Hub bertujuan menyatukan komponen tersebut menjadi
+satu aplikasi lokal yang mudah dijalankan.
+
+Target pengalaman:
+
+Download -> Extract/Install -> Run -> Scan QR -> Ready
+
+Basic installation tidak membutuhkan:
+- Docker
+- MySQL
+- PostgreSQL
+- Redis
+- Node.js manual
+- konfigurasi server manual
+
+untuk pengguna akhir.
+
+============================================================
+4. TARGET USERS
+============================================================
+
+4.1 Small Business
+- Toko
+- Distributor
+- Jasa
+- Agency
+- Online seller
+- Customer service
+
+Kebutuhan:
+- Multi-account
+- Customer/contact management
+- Auto-reply
+- Campaign
+- Integration
+
+4.2 Developer
+- REST API
+- Webhook
+- Local integration
+- Automation
+- Integration dengan CRM, ERP, POS, website, n8n, dan aplikasi
+  internal
+
+4.3 Power User
+- Multi-session
+- Automation
+- Campaign
+- API
+- Webhook
+- Advanced logging
+
+============================================================
+5. PRODUCT GOALS
+============================================================
+
+G1. Easy Installation
+Pengguna dapat menjalankan aplikasi tanpa setup infrastructure
+manual.
+
+G2. Multi-Session
+Pengguna dapat mengelola beberapa akun WhatsApp.
+
+G3. Local First
+Data utama berada di komputer pengguna.
+
+G4. Developer Friendly
+Tersedia REST API dan webhook.
+
+G5. Automation
+Pengguna dapat membuat rule otomatis.
+
+G6. Portable
+Aplikasi dapat dijalankan dari folder portable.
+
+G7. Recoverable
+Session dan data dapat dibackup dan dipulihkan.
+
+============================================================
+6. NON-GOALS
+============================================================
+
+Versi awal tidak bertujuan menjadi:
+- WhatsApp resmi Meta API replacement
+- Cloud WhatsApp hosting
+- CRM enterprise penuh
+- Cloud marketing platform
+- Mass-spam tool
+- Tool untuk menghindari sistem anti-abuse WhatsApp
+
+Campaign dan automation wajib memiliki operational safeguards
+seperti:
+- Rate limit
+- Quota
+- Opt-out
+- Suppression list
+- Audit log
+
+Safeguard digunakan untuk operational control dan responsible
+messaging, bukan untuk menghindari sistem anti-spam.
+
+============================================================
+7. CORE ARCHITECTURE
+============================================================
+
+Struktur:
+
+WHATSAPP LOCAL HUB
+|
++-- Desktop UI
+|
++-- Application Core
+|   +-- Session Manager
+|   +-- Message Service
+|   +-- Contact Service
+|   +-- Group Service
+|   +-- Campaign Engine
+|   +-- Automation Engine
+|   +-- Webhook Manager
+|   +-- REST API
+|   +-- Event Bus
+|   +-- Security
+|   +-- Logger
+|
++-- Baileys Adapter/Engine
+|
++-- SQLite
+|
++-- Local File Storage
+
+Prinsip:
+- UI tidak boleh langsung mengakses Baileys.
+- Semua operasi melewati Application Core.
+- Baileys menjadi transport/core layer.
+- Campaign dan Automation bukan bagian dari transport layer.
+- Session harus isolated.
+
+============================================================
+8. SESSION MANAGEMENT
+============================================================
+
+User dapat:
+- Create session
+- Delete session
+- Connect
+- Disconnect
+- Reconnect
+- View status
+- View QR
+- Pairing flow jika tersedia/stabil
+- Rename session
+
+Contoh status:
+- CREATED
+- INITIALIZING
+- QR_REQUIRED
+- AUTHENTICATING
+- CONNECTED
+- DISCONNECTED
+- RECONNECTING
+- LOGGED_OUT
+
+Acceptance criteria:
+- Session A tidak dapat membaca auth session B.
+- Restart aplikasi tidak menghilangkan session.
+- Session valid dapat reconnect.
+- Logout terdeteksi.
+- Connection error tercatat.
+
+============================================================
+9. QR AUTHENTICATION
+============================================================
+
+Flow:
+
+Add WhatsApp
+    |
+    +-- Session Name
+    |
+    +-- QR Code
+    |
+    v
+WhatsApp Linked Devices
+    |
+    v
+Scan QR
+    |
+    v
+Connected
+
+Dashboard harus menampilkan status authentication secara jelas.
+
+============================================================
+10. PAIRING FLOW
+============================================================
+
+Jika didukung dan stabil oleh engine/protokol:
+
+Phone Number
+    |
+    v
+Generate Pairing Code
+    |
+    v
+Display Pairing Code
+    |
+    v
+User memasukkan kode pada WhatsApp
+    |
+    v
+Authenticating
+    |
+    v
+Connected
+
+Feature harus diperlakukan sebagai optional capability, bukan
+dependency yang diasumsikan selalu tersedia.
+
+============================================================
+11. MESSAGING
+============================================================
+
+Outgoing:
+- Send text
+- Send image
+- Send video
+- Send audio
+- Send document
+- Send sticker jika tersedia
+
+Incoming/events:
+- Message received
+- Message sent
+- Message delivered
+- Message read
+- Message updated
+
+Semua event diproses melalui internal Event Bus.
+
+============================================================
+12. CHAT MANAGEMENT
+============================================================
+
+Fitur:
+- Chat list
+- Search
+- Unread indicator
+- Message history
+- Send message
+- Media
+- Timestamp
+- Delivery status
+
+UI target:
+
+Chats
+--------------------------------
+Contact A
+Last message...
+
+Contact B
+Last message...
+
+Contact C
+Last message...
+
+============================================================
+13. CONTACT MANAGEMENT
+============================================================
+
+Data:
+- Name
+- Phone/JID
+- Tags
+- Notes
+- Source
+- Last interaction
+- Custom fields
+
+Import:
+- CSV
+- XLSX
+- TXT
+
+Export:
+- CSV
+- XLSX
+- JSON
+
+Template variables:
+- {{name}}
+- {{phone}}
+- {{company}}
+- {{tag}}
+- Custom fields
+
+============================================================
+14. GROUP MANAGEMENT
+============================================================
+
+Data yang tersedia melalui koneksi:
+- Group name
+- Group ID
+- Description
+- Participants
+- Admin information
+
+Fitur:
+- List groups
+- Group details
+- Participant information sesuai data yang tersedia
+- Export permitted/available data
+
+Tidak boleh mengandalkan bypass privacy controls.
+
+============================================================
+15. CAMPAIGN ENGINE
+============================================================
+
+Campaign menggantikan konsep "blast" sebagai abstraction utama.
+
+Campaign:
+- Audience
+- Template
+- Variables
+- Schedule
+- Queue
+- Rate Limit
+- Delivery Tracking
+- Report
+
+Contoh status:
+- Draft
+- Scheduled
+- Running
+- Paused
+- Completed
+- Cancelled
+- Failed
+
+Campaign metrics:
+- Queued
+- Sent
+- Delivered
+- Read
+- Failed
+
+============================================================
+16. CAMPAIGN SAFEGUARDS
+============================================================
+
+Wajib tersedia:
+- Daily limit
+- Hourly limit
+- Batch size
+- Cooldown
+- Opt-out
+- Suppression list
+- Audit log
+
+Tujuan:
+- Operational safety
+- User control
+- Responsible messaging
+- Prevention of accidental over-sending
+
+Bukan untuk:
+- Menghindari spam detection
+- Mengakali anti-abuse systems
+- Menyamarkan bulk spam
+
+============================================================
+17. TEMPLATE ENGINE
+============================================================
+
+Template contoh:
+
+Halo {{name}},
+
+Pesanan {{order_id}} sebesar {{amount}}
+sudah siap.
+
+Variable:
+- {{name}}
+- {{phone}}
+- {{company}}
+- {{order_id}}
+- {{amount}}
+- Custom fields
+
+Dashboard harus menyediakan preview hasil render.
+
+============================================================
+18. AUTOMATION ENGINE
+============================================================
+
+Model:
+
+WHEN
+    message.received
+
+IF
+    text contains "harga"
+
+THEN
+    send text
+
+Rule terdiri dari:
+- Trigger
+- Conditions
+- Actions
+- Enabled/Disabled
+- Audit metadata
+
+MVP actions:
+- Send Text
+- Send Media
+- Add Tag
+- Remove Tag
+- Create Event
+- Call Webhook
+
+Future:
+- HTTP Request
+- Conditional Branch
+- Delay
+- AI Response
+- External API
+- Database Query
+
+============================================================
+19. WEBHOOK SYSTEM
+============================================================
+
+User dapat membuat webhook:
+
+Name:
+CRM Integration
+
+URL:
+https://example.com/webhook
+
+Events:
+- message.received
+- message.sent
+- message.delivered
+- message.read
+- session.connected
+- session.disconnected
+
+Flow:
+
+Baileys
+  |
+  v
+Event Bus
+  |
+  v
+Webhook Dispatcher
+  |
+  v
+External System
+
+Webhook harus memiliki:
+- Retry policy
+- Delivery log
+- Failure state
+- Enable/disable
+- Event filtering
+
+============================================================
+20. REST API
+============================================================
+
+Base:
+ /api/v1
+
+Sessions:
+GET    /sessions
+POST   /sessions
+GET    /sessions/:id
+DELETE /sessions/:id
+POST   /sessions/:id/connect
+POST   /sessions/:id/disconnect
+
+Messages:
+POST   /messages/text
+POST   /messages/media
+
+Contacts:
+GET    /contacts
+POST   /contacts
+PUT    /contacts/:id
+DELETE /contacts/:id
+
+Campaigns:
+GET    /campaigns
+POST   /campaigns
+GET    /campaigns/:id
+POST   /campaigns/:id/start
+POST   /campaigns/:id/pause
+POST   /campaigns/:id/cancel
+
+Automation:
+GET    /automations
+POST   /automations
+PUT    /automations/:id
+DELETE /automations/:id
+
+Health:
+GET    /health
+GET    /status
+
+============================================================
+21. API AUTHENTICATION
+============================================================
+
+Default local API binding:
+127.0.0.1
+
+Remote binding tidak aktif secara default.
+
+API menggunakan:
+Authorization: Bearer <API_KEY>
+
+Permission model:
+- sessions.read
+- sessions.write
+- messages.read
+- messages.send
+- contacts.read
+- contacts.write
+- campaigns.read
+- campaigns.write
+- automation.read
+- automation.write
+- webhooks.read
+- webhooks.write
+
+============================================================
+22. OPENAPI / API DOCUMENTATION
+============================================================
+
+Dashboard menu:
+
+Developer
+- API Keys
+- API Documentation
+- Webhooks
+- Events
+- Logs
+
+OpenAPI documentation:
+ /api/docs
+
+Dokumentasi harus selalu mengikuti API version yang sedang
+digunakan.
+
+============================================================
+23. EVENT BUS
+============================================================
+
+Core events:
+
+message.received
+message.sent
+message.delivered
+message.read
+message.updated
+
+session.created
+session.connected
+session.disconnected
+session.logged_out
+
+contact.updated
+group.updated
+
+campaign.created
+campaign.started
+campaign.paused
+campaign.completed
+campaign.failed
+
+automation.executed
+
+Event subscribers:
+- Database
+- Automation
+- Webhook
+- UI
+- Logger
+
+============================================================
+24. LOGGING
+============================================================
+
+Log levels:
+- DEBUG
+- INFO
+- WARN
+- ERROR
+
+Contoh:
+INFO  session marketing connected
+INFO  message received
+INFO  automation executed
+WARN  webhook retry
+ERROR connection failed
+
+Dashboard:
+- Filter by level
+- Filter by session
+- Filter by event
+- Search
+- Timestamp
+- Export
+
+Sensitive data harus diminimalkan dalam logs.
+
+============================================================
+25. DATABASE
+============================================================
+
+Database:
+SQLite
+
+Initial tables:
+
+sessions
+contacts
+chats
+messages
+groups
+group_members
+campaigns
+campaign_recipients
+automation_rules
+webhooks
+events
+settings
+audit_logs
+
+Authentication/session material Baileys disimpan dalam storage
+terpisah dari database metadata jika diperlukan oleh adapter.
+
+============================================================
+26. INITIAL DATABASE SCHEMA
+============================================================
+
+sessions
+- id
+- name
+- phone
+- status
+- created_at
+- updated_at
+
+contacts
+- id
+- session_id
+- jid
+- name
+- phone
+- metadata
+- created_at
+- updated_at
+
+chats
+- id
+- session_id
+- jid
+- name
+- last_message
+- updated_at
+
+messages
+- id
+- session_id
+- chat_id
+- message_id
+- direction
+- type
+- content
+- status
+- timestamp
+
+groups
+- id
+- session_id
+- jid
+- name
+- metadata
+
+group_members
+- id
+- group_id
+- jid
+- name
+- role
+
+campaigns
+- id
+- name
+- status
+- template
+- created_at
+
+campaign_recipients
+- id
+- campaign_id
+- contact_id
+- status
+- sent_at
+- delivered_at
+- read_at
+
+automation_rules
+- id
+- name
+- enabled
+- definition
+
+webhooks
+- id
+- name
+- url
+- events
+- enabled
+
+audit_logs
+- id
+- actor
+- action
+- resource
+- metadata
+- timestamp
+
+============================================================
+27. BACKUP AND RESTORE
+============================================================
+
+Menu:
+Settings
+  |
+  +-- Backup
+  +-- Restore
+  +-- Export
+  +-- Reset
+
+Backup format:
+.wahub
+
+Backup dapat berisi:
+- Database
+- Settings
+- Automation definitions
+- Campaign definitions
+- Contacts
+- Session metadata
+
+Authentication/session secrets harus diproteksi secara khusus.
+
+Restore flow:
+Select Backup
+    |
+    v
+Validate
+    |
+    v
+Preview
+    |
+    v
+Restore
+    |
+    v
+Verify
+
+============================================================
+28. SETTINGS
+============================================================
+
+General:
+- Language
+- Theme
+- Startup behavior
+
+Storage:
+- Data directory
+- Media directory
+- Backup directory
+
+WhatsApp:
+- Connection settings
+- Reconnect settings
+
+API:
+- Port
+- API keys
+- Webhooks
+
+Security:
+- Encryption
+- Application lock
+- Audit logs
+
+Advanced:
+- Logging
+- Diagnostics
+- Developer options
+
+============================================================
+29. PORTABLE MODE
+============================================================
+
+Target structure:
+
+WhatsAppLocalHub/
+|
++-- WhatsAppLocalHub.exe
++-- runtime/
++-- app/
++-- config/
++-- data/
+|   +-- database.sqlite
+|   +-- sessions/
+|   +-- media/
+|   +-- backups/
+|   +-- exports/
+|
++-- logs/
+
+Requirement:
+- Tidak membutuhkan Node.js milik user.
+- Tidak membutuhkan database server eksternal.
+- Tidak membutuhkan Redis untuk basic mode.
+- Semua runtime dependency dikemas sesuai licensing dan packaging
+  requirements.
+
+User cukup:
+1. Download
+2. Extract
+3. Run WhatsAppLocalHub.exe
+
+============================================================
+30. INSTALLED MODE
+============================================================
+
+Installer:
+WhatsAppLocalHub-Setup.exe
+
+Options:
+- Desktop shortcut
+- Start with Windows
+- Launch after installation
+
+Application data sebaiknya dipisahkan dari installation directory
+untuk installed mode.
+
+============================================================
+31. DESKTOP ARCHITECTURE
+============================================================
+
+Desktop Shell
+    |
+    v
+Frontend
+    |
+    v
+Local HTTP/WebSocket
+    |
+    v
+Application Core
+    |
+    +-- Session Manager
+    +-- Message Service
+    +-- Contact Service
+    +-- Campaign Engine
+    +-- Automation Engine
+    +-- Webhook Manager
+    +-- REST API
+    |
+    v
+Baileys Adapter
+
+Frontend tidak boleh langsung memanggil Baileys.
+
+Desktop technology belum dikunci sebelum prototype core selesai.
+Prioritas:
+- Portable
+- Small footprint
+- Windows support
+- Reliable packaging
+
+============================================================
+32. PROJECT STRUCTURE
+============================================================
+
+whatsapp-local-hub/
+|
++-- apps/
+|   +-- desktop/
+|   +-- web/
+|
++-- packages/
+|   +-- core/
+|   +-- whatsapp/
+|   +-- sessions/
+|   +-- messaging/
+|   +-- contacts/
+|   +-- groups/
+|   +-- campaigns/
+|   +-- automation/
+|   +-- webhooks/
+|   +-- api/
+|   +-- database/
+|   +-- events/
+|   +-- security/
+|   +-- logger/
+|
++-- migrations/
++-- tests/
++-- docs/
++-- scripts/
++-- package.json
+
+============================================================
+33. TECHNOLOGY STACK
+============================================================
+
+Backend:
+- Node.js
+- TypeScript
+- Fastify atau framework HTTP setara
+- Baileys
+- SQLite
+
+Frontend:
+- React
+- TypeScript
+- Vite
+- Tailwind CSS
+
+Desktop:
+- Desktop shell yang dipilih berdasarkan hasil prototype core.
+- Fokus utama: portable, low overhead, reliable packaging.
+
+============================================================
+34. SECURITY REQUIREMENTS
+============================================================
+
+SR-01 Session Isolation
+Session tidak boleh mengakses authentication data session lain.
+
+SR-02 API Authentication
+API write operations membutuhkan authentication.
+
+SR-03 Secret Protection
+API keys dan authentication material tidak disimpan plaintext jika
+tidak diperlukan.
+
+SR-04 Local Binding
+Default API hanya bind ke 127.0.0.1.
+
+SR-05 Audit
+Perubahan penting harus dicatat.
+
+Contoh:
+- Session created
+- Session deleted
+- API key created
+- Campaign started
+- Campaign stopped
+- Automation modified
+- Backup restored
+
+SR-06 Sensitive Logging
+Nomor telepon, token, auth material, dan isi pesan tidak boleh
+masuk log secara berlebihan.
+
+============================================================
+35. PERFORMANCE REQUIREMENTS
+============================================================
+
+Target:
+- Fast startup
+- Low idle footprint
+- Incremental resource usage per session
+- Stable operation dengan beberapa session
+
+Tidak menetapkan angka RAM absolut seperti "40-70 MB" karena
+penggunaan aktual bergantung pada:
+- jumlah session
+- traffic
+- cache
+- media
+- Node.js runtime
+- versi dependency
+- hardware
+
+Performance harus diukur menggunakan benchmark nyata.
+
+============================================================
+36. RELIABILITY
+============================================================
+
+System harus mampu:
+- Restart
+- Reconnect
+- Recover database
+- Recover queue
+- Recover session
+- Handle temporary network failure
+
+Crash recovery:
+Restart
+  |
+  v
+Load database
+  |
+  v
+Load sessions
+  |
+  v
+Recover state
+  |
+  v
+Reconnect
+  |
+  v
+Ready
+
+============================================================
+37. TESTING STRATEGY
+============================================================
+
+37.1 Unit Tests
+- SessionManager
+- MessageService
+- CampaignEngine
+- AutomationEngine
+- TemplateEngine
+- WebhookDispatcher
+- Database repositories
+
+37.2 Integration Tests
+- SQLite
+- Baileys adapter
+- REST API
+- Webhook
+- Event Bus
+
+37.3 E2E
+Install
+ -> Create session
+ -> QR
+ -> Connect
+ -> Receive message
+ -> Send reply
+ -> Automation
+ -> Webhook
+
+37.4 Packaging Test
+Fresh Windows machine
+ -> Install
+ -> Launch
+ -> Connect WhatsApp
+
+Portable:
+Copy folder
+ -> Run EXE
+ -> Connect
+ -> Restart
+ -> Verify persistence
+
+============================================================
+38. MVP SCOPE
+============================================================
+
+MVP 1.0:
+
+[ ] Desktop launcher
+[ ] Dashboard
+[ ] Session manager
+[ ] QR login
+[ ] Pairing flow if available/stable
+[ ] Multi-session
+[ ] Send text
+[ ] Receive text
+[ ] Send media
+[ ] Contacts
+[ ] Groups
+[ ] SQLite
+[ ] REST API
+[ ] Webhook
+[ ] Logs
+[ ] Backup
+[ ] Portable build
+
+Tidak termasuk MVP:
+- AI assistant
+- Full CRM
+- Advanced workflow builder
+- Cloud sync
+- Plugin marketplace
+- Advanced analytics
+
+============================================================
+39. VERSION ROADMAP
+============================================================
+
+v0.1 - Core
+- Baileys
+- Session
+- QR
+- Connection
+- SQLite
+
+v0.2 - Messaging
+- Send
+- Receive
+- Media
+- Chats
+- Contacts
+- Groups
+
+v0.3 - API
+- REST
+- OpenAPI
+- Webhook
+- API Key
+- Events
+
+v0.4 - Dashboard
+- Sessions
+- Chats
+- Contacts
+- Groups
+- Logs
+
+v0.5 - Automation
+- Rules
+- Triggers
+- Actions
+- Templates
+
+v0.6 - Campaign
+- Audience
+- Campaign
+- Queue
+- Rate Limit
+- Reports
+- Opt-out
+
+v0.7 - Backup
+- Backup
+- Restore
+- Export
+- Import
+
+v0.8 - Portable
+- Windows EXE
+- Portable package
+- Installer
+
+v0.9 - Hardening
+- Security
+- Crash recovery
+- Migration
+- Session isolation
+- Performance
+
+v1.0 - Production Release
+
+============================================================
+40. DEFINITION OF DONE - MVP
+============================================================
+
+MVP dianggap selesai apabila:
+
+[ ] Aplikasi dapat dijalankan di Windows
+[ ] Tidak membutuhkan Node.js user
+[ ] User dapat membuat session
+[ ] QR dapat ditampilkan
+[ ] WhatsApp dapat terhubung
+[ ] Session tetap ada setelah restart
+[ ] Multiple session dapat berjalan
+[ ] Pesan dapat diterima
+[ ] Pesan dapat dikirim
+[ ] Media dapat dikirim
+[ ] Contacts dapat ditampilkan
+[ ] Groups dapat ditampilkan
+[ ] REST API aktif
+[ ] Webhook aktif
+[ ] Event tercatat
+[ ] Logs tersedia
+[ ] Backup tersedia
+[ ] Portable package berhasil
+[ ] Fresh Windows test berhasil
+
+============================================================
+41. ARCHITECTURAL RULES
+============================================================
+
+RULE 01
+Baileys = WhatsApp transport/core.
+
+RULE 02
+UI tidak boleh langsung mengakses Baileys.
+
+RULE 03
+Semua operasi melewati Application Core.
+
+RULE 04
+Session harus isolated.
+
+RULE 05
+Authentication material harus dikelola secara terpisah/aman dari
+metadata database sesuai kebutuhan adapter.
+
+RULE 06
+API harus versioned.
+
+RULE 07
+Events menggunakan internal Event Bus.
+
+RULE 08
+Campaign dan Automation bukan bagian dari WhatsApp transport layer.
+
+RULE 09
+Default local API hanya bind ke localhost.
+
+RULE 10
+Portable mode adalah first-class deployment mode.
+
+RULE 11
+Basic installation tidak membutuhkan Docker/Redis/PostgreSQL.
+
+RULE 12
+Setiap external dependency harus memiliki alasan yang jelas.
+
+RULE 13
+WhatsApp engine harus berada di balik adapter/interface agar dapat
+diganti atau diperbarui tanpa merombak seluruh Application Core.
+
+RULE 14
+Tidak boleh mengandalkan mekanisme bypass privacy atau platform
+security controls.
+
+RULE 15
+Operational safeguards harus menjadi bagian dari Campaign Engine.
+
+============================================================
+42. DEVELOPMENT PRIORITY
+============================================================
+
+1. Architecture
+2. Baileys Core
+3. Session Layer
+4. Message Core
+5. SQLite
+6. REST / Events
+7. Dashboard
+8. Automation
+9. Campaign
+10. Backup/Restore
+11. Portable Packaging
+12. Hardening
+13. Production Release
+
+============================================================
+43. FINAL PRODUCT FLOW
+============================================================
+
+Download
+   |
+   v
+Install / Extract
+   |
+   v
+WhatsAppLocalHub.exe
+   |
+   v
+Application Core starts
+   |
+   +--> SQLite
+   +--> Local API
+   +--> Event Bus
+   +--> WhatsApp Engine
+   |
+   v
+Dashboard
+   |
+   v
+Add WhatsApp
+   |
+   v
+Scan QR / Pairing if available
+   |
+   v
+Connected
+   |
+   +--> Chats
+   +--> Contacts
+   +--> Groups
+   +--> Automation
+   +--> Campaigns
+   +--> API
+   +--> Webhooks
+   +--> Logs
+   +--> Backup
+
+============================================================
+44. PRODUCT PRINCIPLE
+============================================================
+
+WhatsApp Local Hub bukan sekadar wrapper Baileys.
+
+Produk harus diperlakukan sebagai platform dengan:
+
+- WhatsApp connectivity layer
+- Application Core
+- Local persistence
+- Event architecture
+- Automation
+- Campaign management
+- Developer API
+- Webhooks
+- Desktop UI
+- Portable deployment
+- Security
+- Recovery
+
+Prioritas utama:
+1. Stability
+2. Session isolation
+3. Data safety
+4. Simple installation
+5. Developer usability
+6. Extensibility
+7. Performance
+
+============================================================
+END OF PRD
+============================================================
