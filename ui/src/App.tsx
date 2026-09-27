@@ -23,7 +23,12 @@ import {
   Activity,
   Layers,
   Search,
-  ExternalLink
+  ExternalLink,
+  ShieldCheck,
+  FileSpreadsheet,
+  Info,
+  Sliders,
+  ChevronRight
 } from 'lucide-react';
 
 interface SessionMeta {
@@ -73,6 +78,13 @@ interface AutoRule {
   hit_count: number;
 }
 
+interface AuditLog {
+  id: string;
+  event_type: string;
+  payload: any;
+  created_at: number;
+}
+
 interface SystemStatus {
   appName: string;
   version: string;
@@ -99,9 +111,11 @@ export default function App() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [rules, setRules] = useState<AutoRule[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
   const [backups, setBackups] = useState<any[]>([]);
   const [liveLogs, setLiveLogs] = useState<Array<{ id: string; time: string; text: string; type: 'info' | 'success' | 'warn' }>>([]);
+  const [isTrayNoticeDismissed, setIsTrayNoticeDismissed] = useState(false);
 
   // Modals state
   const [isAddSessionModal, setIsAddSessionModal] = useState(false);
@@ -118,7 +132,7 @@ export default function App() {
   // New Campaign Form
   const [isNewCampaignModal, setIsNewCampaignModal] = useState(false);
   const [campName, setCampName] = useState('');
-  const [campTemplate, setCampTemplate] = useState('Halo {{name}}, perkenalkan kami dari tim support...');
+  const [campTemplate, setCampTemplate] = useState('Halo {{name}}, perkenalkan penawaran spesial kami...');
   const [campRecipientsRaw, setCampRecipientsRaw] = useState('');
 
   // New Rule Form
@@ -212,6 +226,16 @@ export default function App() {
     }
   };
 
+  const fetchAuditLogs = async () => {
+    try {
+      const res = await fetch('/api/v1/system/audit');
+      const data = await res.json();
+      if (data.success) setAuditLogs(data.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   // Setup WebSocket for Real-Time synchronization
   useEffect(() => {
     fetchSessions();
@@ -219,6 +243,7 @@ export default function App() {
     fetchRules();
     fetchSystemStatus();
     fetchBackups();
+    fetchAuditLogs();
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws`;
@@ -226,18 +251,18 @@ export default function App() {
     wsRef.current = ws;
 
     ws.onopen = () => {
-      addLog('WebSocket terhubung ke Local Core Server', 'success');
+      addLog('WebSocket terhubung ke WhatsApp Local Core', 'success');
     };
 
     ws.onmessage = (evt) => {
       try {
         const msg = JSON.parse(evt.data);
-        if (msg.event === 'session.status' || msg.event === 'session.qr' || msg.event === 'session.pairing_code' || msg.event === 'session.connected' || msg.event === 'session.disconnected') {
+        if (msg.event?.startsWith('session.')) {
           fetchSessions();
           addLog(`Event Sesi: ${msg.event} (${msg.payload?.sessionId || ''})`, 'info');
         }
         if (msg.event === 'message.received') {
-          addLog(`Pesan masuk dari ${msg.payload?.message?.senderJid}: "${msg.payload?.message?.text || '[Media]'}"`, 'info');
+          addLog(`Pesan Masuk dari ${msg.payload?.message?.senderJid}: "${msg.payload?.message?.text || '[Media]'}"`, 'info');
         }
         if (msg.event === 'campaign.updated') {
           fetchCampaigns();
@@ -425,7 +450,7 @@ export default function App() {
     }
   };
 
-  // Backup
+  // Backup in .wahub format
   const handleCreateBackup = async () => {
     try {
       const res = await fetch('/api/v1/system/backup', { method: 'POST' });
@@ -433,6 +458,7 @@ export default function App() {
       if (data.success) {
         addLog(`Backup berhasil dibuat: ${data.data.backupFileName}`, 'success');
         fetchBackups();
+        fetchAuditLogs();
       }
     } catch (err: any) {
       alert(err.message);
@@ -442,19 +468,19 @@ export default function App() {
   const connectedCount = sessions.filter((s) => s.status === 'CONNECTED').length;
 
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-800 overflow-hidden font-sans">
-      {/* Sidebar */}
+    <div className="flex h-screen bg-[#f8fafc] text-slate-800 overflow-hidden font-sans">
+      {/* Sidebar Desktop */}
       <aside className="w-64 bg-slate-900 text-slate-200 flex flex-col border-r border-slate-800 flex-shrink-0">
         <div className="p-4 border-b border-slate-800 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center text-white font-bold text-lg shadow-sm">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold text-base shadow-sm">
               W
             </div>
             <div>
               <h1 className="font-bold text-sm tracking-wide text-white leading-tight">WhatsApp Local Hub</h1>
-              <p className="text-xs text-emerald-400 font-mono flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block animate-pulse"></span>
-                Portable Edition
+              <p className="text-[11px] text-emerald-400 font-mono flex items-center gap-1.5 mt-0.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block animate-pulse"></span>
+                Tauri Desktop Edition
               </p>
             </div>
           </div>
@@ -465,7 +491,7 @@ export default function App() {
           <button
             onClick={() => setActiveTab('overview')}
             className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'overview' ? 'bg-emerald-600 text-white' : 'hover:bg-slate-800 text-slate-300'
+              activeTab === 'overview' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-300'
             }`}
           >
             <Activity className="w-4 h-4" />
@@ -475,7 +501,7 @@ export default function App() {
           <button
             onClick={() => setActiveTab('sessions')}
             className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'sessions' ? 'bg-emerald-600 text-white' : 'hover:bg-slate-800 text-slate-300'
+              activeTab === 'sessions' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-300'
             }`}
           >
             <div className="flex items-center space-x-3">
@@ -490,7 +516,7 @@ export default function App() {
           <button
             onClick={() => setActiveTab('messages')}
             className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'messages' ? 'bg-emerald-600 text-white' : 'hover:bg-slate-800 text-slate-300'
+              activeTab === 'messages' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-300'
             }`}
           >
             <MessageSquare className="w-4 h-4" />
@@ -500,7 +526,7 @@ export default function App() {
           <button
             onClick={() => setActiveTab('contacts')}
             className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'contacts' ? 'bg-emerald-600 text-white' : 'hover:bg-slate-800 text-slate-300'
+              activeTab === 'contacts' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-300'
             }`}
           >
             <Users className="w-4 h-4" />
@@ -510,7 +536,7 @@ export default function App() {
           <button
             onClick={() => setActiveTab('groups')}
             className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'groups' ? 'bg-emerald-600 text-white' : 'hover:bg-slate-800 text-slate-300'
+              activeTab === 'groups' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-300'
             }`}
           >
             <FolderGit2 className="w-4 h-4" />
@@ -520,7 +546,7 @@ export default function App() {
           <button
             onClick={() => setActiveTab('campaigns')}
             className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'campaigns' ? 'bg-emerald-600 text-white' : 'hover:bg-slate-800 text-slate-300'
+              activeTab === 'campaigns' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-300'
             }`}
           >
             <div className="flex items-center space-x-3">
@@ -537,7 +563,7 @@ export default function App() {
           <button
             onClick={() => setActiveTab('automation')}
             className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'automation' ? 'bg-emerald-600 text-white' : 'hover:bg-slate-800 text-slate-300'
+              activeTab === 'automation' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-300'
             }`}
           >
             <Zap className="w-4 h-4" />
@@ -545,17 +571,17 @@ export default function App() {
           </button>
 
           <div className="pt-4 pb-1 border-t border-slate-800 my-2">
-            <span className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Sistem & Dev</span>
+            <span className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Developer & Tools</span>
           </div>
 
           <a
-            href="/docs"
+            href="/api/docs"
             target="_blank"
             rel="noreferrer"
             className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 text-slate-300 transition-colors"
           >
             <div className="flex items-center space-x-3">
-              <BookOpen className="w-4 h-4 text-emerald-400" />
+              <BookOpen className="w-4 h-4 text-blue-400" />
               <span>Swagger API Docs</span>
             </div>
             <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
@@ -564,21 +590,21 @@ export default function App() {
           <button
             onClick={() => setActiveTab('system')}
             className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'system' ? 'bg-emerald-600 text-white' : 'hover:bg-slate-800 text-slate-300'
+              activeTab === 'system' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-300'
             }`}
           >
             <HardDrive className="w-4 h-4" />
-            <span>Storage & Backup</span>
+            <span>Storage & Backup (.wahub)</span>
           </button>
         </nav>
 
-        {/* Selected Session Pill in Sidebar */}
+        {/* Selected Session in Sidebar */}
         <div className="p-3 bg-slate-950/60 border-t border-slate-800">
-          <label className="text-xs text-slate-400 block mb-1 font-medium">Sesi Aktif di Dashboard:</label>
+          <label className="text-[11px] text-slate-400 block mb-1 font-medium">Sesi Terpilih di Dashboard:</label>
           <select
             value={selectedSessionId}
             onChange={(e) => setSelectedSessionId(e.target.value)}
-            className="w-full bg-slate-800 text-white text-xs rounded border border-slate-700 py-1.5 px-2 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+            className="w-full bg-slate-800 text-white text-xs rounded-lg border border-slate-700 py-1.5 px-2 focus:ring-1 focus:ring-blue-500 focus:outline-none"
           >
             {sessions.length === 0 ? (
               <option value="">Belum ada akun</option>
@@ -594,44 +620,68 @@ export default function App() {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col overflow-hidden bg-slate-100">
+      <main className="flex-1 flex flex-col overflow-hidden bg-[#f8fafc]">
         {/* Top Header */}
-        <header className="h-14 bg-white border-b border-slate-200 px-6 flex items-center justify-between shadow-sm">
+        <header className="h-14 bg-white border-b border-slate-200 px-6 flex items-center justify-between shadow-sm flex-shrink-0">
           <div className="flex items-center space-x-3">
-            <h2 className="text-base font-semibold text-slate-800 capitalize">
-              {activeTab === 'overview' && 'Dashboard Telemetri & Aktivitas'}
+            <h2 className="text-sm font-bold text-slate-900 capitalize tracking-tight">
+              {activeTab === 'overview' && 'Dashboard Telemetri & Aktivitas Real-Time'}
               {activeTab === 'sessions' && 'Manajemen Akun WhatsApp (Multi-Session)'}
-              {activeTab === 'messages' && 'Kirim Pesan & Direct Chat'}
-              {activeTab === 'contacts' && 'Daftar Kontak & Audiens'}
-              {activeTab === 'groups' && 'Group Grabber & Member Extractor'}
-              {activeTab === 'campaigns' && 'Campaign Broadcast & Blaster'}
-              {activeTab === 'automation' && 'Aturan Balas Otomatis (Auto-Responder)'}
-              {activeTab === 'system' && 'Kesehatan Sistem, RAM & Backup'}
+              {activeTab === 'messages' && 'Kirim Pesan Cepat & Direct Chat'}
+              {activeTab === 'contacts' && 'Daftar Kontak & Manajemen Audiens'}
+              {activeTab === 'groups' && 'WhatsApp Group Grabber (Ekstraksi Anggota)'}
+              {activeTab === 'campaigns' && 'Campaign Broadcast & Smart Blaster'}
+              {activeTab === 'automation' && 'Aturan Balas Otomatis (Auto-Responder Rules)'}
+              {activeTab === 'system' && 'Kesehatan Mesin, Audit Log & Cadangan .wahub'}
             </h2>
           </div>
 
           <div className="flex items-center space-x-3">
+            <div className="hidden md:flex items-center space-x-2 bg-slate-100 text-slate-600 text-xs px-2.5 py-1 rounded-full font-mono">
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+              <span>Core Port: 3000</span>
+            </div>
+
             <button
               onClick={() => {
                 fetchSessions();
                 fetchCampaigns();
                 fetchSystemStatus();
+                fetchAuditLogs();
                 addLog('Data disegarkan', 'info');
               }}
-              className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-md transition"
+              className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition"
               title="Segarkan Data"
             >
               <RefreshCw className="w-4 h-4" />
             </button>
             <button
               onClick={() => setIsAddSessionModal(true)}
-              className="inline-flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm transition"
+              className="inline-flex items-center space-x-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm transition"
             >
               <Plus className="w-4 h-4" />
               <span>Tambah Akun WA</span>
             </button>
           </div>
         </header>
+
+        {/* System Tray Informative Banner */}
+        {!isTrayNoticeDismissed && (
+          <div className="bg-blue-50 border-b border-blue-100 px-6 py-2 flex items-center justify-between text-xs text-blue-900">
+            <div className="flex items-center space-x-2">
+              <Info className="w-4 h-4 text-blue-600 flex-shrink-0" />
+              <span>
+                <strong>Mode Desktop Aktif:</strong> Saat Anda menutup jendela ini (tombol X), aplikasi akan tetap berjalan di <strong>System Tray (dekat jam)</strong> agar pesan masuk, bot auto-reply, dan campaign tidak terputus.
+              </span>
+            </div>
+            <button
+              onClick={() => setIsTrayNoticeDismissed(true)}
+              className="text-blue-600 hover:text-blue-800 font-semibold text-[11px] ml-4"
+            >
+              Mengerti
+            </button>
+          </div>
+        )}
 
         {/* View Content */}
         <div className="flex-1 overflow-y-auto p-6">
@@ -643,11 +693,11 @@ export default function App() {
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
                   <div>
                     <p className="text-xs text-slate-500 font-medium">Akun Terhubung</p>
-                    <p className="text-2xl font-bold text-slate-800 mt-1">
+                    <p className="text-2xl font-bold text-slate-900 mt-1">
                       {connectedCount} <span className="text-sm font-normal text-slate-400">/ {sessions.length}</span>
                     </p>
                   </div>
-                  <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
                     <Smartphone className="w-5 h-5" />
                   </div>
                 </div>
@@ -655,19 +705,19 @@ export default function App() {
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
                   <div>
                     <p className="text-xs text-slate-500 font-medium">Total Kontak</p>
-                    <p className="text-2xl font-bold text-slate-800 mt-1">{contacts.length}</p>
+                    <p className="text-2xl font-bold text-slate-900 mt-1">{contacts.length}</p>
                   </div>
-                  <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
                     <Users className="w-5 h-5" />
                   </div>
                 </div>
 
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-slate-500 font-medium">Campaign Broadcast</p>
-                    <p className="text-2xl font-bold text-slate-800 mt-1">{campaigns.length}</p>
+                    <p className="text-xs text-slate-500 font-medium">Total Broadcast</p>
+                    <p className="text-2xl font-bold text-slate-900 mt-1">{campaigns.length}</p>
                   </div>
-                  <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
                     <Send className="w-5 h-5" />
                   </div>
                 </div>
@@ -675,11 +725,11 @@ export default function App() {
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
                   <div>
                     <p className="text-xs text-slate-500 font-medium">RAM Pemakaian</p>
-                    <p className="text-2xl font-bold text-slate-800 mt-1">
+                    <p className="text-2xl font-bold text-slate-900 mt-1">
                       {systemStatus?.memory.rssMb || 0} <span className="text-xs font-normal text-slate-400">MB</span>
                     </p>
                   </div>
-                  <div className="w-10 h-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
                     <Activity className="w-5 h-5" />
                   </div>
                 </div>
@@ -688,27 +738,27 @@ export default function App() {
               {/* Sessions Grid Preview */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold text-slate-800 text-sm">Status Akun WhatsApp Terpasang</h3>
+                  <h3 className="font-semibold text-slate-900 text-sm">Status Akun WhatsApp Terpasang</h3>
                   <button
                     onClick={() => setActiveTab('sessions')}
-                    className="text-xs text-emerald-600 hover:underline font-medium"
+                    className="text-xs text-blue-600 hover:underline font-semibold"
                   >
-                    Kelola Semua Sesi &rarr;
+                    Kelola Sesi Lengkap &rarr;
                   </button>
                 </div>
 
                 {sessions.length === 0 ? (
                   <div className="text-center py-8 text-slate-400 text-sm">
-                    Belum ada akun terdaftar. Klik tombol <b>"Tambah Akun WA"</b> untuk menghubungkan.
+                    Belum ada akun terdaftar. Klik tombol <b>"Tambah Akun WA"</b> untuk menghubungkan WhatsApp Anda.
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {sessions.map((s) => (
-                      <div key={s.id} className="border border-slate-200 rounded-lg p-3 hover:border-slate-300 transition">
+                      <div key={s.id} className="border border-slate-200 rounded-xl p-3.5 hover:border-slate-300 transition">
                         <div className="flex items-center justify-between">
-                          <span className="font-semibold text-sm text-slate-800">{s.name}</span>
+                          <span className="font-bold text-sm text-slate-900">{s.name}</span>
                           <span
-                            className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                            className={`text-[11px] px-2.5 py-0.5 rounded-full font-medium ${
                               s.status === 'CONNECTED'
                                 ? 'bg-emerald-100 text-emerald-800'
                                 : s.status === 'QR_READY'
@@ -722,7 +772,7 @@ export default function App() {
                           </span>
                         </div>
                         <p className="text-xs text-slate-500 font-mono mt-1">
-                          {s.phoneNumber ? `+${s.phoneNumber}` : 'Belum terautentikasi'}
+                          {s.phoneNumber ? `+${s.phoneNumber}` : 'Menunggu koneksi...'}
                         </p>
                       </div>
                     ))}
@@ -732,11 +782,11 @@ export default function App() {
 
               {/* Real-time Activity Logs */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-                <h3 className="font-semibold text-slate-800 text-sm mb-3 flex items-center gap-2">
+                <h3 className="font-semibold text-slate-900 text-sm mb-3 flex items-center gap-2">
                   <Activity className="w-4 h-4 text-emerald-500" />
                   <span>Aktivitas Real-Time Engine (Live Event Stream)</span>
                 </h3>
-                <div className="bg-slate-900 rounded-lg p-3 text-xs font-mono text-slate-200 h-48 overflow-y-auto space-y-1">
+                <div className="bg-slate-900 rounded-xl p-3 text-xs font-mono text-slate-200 h-48 overflow-y-auto space-y-1">
                   {liveLogs.length === 0 ? (
                     <p className="text-slate-500 italic">Menunggu aktivitas pesan atau sesi...</p>
                   ) : (
@@ -770,11 +820,11 @@ export default function App() {
                   <div key={s.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
                     <div className="p-4 border-b border-slate-100 flex items-center justify-between">
                       <div>
-                        <h4 className="font-bold text-slate-800 text-sm">{s.name}</h4>
+                        <h4 className="font-bold text-slate-900 text-sm">{s.name}</h4>
                         <span className="text-xs text-slate-400 font-mono">ID: {s.id}</span>
                       </div>
                       <span
-                        className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
+                        className={`text-[11px] px-2.5 py-0.5 rounded-full font-medium ${
                           s.status === 'CONNECTED'
                             ? 'bg-emerald-100 text-emerald-800'
                             : s.status === 'QR_READY'
@@ -794,15 +844,15 @@ export default function App() {
                           <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
                             <CheckCircle className="w-8 h-8" />
                           </div>
-                          <p className="font-bold text-base text-slate-800">+{s.phoneNumber}</p>
-                          <p className="text-xs text-slate-400">Siap menerima dan mengirim pesan</p>
+                          <p className="font-bold text-base text-slate-900">+{s.phoneNumber}</p>
+                          <p className="text-xs text-slate-400">Siap menerima dan mengirim pesan otomatis</p>
                         </div>
                       )}
 
                       {s.status === 'QR_READY' && s.qrCode && (
                         <div className="space-y-2">
-                          <img src={s.qrCode} alt="WhatsApp QR" className="w-48 h-48 mx-auto border rounded-lg shadow-sm" />
-                          <p className="text-xs text-slate-500">Scan QR Code ini menggunakan WhatsApp di HP</p>
+                          <img src={s.qrCode} alt="WhatsApp QR" className="w-48 h-48 mx-auto border rounded-xl shadow-sm" />
+                          <p className="text-xs text-slate-500">Scan QR Code ini menggunakan menu Perangkat Tertaut di WhatsApp HP</p>
                         </div>
                       )}
 
@@ -812,7 +862,7 @@ export default function App() {
                             <KeyRound className="w-6 h-6" />
                           </div>
                           <p className="text-xs text-slate-500">Masukkan 8-digit kode ini di WhatsApp HP:</p>
-                          <p className="text-2xl font-mono font-bold tracking-widest text-blue-600 bg-blue-50 px-4 py-2 rounded border border-blue-200">
+                          <p className="text-2xl font-mono font-bold tracking-widest text-blue-600 bg-blue-50 px-4 py-2 rounded-lg border border-blue-200">
                             {s.pairingCode}
                           </p>
                         </div>
@@ -824,12 +874,12 @@ export default function App() {
                             <Smartphone className="w-6 h-6" />
                           </div>
                           <p className="text-xs text-slate-400">
-                            {s.status === 'CONNECTING' ? 'Menghubungkan ke WhatsApp Server...' : 'Sesi ini sedang tidak aktif'}
+                            {s.status === 'CONNECTING' ? 'Menghubungkan ke server WhatsApp...' : 'Sesi ini sedang tidak aktif'}
                           </p>
                           {s.status === 'DISCONNECTED' && (
                             <button
                               onClick={() => handleConnectSession(s.id)}
-                              className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-semibold rounded hover:bg-emerald-700 transition"
+                              className="px-3.5 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition"
                             >
                               Hubungkan Sekarang
                             </button>
@@ -842,7 +892,7 @@ export default function App() {
                       {s.status === 'CONNECTED' ? (
                         <button
                           onClick={() => handleDisconnect(s.id)}
-                          className="text-xs text-amber-600 hover:text-amber-700 font-medium"
+                          className="text-xs text-amber-600 hover:text-amber-700 font-semibold"
                         >
                           Putuskan Koneksi
                         </button>
@@ -851,7 +901,7 @@ export default function App() {
                       )}
                       <button
                         onClick={() => handleDeleteSession(s.id)}
-                        className="text-xs text-rose-600 hover:text-rose-700 font-medium flex items-center gap-1"
+                        className="text-xs text-rose-600 hover:text-rose-700 font-semibold flex items-center gap-1"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                         <span>Hapus Sesi</span>
@@ -866,14 +916,14 @@ export default function App() {
           {/* TAB 3: DIRECT MESSAGES */}
           {activeTab === 'messages' && (
             <div className="max-w-2xl bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
-              <h3 className="font-semibold text-slate-800 text-base">Kirim Pesan Cepat (Direct Test)</h3>
+              <h3 className="font-bold text-slate-900 text-base">Kirim Pesan Cepat (Direct Chat)</h3>
 
               <div>
                 <label className="text-xs font-medium text-slate-600 block mb-1">Gunakan Akun Pengirim:</label>
                 <select
                   value={selectedSessionId}
                   onChange={(e) => setSelectedSessionId(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                  className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none"
                 >
                   {sessions.map((s) => (
                     <option key={s.id} value={s.id}>
@@ -884,13 +934,13 @@ export default function App() {
               </div>
 
               <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1">Nomor Tujuan (dengan kode negara):</label>
+                <label className="text-xs font-medium text-slate-600 block mb-1">Nomor WhatsApp Tujuan (dengan kode negara):</label>
                 <input
                   type="text"
                   placeholder="Contoh: 628123456789"
                   value={msgTo}
                   onChange={(e) => setMsgTo(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                  className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none font-mono"
                 />
               </div>
 
@@ -901,14 +951,14 @@ export default function App() {
                   placeholder="Ketik pesan Anda di sini..."
                   value={msgText}
                   onChange={(e) => setMsgText(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                  className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none"
                 />
               </div>
 
               <button
                 disabled={isSendingMsg || !msgTo || !msgText}
                 onClick={handleSendMessage}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-lg text-sm transition flex items-center justify-center space-x-2"
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-lg text-sm transition flex items-center justify-center space-x-2"
               >
                 <Send className="w-4 h-4" />
                 <span>{isSendingMsg ? 'Mengirim...' : 'Kirim Pesan Sekarang'}</span>
@@ -921,12 +971,12 @@ export default function App() {
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-semibold text-slate-800 text-sm">Daftar Kontak Tersimpan</h3>
-                  <p className="text-xs text-slate-400">Total: {contacts.length} kontak pada sesi ini</p>
+                  <h3 className="font-semibold text-slate-900 text-sm">Daftar Kontak & Audiens</h3>
+                  <p className="text-xs text-slate-400">Total: {contacts.length} kontak tersimpan</p>
                 </div>
 
                 <div className="flex items-center space-x-2">
-                  <label className="cursor-pointer inline-flex items-center space-x-1 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs px-3 py-1.5 rounded-lg font-medium shadow-sm transition">
+                  <label className="cursor-pointer inline-flex items-center space-x-1.5 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs px-3 py-1.5 rounded-lg font-medium shadow-sm transition">
                     <Upload className="w-3.5 h-3.5" />
                     <span>Import Excel / CSV</span>
                     <input
@@ -952,7 +1002,7 @@ export default function App() {
                   <a
                     href={`/api/v1/contacts/export?sessionId=${selectedSessionId}`}
                     download
-                    className="inline-flex items-center space-x-1 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs px-3 py-1.5 rounded-lg font-medium shadow-sm transition"
+                    className="inline-flex items-center space-x-1.5 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs px-3 py-1.5 rounded-lg font-medium shadow-sm transition"
                   >
                     <Download className="w-3.5 h-3.5" />
                     <span>Export Excel</span>
@@ -975,13 +1025,13 @@ export default function App() {
                     {contacts.length === 0 ? (
                       <tr>
                         <td colSpan={5} className="py-6 text-center text-slate-400">
-                          Belum ada kontak tersimpan. Import file Excel atau tunggu kontak masuk.
+                          Belum ada kontak tersimpan. Import file Excel atau tunggu interaksi pesan.
                         </td>
                       </tr>
                     ) : (
                       contacts.map((c) => (
                         <tr key={c.id} className="hover:bg-slate-50">
-                          <td className="py-2.5 px-3 font-mono font-medium text-slate-800">+{c.phone}</td>
+                          <td className="py-2.5 px-3 font-mono font-medium text-slate-900">+{c.phone}</td>
                           <td className="py-2.5 px-3">{c.name || '-'}</td>
                           <td className="py-2.5 px-3">{c.push_name || '-'}</td>
                           <td className="py-2.5 px-3">
@@ -1014,7 +1064,7 @@ export default function App() {
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-semibold text-slate-800 text-sm">WhatsApp Group Grabber</h3>
+                  <h3 className="font-semibold text-slate-900 text-sm">WhatsApp Group Grabber</h3>
                   <p className="text-xs text-slate-400">Ekstrak seluruh nomor anggota grup WhatsApp yang diikuti ke file Excel</p>
                 </div>
 
@@ -1034,17 +1084,17 @@ export default function App() {
                   </div>
                 ) : (
                   groups.map((g) => (
-                    <div key={g.jid} className="border border-slate-200 rounded-lg p-4 flex flex-col justify-between hover:border-slate-300 transition">
+                    <div key={g.jid} className="border border-slate-200 rounded-xl p-4 flex flex-col justify-between hover:border-slate-300 transition">
                       <div>
-                        <h4 className="font-bold text-slate-800 text-sm truncate">{g.name}</h4>
-                        <p className="text-xs text-slate-500 mt-1">Anggota: <span className="font-semibold text-slate-700">{g.memberCount} orang</span></p>
+                        <h4 className="font-bold text-slate-900 text-sm truncate">{g.name}</h4>
+                        <p className="text-xs text-slate-500 mt-1">Anggota: <span className="font-semibold text-slate-800">{g.memberCount} orang</span></p>
                         <p className="text-[11px] text-slate-400 font-mono truncate mt-0.5">{g.jid}</p>
                       </div>
 
                       <a
                         href={`/api/v1/groups/${g.jid}/export?sessionId=${selectedSessionId}`}
                         download
-                        className="mt-4 w-full bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold py-1.5 rounded flex items-center justify-center space-x-1.5 transition"
+                        className="mt-4 w-full bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold py-1.5 rounded-lg flex items-center justify-center space-x-1.5 transition"
                       >
                         <Download className="w-3.5 h-3.5" />
                         <span>Download Anggota (.xlsx)</span>
@@ -1061,13 +1111,13 @@ export default function App() {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-semibold text-slate-800 text-base">Smart Campaign Broadcast</h3>
+                  <h3 className="font-semibold text-slate-900 text-base">Smart Campaign Broadcast</h3>
                   <p className="text-xs text-slate-500">Kirim pesan massal dengan random delay, spintax, dan proteksi anti-banned</p>
                 </div>
 
                 <button
                   onClick={() => setIsNewCampaignModal(true)}
-                  className="inline-flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm transition"
+                  className="inline-flex items-center space-x-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm transition"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Buat Broadcast Baru</span>
@@ -1084,11 +1134,11 @@ export default function App() {
                     <div key={c.id} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3">
                       <div className="flex items-center justify-between">
                         <div>
-                          <h4 className="font-bold text-slate-800 text-sm">{c.name}</h4>
+                          <h4 className="font-bold text-slate-900 text-sm">{c.name}</h4>
                           <span className="text-xs text-slate-400 font-mono">ID: {c.id}</span>
                         </div>
                         <span
-                          className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
+                          className={`text-[11px] px-2.5 py-0.5 rounded-full font-medium ${
                             c.status === 'RUNNING'
                               ? 'bg-blue-100 text-blue-800 animate-pulse'
                               : c.status === 'COMPLETED'
@@ -1108,7 +1158,7 @@ export default function App() {
                         </div>
                         <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                           <div
-                            className="bg-emerald-500 h-full rounded-full transition-all duration-300"
+                            className="bg-blue-600 h-full rounded-full transition-all duration-300"
                             style={{
                               width: `${c.total_recipients > 0 ? (c.sent_count / c.total_recipients) * 100 : 0}%`
                             }}
@@ -1122,7 +1172,7 @@ export default function App() {
                           {c.status === 'RUNNING' ? (
                             <button
                               onClick={() => handlePauseCampaign(c.id)}
-                              className="inline-flex items-center space-x-1 px-3 py-1 bg-amber-100 text-amber-800 text-xs font-medium rounded hover:bg-amber-200"
+                              className="inline-flex items-center space-x-1 px-3 py-1 bg-amber-100 text-amber-800 text-xs font-medium rounded-lg hover:bg-amber-200"
                             >
                               <Pause className="w-3.5 h-3.5" />
                               <span>Jeda</span>
@@ -1130,7 +1180,7 @@ export default function App() {
                           ) : (
                             <button
                               onClick={() => handleStartCampaign(c.id)}
-                              className="inline-flex items-center space-x-1 px-3 py-1 bg-emerald-600 text-white text-xs font-medium rounded hover:bg-emerald-700"
+                              className="inline-flex items-center space-x-1 px-3 py-1 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700"
                             >
                               <Play className="w-3.5 h-3.5" />
                               <span>Jalankan</span>
@@ -1150,13 +1200,13 @@ export default function App() {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-semibold text-slate-800 text-base">Auto-Responder & Chatbot Rules</h3>
+                  <h3 className="font-semibold text-slate-900 text-base">Auto-Responder & Bot Rules</h3>
                   <p className="text-xs text-slate-500">Evaluasi kata kunci dan balas otomatis pesan masuk pelanggan</p>
                 </div>
 
                 <button
                   onClick={() => setIsNewRuleModal(true)}
-                  className="inline-flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm transition"
+                  className="inline-flex items-center space-x-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm transition"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Tambah Rule Baru</span>
@@ -1172,13 +1222,13 @@ export default function App() {
                   rules.map((r) => (
                     <div key={r.id} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3">
                       <div className="flex items-center justify-between">
-                        <h4 className="font-bold text-slate-800 text-sm">{r.name}</h4>
-                        <span className="text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded font-mono">
+                        <h4 className="font-bold text-slate-900 text-sm">{r.name}</h4>
+                        <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-mono">
                           Hit: {r.hit_count}x
                         </span>
                       </div>
 
-                      <div className="bg-slate-50 p-2.5 rounded text-xs space-y-1">
+                      <div className="bg-slate-50 p-2.5 rounded-lg text-xs space-y-1">
                         <p className="text-slate-600">
                           <span className="font-semibold text-slate-800">Trigger:</span> Pesan mengandung "
                           {r.conditions[0]?.value}"
@@ -1194,7 +1244,7 @@ export default function App() {
                             await fetch(`/api/v1/automation/${r.id}`, { method: 'DELETE' });
                             fetchRules();
                           }}
-                          className="text-xs text-rose-600 hover:text-rose-700 font-medium"
+                          className="text-xs text-rose-600 hover:text-rose-700 font-semibold"
                         >
                           Hapus Rule
                         </button>
@@ -1211,7 +1261,7 @@ export default function App() {
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
-                  <h3 className="font-semibold text-slate-800 text-sm flex items-center gap-2">
+                  <h3 className="font-semibold text-slate-900 text-sm flex items-center gap-2">
                     <Activity className="w-4 h-4 text-emerald-600" />
                     <span>Status Kesehatan Mesin (Telemetry)</span>
                   </h3>
@@ -1219,7 +1269,7 @@ export default function App() {
                   <div className="space-y-2 text-xs divide-y divide-slate-100">
                     <div className="flex justify-between py-1.5">
                       <span className="text-slate-500">Mode Aplikasi</span>
-                      <span className="font-semibold text-emerald-600 font-mono">
+                      <span className="font-semibold text-blue-600 font-mono">
                         {systemStatus?.isPortable ? 'Portable Mode (Zero-Config)' : 'Installed Mode'}
                       </span>
                     </div>
@@ -1229,11 +1279,11 @@ export default function App() {
                     </div>
                     <div className="flex justify-between py-1.5">
                       <span className="text-slate-500">RAM Terpakai (RSS)</span>
-                      <span className="font-semibold text-slate-800 font-mono">{systemStatus?.memory.rssMb} MB</span>
+                      <span className="font-semibold text-slate-900 font-mono">{systemStatus?.memory.rssMb} MB</span>
                     </div>
                     <div className="flex justify-between py-1.5">
                       <span className="text-slate-500">Sisa RAM Laptop</span>
-                      <span className="font-semibold text-slate-800 font-mono">{systemStatus?.memory.freeSystemMemMb} MB</span>
+                      <span className="font-semibold text-slate-900 font-mono">{systemStatus?.memory.freeSystemMemMb} MB</span>
                     </div>
                     <div className="flex justify-between py-1.5">
                       <span className="text-slate-500">Uptime Server</span>
@@ -1244,15 +1294,15 @@ export default function App() {
 
                 <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-slate-800 text-sm flex items-center gap-2">
+                    <h3 className="font-semibold text-slate-900 text-sm flex items-center gap-2">
                       <HardDrive className="w-4 h-4 text-blue-600" />
-                      <span>Cadangan Database (Point-in-Time Backup)</span>
+                      <span>Cadangan Database (.wahub)</span>
                     </h3>
                     <button
                       onClick={handleCreateBackup}
                       className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm transition"
                     >
-                      Buat Backup Sekarang
+                      Buat Backup .wahub
                     </button>
                   </div>
 
@@ -1261,16 +1311,57 @@ export default function App() {
                       <p className="text-slate-400 italic py-4 text-center">Belum ada file backup.</p>
                     ) : (
                       backups.map((b) => (
-                        <div key={b.fileName} className="flex items-center justify-between p-2 border border-slate-100 rounded bg-slate-50">
+                        <div key={b.fileName} className="flex items-center justify-between p-2 border border-slate-100 rounded-lg bg-slate-50">
                           <div>
-                            <p className="font-mono font-medium text-slate-800">{b.fileName}</p>
+                            <p className="font-mono font-medium text-slate-900">{b.fileName}</p>
                             <p className="text-[10px] text-slate-400">Ukuran: {(b.size / 1024).toFixed(1)} KB</p>
                           </div>
-                          <span className="text-emerald-600 font-semibold text-[11px]">Valid</span>
+                          <span className="text-blue-600 font-semibold text-[11px]">Valid .wahub</span>
                         </div>
                       ))
                     )}
                   </div>
+                </div>
+              </div>
+
+              {/* Audit Logs Table (PRD Section 24 & 34) */}
+              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3">
+                <h3 className="font-semibold text-slate-900 text-sm flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                  <span>Rekam Jejak Keamanan & Audit Log Sistem (PRD Section 34)</span>
+                </h3>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs text-slate-600">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold">
+                      <tr>
+                        <th className="py-2 px-3">Waktu</th>
+                        <th className="py-2 px-3">Tipe Event</th>
+                        <th className="py-2 px-3">Detail Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {auditLogs.length === 0 ? (
+                        <tr>
+                          <td colSpan={3} className="py-4 text-center text-slate-400">
+                            Belum ada rekam audit tercatat.
+                          </td>
+                        </tr>
+                      ) : (
+                        auditLogs.slice(0, 15).map((log) => (
+                          <tr key={log.id} className="hover:bg-slate-50">
+                            <td className="py-2 px-3 font-mono text-slate-500 whitespace-nowrap">
+                              {new Date(log.created_at).toLocaleString()}
+                            </td>
+                            <td className="py-2 px-3 font-semibold text-slate-800">{log.event_type}</td>
+                            <td className="py-2 px-3 font-mono text-[11px] text-slate-600">
+                              {JSON.stringify(log.payload)}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
@@ -1282,7 +1373,7 @@ export default function App() {
       {isAddSessionModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl border border-slate-200 space-y-4">
-            <h3 className="font-bold text-slate-800 text-base">Tambah Akun WhatsApp Baru</h3>
+            <h3 className="font-bold text-slate-900 text-base">Tambah Akun WhatsApp Baru</h3>
 
             <div>
               <label className="text-xs font-medium text-slate-600 block mb-1">Session ID (Unik, tanpa spasi):</label>
@@ -1291,7 +1382,7 @@ export default function App() {
                 placeholder="Contoh: marketing, cs1, sales"
                 value={newSessionId}
                 onChange={(e) => setNewSessionId(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
-                className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-emerald-500 focus:outline-none font-mono"
+                className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none font-mono"
               />
             </div>
 
@@ -1302,7 +1393,7 @@ export default function App() {
                 placeholder="Contoh: WhatsApp Marketing Pusat"
                 value={newSessionName}
                 onChange={(e) => setNewSessionName(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none"
               />
             </div>
 
@@ -1312,7 +1403,7 @@ export default function App() {
                 <label
                   className={`border rounded-lg p-3 cursor-pointer text-center text-xs font-medium transition ${
                     loginMethod === 'qr'
-                      ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
+                      ? 'border-blue-500 bg-blue-50 text-blue-800'
                       : 'border-slate-200 hover:bg-slate-50 text-slate-700'
                   }`}
                 >
@@ -1324,14 +1415,14 @@ export default function App() {
                     onChange={() => setLoginMethod('qr')}
                     className="hidden"
                   />
-                  <QrCode className="w-5 h-5 mx-auto mb-1 text-emerald-600" />
+                  <QrCode className="w-5 h-5 mx-auto mb-1 text-blue-600" />
                   Scan QR Code
                 </label>
 
                 <label
                   className={`border rounded-lg p-3 cursor-pointer text-center text-xs font-medium transition ${
                     loginMethod === 'pairing'
-                      ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
+                      ? 'border-blue-500 bg-blue-50 text-blue-800'
                       : 'border-slate-200 hover:bg-slate-50 text-slate-700'
                   }`}
                 >
@@ -1343,7 +1434,7 @@ export default function App() {
                     onChange={() => setLoginMethod('pairing')}
                     className="hidden"
                   />
-                  <KeyRound className="w-5 h-5 mx-auto mb-1 text-blue-600" />
+                  <KeyRound className="w-5 h-5 mx-auto mb-1 text-indigo-600" />
                   Pairing Code (8 Digit)
                 </label>
               </div>
@@ -1357,7 +1448,7 @@ export default function App() {
                   placeholder="Contoh: 628123456789"
                   value={pairingPhone}
                   onChange={(e) => setPairingPhone(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                  className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none font-mono"
                 />
               </div>
             )}
@@ -1372,7 +1463,7 @@ export default function App() {
               <button
                 disabled={!newSessionId || (loginMethod === 'pairing' && !pairingPhone)}
                 onClick={handleCreateSession}
-                className="flex-1 py-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg disabled:opacity-50 transition shadow-sm"
+                className="flex-1 py-2 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 transition shadow-sm"
               >
                 Mulai & Tampilkan QR
               </button>
@@ -1385,7 +1476,7 @@ export default function App() {
       {isNewCampaignModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl border border-slate-200 space-y-4">
-            <h3 className="font-bold text-slate-800 text-base">Buat Campaign Broadcast Baru</h3>
+            <h3 className="font-bold text-slate-900 text-base">Buat Campaign Broadcast Baru</h3>
 
             <div>
               <label className="text-xs font-medium text-slate-600 block mb-1">Nama Campaign:</label>
@@ -1394,7 +1485,7 @@ export default function App() {
                 placeholder="Contoh: Promo Spesial Weekend"
                 value={campName}
                 onChange={(e) => setCampName(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none"
               />
             </div>
 
@@ -1404,7 +1495,7 @@ export default function App() {
                 rows={3}
                 value={campTemplate}
                 onChange={(e) => setCampTemplate(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none"
               />
               <p className="text-[11px] text-slate-400 mt-1">Gunakan <code>&#123;Halo|Hai&#125;</code> untuk spintax acak dan <code>&#123;&#123;name&#125;&#125;</code> untuk nama penerima.</p>
             </div>
@@ -1416,7 +1507,7 @@ export default function App() {
                 placeholder="628123456789,Budi&#10;628987654321,Siti"
                 value={campRecipientsRaw}
                 onChange={(e) => setCampRecipientsRaw(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg p-2 text-xs font-mono focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                className="w-full border border-slate-300 rounded-lg p-2 text-xs font-mono focus:ring-1 focus:ring-blue-500 focus:outline-none"
               />
             </div>
 
@@ -1430,7 +1521,7 @@ export default function App() {
               <button
                 disabled={!campName || !campTemplate}
                 onClick={handleCreateCampaign}
-                className="flex-1 py-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg disabled:opacity-50 transition shadow-sm"
+                className="flex-1 py-2 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 transition shadow-sm"
               >
                 Simpan & Siapkan
               </button>
@@ -1443,7 +1534,7 @@ export default function App() {
       {isNewRuleModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl border border-slate-200 space-y-4">
-            <h3 className="font-bold text-slate-800 text-base">Tambah Aturan Balas Otomatis</h3>
+            <h3 className="font-bold text-slate-900 text-base">Tambah Aturan Balas Otomatis</h3>
 
             <div>
               <label className="text-xs font-medium text-slate-600 block mb-1">Nama Aturan:</label>
@@ -1452,7 +1543,7 @@ export default function App() {
                 placeholder="Contoh: Auto Reply Pricelist"
                 value={ruleName}
                 onChange={(e) => setRuleName(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none"
               />
             </div>
 
@@ -1463,7 +1554,7 @@ export default function App() {
                 placeholder="Contoh: harga, pricelist, info"
                 value={ruleTriggerText}
                 onChange={(e) => setRuleTriggerText(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none"
               />
             </div>
 
@@ -1473,7 +1564,7 @@ export default function App() {
                 rows={3}
                 value={ruleReplyText}
                 onChange={(e) => setRuleReplyText(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none"
               />
             </div>
 
@@ -1487,7 +1578,7 @@ export default function App() {
               <button
                 disabled={!ruleName || !ruleTriggerText || !ruleReplyText}
                 onClick={handleCreateRule}
-                className="flex-1 py-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg disabled:opacity-50 transition shadow-sm"
+                className="flex-1 py-2 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 transition shadow-sm"
               >
                 Simpan Aturan
               </button>
