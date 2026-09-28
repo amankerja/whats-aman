@@ -129,6 +129,7 @@ export interface SalesAnalytics {
 }
 
 export interface AutoReplyConfig {
+  autoReplyEnabled: boolean;
   businessHoursEnabled: boolean;
   businessHoursStart: string;
   businessHoursEnd: string;
@@ -519,6 +520,7 @@ export default function App() {
 
   // AMAN CHAT Pro: Auto-Reply Bot Configuration
   const [botConfig, setBotConfig] = useState<AutoReplyConfig>({
+    autoReplyEnabled: true,
     businessHoursEnabled: false,
     businessHoursStart: '08:00',
     businessHoursEnd: '17:00',
@@ -5557,7 +5559,7 @@ export default function App() {
                       <div className="flex gap-2">
                         <button
                           type="button"
-                          onClick={() => setChatBroadcastSelectedPhones(chats.map(c => c.jid.replace(/[^0-9]/g, '')).filter(Boolean))}
+                          onClick={() => setChatBroadcastSelectedPhones(chats.map(c => c.chat_jid.replace(/[^0-9]/g, '')).filter(Boolean))}
                           className="text-[11px] text-sky-600 hover:underline font-medium"
                         >
                           Pilih Semua
@@ -5572,10 +5574,10 @@ export default function App() {
                       </div>
                     </div>
                     {chats.map(chat => {
-                      const phone = chat.jid.replace(/[^0-9]/g, '');
+                      const phone = chat.chat_jid.replace(/[^0-9]/g, '');
                       const isChecked = chatBroadcastSelectedPhones.includes(phone);
                       return (
-                        <label key={chat.jid} className="flex items-center gap-2 p-1.5 hover:bg-white rounded cursor-pointer text-xs">
+                        <label key={chat.chat_jid} className="flex items-center gap-2 p-1.5 hover:bg-white rounded cursor-pointer text-xs">
                           <input
                             type="checkbox"
                             checked={isChecked}
@@ -5605,8 +5607,8 @@ export default function App() {
                       className="w-full border border-slate-200 rounded-lg p-2 text-xs"
                     >
                       <option value="ALL">Semua Kontak (Aktif)</option>
-                      {availableTags.map(tag => (
-                        <option key={tag} value={tag}>{tag}</option>
+                      {availableTags.map(t => (
+                        <option key={t.tag} value={t.tag}>{t.tag} ({t.count})</option>
                       ))}
                     </select>
                   </div>
@@ -6572,7 +6574,7 @@ export default function App() {
                         <span className="text-[11px] text-emerald-600 font-mono">+{st.delayHours} Jam</span>
                       </div>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 italic truncate">
-                        "{st.messageTemplate}"
+                        "{st.template}"
                       </p>
                     </div>
                   ))}
