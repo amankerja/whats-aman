@@ -660,6 +660,36 @@ export class BaileysAdapter implements IWhatsAppEngine {
     return [];
   }
 
+  private mapBaileysGroup(g: any): GroupInfo {
+    return {
+      jid: g.id,
+      name: g.subject || g.id,
+      topic: g.desc,
+      ownerJid: g.owner,
+      memberCount: Array.isArray(g.participants) ? g.participants.length : 0,
+      participants: Array.isArray(g.participants) ? g.participants.map((p: any) => {
+        let phone = '';
+        if (p.phoneNumber && typeof p.phoneNumber === 'string') {
+          phone = p.phoneNumber.replace(/[^0-9]/g, '');
+        } else if (p.id) {
+          const cleanId = p.id.replace(/:[0-9]+@/, '@');
+          if (cleanId.includes('@lid')) {
+            const resolved = this.resolveLidToPhone(cleanId);
+            phone = resolved || cleanId.split('@')[0];
+          } else {
+            phone = cleanId.split('@')[0].replace(/[^0-9]/g, '');
+          }
+        }
+        return {
+          jid: p.id,
+          phone: phone || p.id.split('@')[0],
+          name: p.name || p.notify || undefined,
+          role: (p.admin as any) || 'member'
+        };
+      }) : []
+    };
+  }
+
   public async getGroups(): Promise<GroupInfo[]> {
     if (!this.socket || this.status !== 'CONNECTED') {
       return [];
@@ -670,18 +700,7 @@ export class BaileysAdapter implements IWhatsAppEngine {
       if (!groups || typeof groups !== 'object') {
         return [];
       }
-      return Object.values(groups).map((g) => ({
-        jid: g.id,
-        name: g.subject || g.id,
-        topic: g.desc,
-        ownerJid: g.owner,
-        memberCount: Array.isArray(g.participants) ? g.participants.length : 0,
-        participants: Array.isArray(g.participants) ? g.participants.map((p) => ({
-          jid: p.id,
-          phone: p.id.split('@')[0],
-          role: (p.admin as any) || 'member'
-        })) : []
-      }));
+      return Object.values(groups).map((g) => this.mapBaileysGroup(g));
     } catch (err: any) {
       logger.warn({ sessionId: this.sessionId, err: err?.message || String(err) }, 'Failed to fetch groups from WhatsApp socket (will retry when connection stabilizes)');
       return [];
@@ -690,29 +709,29 @@ export class BaileysAdapter implements IWhatsAppEngine {
 
   public async getGroupMetadata(groupJid: string): Promise<GroupInfo> {
     if (!this.socket || this.status !== 'CONNECTED') {
-      throw new EngineError(`Session ${this.sessionId} is not connected`);
+      throw new EngineError(`Sesi WhatsApp (${this.sessionId}) belum terhubung. Pastikan status sesi "CONNECTED".`);
     }
 
     try {
       const g = await this.socket.groupMetadata(groupJid);
-      if (!g) {
-        throw new EngineError(`Group metadata not found for ${groupJid}`);
+      if (g) {
+        return this.mapBaileysGroup(g);
       }
-      return {
-        jid: g.id,
-        name: g.subject || g.id,
-        topic: g.desc,
-        ownerJid: g.owner,
-        memberCount: Array.isArray(g.participants) ? g.participants.length : 0,
-        participants: Array.isArray(g.participants) ? g.participants.map((p) => ({
-          jid: p.id,
-          phone: p.id.split('@')[0],
-          role: (p.admin as any) || 'member'
-        })) : []
-      };
     } catch (err: any) {
-      throw new EngineError(`Failed to fetch group metadata: ${err?.message || String(err)}`);
+      logger.warn({ sessionId: this.sessionId, groupJid, err: err?.message || String(err) }, 'Direct groupMetadata query failed, attempting groupFetchAllParticipating fallback');
+      try {
+        const allGroups = await this.socket.groupFetchAllParticipating();
+        const found = allGroups[groupJid] || Object.values(allGroups).find((item: any) => item.id === groupJid);
+        if (found) {
+          return this.mapBaileysGroup(found);
+        }
+      } catch (fallbackErr: any) {
+        logger.warn({ sessionId: this.sessionId, groupJid, fallbackErr: fallbackErr?.message }, 'Fallback group fetch also failed');
+      }
+      throw new EngineError(`Gagal mengambil data grup WhatsApp: ${err?.message || String(err)}`);
     }
+
+    throw new EngineError(`Grup tidak ditemukan untuk ID ${groupJid}`);
   }
 
   public resolveLidToPhone(lid: string): string | undefined {

@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{colors:{"surface-container-low":"#eff4ff","on-primary-fixed-variant":"#005236","surface-container-lowest":"#ffffff","on-surface":"#0b1c30","on-error":"#ffffff","tertiary-fixed-dim":"#93ccff","surface-variant":"#d3e4fe","on-primary":"#ffffff","surface-container-highest":"#d3e4fe","primary-fixed":"#6ffbbe","surface-tint":"#006c49","outline":"#6c7a71","on-error-container":"#93000a","on-background":"#0b1c30","outline-variant":"#bbcabf","secondary-fixed-dim":"#68dba9","on-tertiary-fixed-variant":"#004b73","background":"#f8f9ff","on-secondary-fixed-variant":"#005137","tertiary":"#006398","tertiary-fixed":"#cce5ff","on-primary-container":"#00422b","surface-container":"#e5eeff","surface-dim":"#cbdbf5","on-primary-fixed":"#002113","surface-container-high":"#dce9ff","inverse-primary":"#4edea3","on-secondary-fixed":"#002114","secondary-fixed":"#85f8c4","primary-container":"#10b981","primary-fixed-dim":"#4edea3","inverse-surface":"#213145","on-surface-variant":"#3c4a42","error":"#ba1a1a","on-tertiary-container":"#003c5e","inverse-on-surface":"#eaf1ff","on-tertiary-fixed":"#001d31","secondary":"#006c4a","primary":"#006c49","secondary-container":"#82f5c1","tertiary-container":"#4aaaef","on-secondary":"#ffffff","on-tertiary":"#ffffff","surface-bright":"#f8f9ff","error-container":"#ffdad6","on-secondary-container":"#00714e","surface":"#f8f9ff"},borderRadius:{"DEFAULT":"0.25rem","lg":"0.5rem","xl":"0.75rem","full":"9999px"},spacing:{"space-lg":"1.25rem","gutter":"1rem","margin-desktop":"1.75rem","space-xs":"0.25rem","space-md":"0.875rem","space-2xl":"2.5rem","space-sm":"0.5rem","margin":"1rem","gutter-desktop":"1.25rem","space-xl":"1.75rem"},fontFamily:{"headline-xl":["Plus Jakarta Sans"],"label-lg":["Plus Jakarta Sans"],"headline-lg":["Plus Jakarta Sans"],"label-md":["Plus Jakarta Sans"],"headline-xl-mobile":["Plus Jakarta Sans"],"label-xs":["Plus Jakarta Sans"],"body-lg":["Plus Jakarta Sans"],"body-md":["Plus Jakarta Sans"],"body-sm":["Plus Jakarta Sans"],"headline-sm":["Plus Jakarta Sans"]},fontSize:{"headline-xl":["30px",{lineHeight:"38px",letterSpacing:"-0.02em",fontWeight:"700"}],"label-lg":["13px",{lineHeight:"18px",fontWeight:"600"}],"headline-lg":["22px",{lineHeight:"28px",letterSpacing:"-0.015em",fontWeight:"700"}],"label-md":["12px",{lineHeight:"16px",letterSpacing:"0.02em",fontWeight:"600"}],"headline-xl-mobile":["24px",{lineHeight:"32px",letterSpacing:"-0.015em",fontWeight:"700"}],"label-xs":["11px",{lineHeight:"14px",letterSpacing:"0.04em",fontWeight:"700"}],"body-lg":["15px",{lineHeight:"22px",fontWeight:"400"}],"body-md":["14px",{lineHeight:"20px",fontWeight:"400"}],"body-sm":["13px",{lineHeight:"18px",fontWeight:"400"}],"headline-sm":["18px",{lineHeight:"24px",letterSpacing:"-0.01em",fontWeight:"600"}]}}}};</script></head><body class="bg-surface font-body-md text-on-surface antialiased"><aside class="fixed left-0 top-0 h-screen w-64 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-50 flex flex-col justify-between overflow-y-auto"><div class="flex flex-col"><div class="h-16 px-space-md flex items-center justify-between bg-surface-container-lowest"><div class="flex items-center gap-space-sm"><img alt="WhatsAman Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1WlOfUmew9CQf59fuHcyGEEmPJ3L9zycaF2-92sv0FxwVoOfAg3ylPAdZzoNS3mqQ3bbVa_lb_Gdm8CKLEUa24crHQm0uVxsy1Dn8JuEeKSZBjuEtJgtuWfU8N_VokXnwVVlN3jbItj1wGvavMSomek3aHtZhN4MBiQF8g4FC71AlFph8A4cmS21uK-KdTSv2b67fP4FUpRRIPGjdjWt-aRKV7cNnkR9xOKHyUrbXHDRta06ABxeJxc7qE"/><div class="flex flex-col"><span class="font-headline-sm text-headline-sm tracking-tight text-on-surface font-bold leading-none">WhatsAman</span><span class="font-label-xs text-label-xs text-on-surface-variant flex items-center gap-1.5 mt-1"><span class="w-1.5 h-1.5 rounded-full bg-primary-container animate-pulse"></span>Gateway Ready</span></div></div><button class="p-1 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low rounded-lg transition-colors" type="button"><span class="material-symbols-outlined text-[20px]">dock_to_left</span></button></div><div class="px-space-md my-space-xs"><div class="p-space-xs px-space-sm bg-surface-container-low rounded-xl flex items-center justify-between"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-primary-container ring-2 ring-secondary-container"></span><div class="flex flex-col"><span class="font-label-md text-label-md text-on-surface font-bold leading-tight">SAMSUNG S23</span><span class="font-label-xs text-label-xs text-primary font-semibold">Connected (Session 1)</span></div></div><span class="material-symbols-outlined text-on-surface-variant text-[18px]">unfold_more</span></div></div><nav class="flex flex-col gap-0.5 px-space-sm mt-space-xs" data-active-classes="bg-surface-container-low text-primary font-bold shadow-none"><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="dashboard" href="#">Dashboard</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="sesi-whatsapp" href="#">Sesi WhatsApp</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="obrolan-inbox" href="#">Obrolan (Inbox)</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="crm-pipeline" href="#">CRM &amp; Pipeline</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="kontak" href="#">Kontak</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="grup-whatsapp" href="#">Grup WhatsApp</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="broadcast-massal" href="#">Broadcast Massal</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="message-tester" href="#">Message Tester</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="template-auto-reply" href="#">Template &amp; Auto-Reply</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="webhooks-integrasi" href="#">Webhooks &amp; Integrasi</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg bg-surface-container-low text-primary font-bold shadow-none transition-all font-label-lg text-label-lg" data-path="infrastruktur" href="#">Infrastruktur</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="audit-logs" href="#">Audit Logs</a></nav></div><div class="p-space-sm flex flex-col gap-2 bg-surface-container-low/50 m-space-sm rounded-xl"><div class="flex items-center justify-between px-space-xs"><span class="font-label-xs text-label-xs text-on-surface-variant">Mode Privasi</span><button class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-container-highest text-on-surface font-label-xs text-label-xs" type="button"><span class="material-symbols-outlined text-[14px]">visibility_off</span><span>Alt+P</span></button></div><div class="flex items-center justify-between px-space-xs pt-1"><div class="flex items-center gap-1.5"><button class="font-label-xs text-label-xs text-on-surface-variant hover:text-on-surface font-bold bg-surface-container-high px-1.5 py-0.5 rounded" type="button">ID</button><button class="font-label-xs text-label-xs text-on-surface-variant hover:text-on-surface px-1.5 py-0.5 rounded" type="button">EN</button></div><button class="p-1 text-on-surface-variant hover:text-on-surface rounded-lg hover:bg-surface-container-high transition-colors" type="button"><span class="material-symbols-outlined text-[18px]">light_mode</span></button></div><div class="pt-1 px-space-xs flex items-center justify-between"><span class="font-label-xs text-label-xs text-on-surface-variant flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-primary-container animate-ping"></span>Core Gateway</span><span class="font-label-xs text-label-xs text-primary font-bold">Online 99.98%</span></div></div></aside><div class="pl-64"><header class="fixed top-0 left-64 right-0 h-16 bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex items-center justify-between px-space-lg"><div class="flex items-center gap-space-md"><div class="hidden md:flex items-center gap-2 font-label-xs text-label-xs text-on-surface-variant"><a class="hover:text-primary transition-colors flex items-center gap-1" href="#"><span class="material-symbols-outlined text-[15px]">home</span>WhatsAman</a><span>/</span><span class="text-on-surface font-bold">Infrastruktur</span></div><div class="relative w-80 lg:w-96 flex items-center"><span class="material-symbols-outlined absolute left-3 text-on-surface-variant text-[20px]">search</span><input class="w-full pl-10 pr-16 py-2 bg-surface-container-lowest rounded-full font-body-sm text-body-sm text-on-surface placeholder:text-on-surface-variant/70 shadow-[0_1px_4px_rgba(0,0,0,0.03)] focus:outline-none focus:ring-2 focus:ring-primary-container" placeholder="Cari node, metrik gateway, port, CPU load..." type="text"/><span class="absolute right-3 px-1.5 py-0.5 bg-surface-container-low font-label-xs text-label-xs text-on-surface-variant rounded border border-outline-variant/30">Ctrl+K</span></div></div><div class="flex items-center gap-space-sm"><div class="flex items-center gap-2"><button class="flex items-center gap-1.5 px-3 py-1.5 bg-primary-container text-on-primary-container hover:bg-primary hover:text-on-primary rounded-full font-label-md text-label-md font-bold transition-all" type="button"><span class="material-symbols-outlined text-[18px]">restart_alt</span><span>Restart Node</span></button><button class="flex items-center gap-1.5 px-3 py-1.5 bg-surface-container-lowest text-on-surface hover:bg-surface-container-low hover:text-on-surface rounded-full font-label-md text-label-md font-semibold transition-all shadow-[0_1px_3px_rgba(0,0,0,0.04)]" type="button"><span class="material-symbols-outlined text-[18px]">download</span><span>Export Telemetri</span></button><button class="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low rounded-full transition-colors" title="Refresh Status" type="button"><span class="material-symbols-outlined text-[20px]">refresh</span></button></div><div class="h-6 w-px bg-outline-variant/40 mx-1"></div><div class="relative"><button class="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low rounded-full transition-colors relative" type="button"><span class="material-symbols-outlined text-[22px]">notifications</span><span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-error ring-2 ring-surface"></span></button></div><div class="flex items-center gap-2.5 pl-1"><div class="relative"><img alt="Profile" class="w-8 h-8 rounded-full object-cover ring-2 ring-primary-container/20" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBrPT2zLitf3BAk6tsmu57PNBTgUJRSjP8YLQsi8OBmdJXhp80lg92GA1M_5qEp_rXbYSbDKXnJH8G1Z9qSIbupocWerzPa8oqWoGyIAsuZJ7MITAquYZIkHoheFdYOVr8C5mYhhihy_FoXRrgtAaeg2cjM05oqMc2A_4Ukj4H9Kfpe9nd4XQIkQw3aCowq2lGLd8RIu2JYmd_whZ9GSIZpEdDa1I67v1gdbvcNo5sX61hstQPJ8cGv"/><span class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-primary-container ring-2 ring-surface"></span></div><div class="hidden xl:flex flex-col text-left"><span class="font-label-md text-label-md text-on-surface font-bold leading-tight">Admin Operasional</span><span class="font-label-xs text-label-xs text-on-surface-variant">Superadmin • Aktif</span></div><span class="material-symbols-outlined text-on-surface-variant text-[18px]">expand_more</span></div></div></header><main class="w-full pt-16 bg-surface px-space-lg py-space-md min-h-screen"><div class="flex flex-col w-full pb-space-2xl space-y-space-lg">
+<!-- Top Hero Header & Control Bar -->
+<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-space-md">
+<div class="flex flex-col space-y-1">
+<div class="flex items-center gap-2 font-label-xs text-label-xs text-on-surface-variant">
+<span>WhatsAman Core Gateway</span>
+<span>/</span>
+<span class="text-primary font-bold">Audit Logs &amp; Telemetri</span>
+</div>
+<div class="flex flex-wrap items-center gap-3">
+<h1 class="font-headline-lg text-headline-lg text-on-surface font-bold tracking-tight">Audit Logs &amp; Telemetri Real-time</h1>
+<div class="flex items-center gap-2">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondary-container/40 text-on-primary-fixed-variant font-label-xs text-label-xs font-bold tracking-wide">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-container opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+</span>
+            STREAM AKTIF (WEBSOCKET LIVE)
+          </span>
+<span class="px-2.5 py-1 rounded-full bg-surface-container-high text-on-surface-variant font-label-xs text-label-xs font-semibold">
+            1.842 EVENT HARI INI
+          </span>
+</div>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant max-w-3xl">
+        Pantau riwayat eksekusi sistem, audit keamanan sesi, panggilan webhook API, dan jejak transmisi engine Baileys secara mendalam.
+      </p>
+</div>
+<!-- Global Actions -->
+<div class="flex flex-wrap items-center gap-2">
+<button class="flex items-center gap-1.5 px-3 py-2 bg-surface-container-lowest hover:bg-surface-container-low text-on-surface rounded-full font-label-md text-label-md font-semibold transition-all shadow-sm" id="streamToggleBtn" type="button">
+<span class="material-symbols-outlined text-[18px] text-tertiary" id="streamIcon">pause_circle</span>
+<span id="streamText">Jeda Stream</span>
+</button>
+<button class="flex items-center gap-1.5 px-3 py-2 bg-surface-container-lowest hover:bg-error-container/40 text-error rounded-full font-label-md text-label-md font-semibold transition-all shadow-sm" type="button">
+<span class="material-symbols-outlined text-[18px]">delete_sweep</span>
+<span>Purge Log</span>
+</button>
+<button class="flex items-center gap-1.5 px-3 py-2 bg-surface-container-lowest hover:bg-surface-container-low text-on-surface rounded-full font-label-md text-label-md font-semibold transition-all shadow-sm" onclick="this.classList.add('animate-spin'); setTimeout(() =&gt; this.classList.remove('animate-spin'), 600)" type="button">
+<span class="material-symbols-outlined text-[18px] text-primary">autorenew</span>
+<span>Segarkan</span>
+</button>
+<button class="flex items-center gap-1.5 px-4 py-2 bg-primary-container hover:bg-primary text-on-primary-container hover:text-on-primary rounded-full font-label-md text-label-md font-bold transition-all shadow-sm" type="button">
+<span class="material-symbols-outlined text-[18px]">ios_share</span>
+<span>+ Ekspor Log (.csv / .json)</span>
+</button>
+</div>
+</div>
+<!-- 4 KPI Metrics Summary Cards with High-Polish Micro Visuals -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md">
+<!-- Card 1 -->
+<div class="relative overflow-hidden bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col justify-between group hover:shadow-md transition-all">
+<div class="flex items-start justify-between">
+<div>
+<span class="font-label-xs text-label-xs uppercase tracking-wider text-on-surface-variant font-bold">Total Aktivitas (24 Jam)</span>
+<div class="font-headline-xl text-headline-xl text-on-surface font-extrabold mt-1">14.829</div>
+</div>
+<div class="p-2 rounded-xl bg-surface-container-low text-primary">
+<span class="material-symbols-outlined text-[24px]">insights</span>
+</div>
+</div>
+<div class="mt-4 flex items-center justify-between">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Rata-rata 10.3 event/dtk</span>
+<span class="px-2 py-0.5 rounded-full bg-secondary-container/50 text-on-secondary-fixed-variant font-label-xs text-label-xs font-bold">Normal Traffic</span>
+</div>
+<!-- Subtle SVG Sparkline -->
+<div class="w-full h-8 mt-2 text-primary opacity-60">
+<svg class="w-full h-full" fill="none" preserveaspectratio="none" viewbox="0 0 100 24">
+<path d="M0,18 Q15,4 28,14 T55,8 T80,16 T100,5" stroke="currentColor" stroke-linecap="round" stroke-width="2.5"></path>
+<path d="M0,18 Q15,4 28,14 T55,8 T80,16 T100,5 L100,24 L0,24 Z" fill="currentColor" fill-opacity="0.08"></path>
+</svg>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="relative overflow-hidden bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col justify-between group hover:shadow-md transition-all">
+<div class="flex items-start justify-between">
+<div>
+<span class="font-label-xs text-label-xs uppercase tracking-wider text-on-surface-variant font-bold">Status Sukses / OK</span>
+<div class="font-headline-xl text-headline-xl text-primary font-extrabold mt-1">99.85%</div>
+</div>
+<div class="p-2 rounded-xl bg-secondary-container/30 text-primary">
+<span class="material-symbols-outlined text-[24px]">verified</span>
+</div>
+</div>
+<div class="mt-4 flex items-center justify-between">
+<span class="font-body-sm text-body-sm text-on-surface-variant">14.807 Berhasil • 22 Error</span>
+<span class="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-fixed-variant font-label-xs text-label-xs font-bold">Sangat Baik</span>
+</div>
+<div class="w-full bg-surface-container-low h-2 rounded-full overflow-hidden mt-3">
+<div class="bg-primary-container h-full rounded-full" style="width: 99.85%"></div>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="relative overflow-hidden bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col justify-between group hover:shadow-md transition-all">
+<div class="flex items-start justify-between">
+<div>
+<span class="font-label-xs text-label-xs uppercase tracking-wider text-on-surface-variant font-bold">Insiden &amp; Peringatan</span>
+<div class="font-headline-xl text-headline-xl text-on-surface font-extrabold mt-1">4 <span class="font-headline-sm text-headline-sm font-semibold text-outline">Peringatan</span></div>
+</div>
+<div class="p-2 rounded-xl bg-surface-container-high text-tertiary">
+<span class="material-symbols-outlined text-[24px]">shield_with_heart</span>
+</div>
+</div>
+<div class="mt-4 flex items-center justify-between">
+<span class="font-body-sm text-body-sm text-on-surface-variant">3 Rate-limit soft • 1 retry</span>
+<span class="px-2 py-0.5 rounded-full bg-surface-container text-tertiary font-label-xs text-label-xs font-bold">0 Fatal Crash</span>
+</div>
+<div class="w-full h-8 mt-2 text-tertiary-container opacity-70">
+<svg class="w-full h-full" fill="none" preserveaspectratio="none" viewbox="0 0 100 24">
+<rect fill="currentColor" height="8" rx="2" width="6" x="5" y="16"></rect>
+<rect fill="currentColor" height="10" rx="2" width="6" x="18" y="14"></rect>
+<rect fill="currentColor" height="5" rx="2" width="6" x="31" y="19"></rect>
+<rect fill="currentColor" height="12" rx="2" width="6" x="44" y="12"></rect>
+<rect fill="currentColor" height="6" rx="2" width="6" x="57" y="18"></rect>
+<rect fill="currentColor" height="16" rx="2" width="6" x="70" y="8"></rect>
+<rect fill="currentColor" height="9" rx="2" width="6" x="83" y="15"></rect>
+<rect fill="currentColor" height="7" rx="2" width="6" x="92" y="17"></rect>
+</svg>
+</div>
+</div>
+<!-- Card 4 -->
+<div class="relative overflow-hidden bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col justify-between group hover:shadow-md transition-all">
+<div class="flex items-start justify-between">
+<div>
+<span class="font-label-xs text-label-xs uppercase tracking-wider text-on-surface-variant font-bold">Ukuran Penyimpanan Log</span>
+<div class="font-headline-xl text-headline-xl text-on-surface font-extrabold mt-1">18.4 <span class="font-headline-sm text-headline-sm font-semibold text-outline">MB</span></div>
+</div>
+<div class="p-2 rounded-xl bg-surface-container-low text-primary">
+<span class="material-symbols-outlined text-[24px]">database</span>
+</div>
+</div>
+<div class="mt-4 flex items-center justify-between">
+<span class="font-body-sm text-body-sm text-on-surface-variant">SQLite WAL mode aktif</span>
+<span class="px-2 py-0.5 rounded-full bg-surface-container-low text-on-surface-variant font-label-xs text-label-xs font-semibold">Auto-Prune: 30 Hari</span>
+</div>
+<div class="flex items-center gap-1.5 mt-3">
+<div class="h-2 flex-1 bg-primary-container rounded-full"></div>
+<div class="h-2 w-16 bg-surface-container-high rounded-full"></div>
+<div class="h-2 w-28 bg-surface-container-low rounded-full"></div>
+</div>
+</div>
+</div>
+<!-- Filter & Control Toolbar Module -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-space-md">
+<!-- Category Filter Pills (Segmented) -->
+<div class="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none" id="categoryPillContainer">
+<button class="category-pill active flex items-center gap-1.5 px-3 py-1.5 rounded-full font-label-md text-label-md font-bold transition-all bg-primary-container text-on-primary-container" data-filter="all" type="button">
+<span class="material-symbols-outlined text-[16px]">data_array</span>
+<span>Semua Event (14.829)</span>
+</button>
+<button class="category-pill flex items-center gap-1.5 px-3 py-1.5 rounded-full font-label-md text-label-md font-medium text-on-surface-variant bg-surface-container-low hover:bg-surface-container hover:text-on-surface transition-all" data-filter="session" type="button">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+<span>session.* (342)</span>
+</button>
+<button class="category-pill flex items-center gap-1.5 px-3 py-1.5 rounded-full font-label-md text-label-md font-medium text-on-surface-variant bg-surface-container-low hover:bg-surface-container hover:text-on-surface transition-all" data-filter="message" type="button">
+<span class="w-2 h-2 rounded-full bg-tertiary"></span>
+<span>message.* (11.204)</span>
+</button>
+<button class="category-pill flex items-center gap-1.5 px-3 py-1.5 rounded-full font-label-md text-label-md font-medium text-on-surface-variant bg-surface-container-low hover:bg-surface-container hover:text-on-surface transition-all" data-filter="campaign" type="button">
+<span class="w-2 h-2 rounded-full bg-secondary-container"></span>
+<span>campaign.* (2.810)</span>
+</button>
+<button class="category-pill flex items-center gap-1.5 px-3 py-1.5 rounded-full font-label-md text-label-md font-medium text-on-surface-variant bg-surface-container-low hover:bg-surface-container hover:text-on-surface transition-all" data-filter="webhook" type="button">
+<span class="w-2 h-2 rounded-full bg-surface-tint"></span>
+<span>webhook.* (425)</span>
+</button>
+<button class="category-pill flex items-center gap-1.5 px-3 py-1.5 rounded-full font-label-md text-label-md font-medium text-on-surface-variant bg-surface-container-low hover:bg-surface-container hover:text-on-surface transition-all" data-filter="security" type="button">
+<span class="w-2 h-2 rounded-full bg-inverse-primary"></span>
+<span>security.* (48)</span>
+</button>
+</div>
+<!-- Search Input & Dropdowns Row -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-space-sm items-center">
+<!-- Search Input -->
+<div class="md:col-span-5 relative">
+<span class="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">filter_alt</span>
+<input class="w-full pl-10 pr-12 py-2 bg-surface-container-low rounded-xl font-body-sm text-body-sm text-on-surface placeholder:text-on-surface-variant/70 focus:outline-none focus:bg-surface-container-lowest shadow-inner transition-all" id="searchInput" placeholder="Cari Session ID, pesan error, nomor HP, IP, atau event..." type="text"/>
+<kbd class="absolute right-3 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded bg-surface-container-highest font-label-xs text-label-xs text-on-surface-variant">Ctrl+F</kbd>
+</div>
+<!-- Level Filter -->
+<div class="md:col-span-2">
+<div class="relative">
+<select class="w-full appearance-none pl-3 pr-8 py-2 bg-surface-container-low rounded-xl font-label-md text-label-md text-on-surface focus:outline-none focus:bg-surface-container-lowest transition-all cursor-pointer" id="levelSelect">
+<option value="ALL">Level: Semua Level</option>
+<option value="INFO">Level: INFO</option>
+<option value="WARN">Level: WARN</option>
+<option value="ERROR">Level: ERROR</option>
+<option value="SECURITY">Level: SECURITY</option>
+</select>
+<span class="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[18px]">expand_more</span>
+</div>
+</div>
+<!-- Session Filter -->
+<div class="md:col-span-2">
+<div class="relative">
+<select class="w-full appearance-none pl-3 pr-8 py-2 bg-surface-container-low rounded-xl font-label-md text-label-md text-on-surface focus:outline-none focus:bg-surface-container-lowest transition-all cursor-pointer">
+<option>Sesi: Semua Device</option>
+<option>samsung-s23-office</option>
+<option>cs-support-session</option>
+<option>nomer-cadangan-02</option>
+<option>system-internal-runner</option>
+</select>
+<span class="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[18px]">phone_android</span>
+</div>
+</div>
+<!-- Date Range -->
+<div class="md:col-span-3 flex items-center justify-between gap-2">
+<div class="flex items-center gap-1.5 px-3 py-2 bg-surface-container-low rounded-xl text-on-surface font-label-md text-label-md flex-1">
+<span class="material-symbols-outlined text-on-surface-variant text-[18px]">calendar_today</span>
+<span class="truncate">Hari Ini (24 Mei 2025)</span>
+</div>
+<!-- Live Auto-Scroll Switch -->
+<label class="flex items-center gap-2 cursor-pointer bg-surface-container-low px-3 py-2 rounded-xl hover:bg-surface-container transition-all" title="Toggle Auto-Scroll saat log baru masuk">
+<input checked="" class="sr-only peer" id="autoScrollToggle" type="checkbox"/>
+<div class="w-7 h-4 bg-outline-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-surface-container-lowest after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary-container relative"></div>
+<span class="font-label-xs text-label-xs font-bold text-on-surface whitespace-nowrap">Live</span>
+</label>
+</div>
+</div>
+</div>
+<!-- Main Interactive Audit Logs Data Table -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden flex flex-col">
+<!-- Header of the Table Container -->
+<div class="px-space-md py-3 bg-surface-container-low/70 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[20px]">receipt_long</span>
+<span class="font-headline-sm text-headline-sm text-on-surface font-bold">Catatan Jejak Telemetri Real-time</span>
+<span class="px-2 py-0.5 rounded-full bg-surface-container-highest text-on-surface-variant font-label-xs text-label-xs font-bold" id="itemCountBadge">7 Ditampilkan</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="flex items-center gap-1 font-label-xs text-label-xs text-on-surface-variant">
+<span class="w-2 h-2 rounded-full bg-primary-container"></span>
+<span>Engine: Baileys v6.6.0 (Multi-Device)</span>
+</div>
+</div>
+</div>
+<!-- Table Canvas -->
+<div class="overflow-x-auto w-full">
+<table class="w-full text-left border-collapse" id="auditLogsTable">
+<thead>
+<tr class="bg-surface-container-low text-on-surface-variant font-label-xs text-label-xs uppercase tracking-wider">
+<th class="py-3 px-space-md whitespace-nowrap">WAKTU &amp; TIMESTAMP</th>
+<th class="py-3 px-3 whitespace-nowrap">LEVEL</th>
+<th class="py-3 px-3 whitespace-nowrap">KATEGORI / EVENT</th>
+<th class="py-3 px-3 whitespace-nowrap">SESI WHATSAPP</th>
+<th class="py-3 px-3 whitespace-nowrap">SUMBER / AKTOR</th>
+<th class="py-3 px-space-md whitespace-nowrap">RINCIAN LOG &amp; PAYLOAD</th>
+<th class="py-3 px-space-md text-right whitespace-nowrap">AKSI</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container-low font-body-sm text-body-sm text-on-surface" id="logTableBody">
+<!-- Entry 1: WARN qr_refresh -->
+<tr class="hover:bg-surface-container-low/40 transition-colors group" data-category="session" data-level="WARN">
+<td class="py-3 px-space-md whitespace-nowrap font-mono text-label-xs">
+<span class="font-bold text-on-surface">10:48:12</span>
+<span class="text-on-surface-variant">.412 WIB</span>
+</td>
+<td class="py-3 px-3 whitespace-nowrap">
+<span class="px-2 py-0.5 rounded-md bg-surface-variant text-on-surface-variant font-label-xs text-label-xs font-bold inline-flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-outline"></span>
+                WARN
+              </span>
+</td>
+<td class="py-3 px-3 whitespace-nowrap">
+<span class="px-2 py-1 rounded-lg bg-surface-container-low font-mono font-label-xs text-label-xs text-on-surface font-semibold">session.qr_refresh</span>
+</td>
+<td class="py-3 px-3 whitespace-nowrap">
+<span class="font-label-md text-label-md text-on-surface font-semibold flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-tertiary">phone_iphone</span>
+                cs-support-session
+              </span>
+</td>
+<td class="py-3 px-3 whitespace-nowrap text-on-surface-variant font-label-sm">System Worker</td>
+<td class="py-3 px-space-md max-w-md xl:max-w-xl">
+<p class="truncate text-on-surface font-medium" title="QR Code diperbarui otomatis (kedaluwarsa 45 detik tanpa interaksi pengguna)">
+                QR Code diperbarui otomatis (kedaluwarsa 45 detik tanpa interaksi pengguna)
+              </p>
+<span class="font-mono text-label-xs text-on-surface-variant">ref: qr_cycle_9824 • ttl: 45s • attempts: 3</span>
+</td>
+<td class="py-3 px-space-md text-right whitespace-nowrap">
+<div class="inline-flex items-center gap-1.5">
+<button class="btn-inspect px-2 py-1 bg-surface-container-low hover:bg-surface-container text-primary font-label-xs text-label-xs font-bold rounded-lg transition-all" data-log-id="log-1" type="button">
+                  Inspect JSON
+                </button>
+<button class="p-1 hover:bg-surface-container rounded text-on-surface-variant hover:text-on-surface transition-all" onclick="copyLogSnippet(this, 'QR_REFRESH')" title="Salin Payload" type="button">
+<span class="material-symbols-outlined text-[16px]">content_copy</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Entry 2: INFO message.sent_success -->
+<tr class="hover:bg-surface-container-low/40 transition-colors group" data-category="message" data-level="INFO">
+<td class="py-3 px-space-md whitespace-nowrap font-mono text-label-xs">
+<span class="font-bold text-on-surface">10:47:55</span>
+<span class="text-on-surface-variant">.108 WIB</span>
+</td>
+<td class="py-3 px-3 whitespace-nowrap">
+<span class="px-2 py-0.5 rounded-md bg-secondary-container/50 text-on-primary-fixed-variant font-label-xs text-label-xs font-bold inline-flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span>
+                INFO
+              </span>
+</td>
+<td class="py-3 px-3 whitespace-nowrap">
+<span class="px-2 py-1 rounded-lg bg-surface-container-low font-mono font-label-xs text-label-xs text-primary font-semibold">message.sent_success</span>
+</td>
+<td class="py-3 px-3 whitespace-nowrap">
+<span class="font-label-md text-label-md text-on-surface font-semibold flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-primary">smartphone</span>
+                samsung-s23-office
+              </span>
+</td>
+<td class="py-3 px-3 whitespace-nowrap text-on-surface-variant font-label-sm">Admin Operasional</td>
+<td class="py-3 px-space-md max-w-md xl:max-w-xl">
+<p class="truncate text-on-surface font-medium" title="Pesan teks berhasil dikirim ke +62 812-3456-7890 via Baileys WS (Latensi: 34ms, Jitter: 2.4s)">
+                Pesan teks berhasil dikirim ke <span class="font-mono text-primary font-bold">+62 812-3456-7890</span> via Baileys WS
+              </p>
+<span class="font-mono text-label-xs text-on-surface-variant">ack: 2 (SERVER_ACK) • latency: 34ms • msgId: 3EB0A9943</span>
+</td>
+<td class="py-3 px-space-md text-right whitespace-nowrap">
+<div class="inline-flex items-center gap-1.5">
+<button class="btn-inspect px-2 py-1 bg-surface-container-low hover:bg-surface-container text-primary font-label-xs text-label-xs font-bold rounded-lg transition-all" data-log-id="log-2" type="button">
+                  Inspect JSON
+                </button>
+<button class="p-1 hover:bg-surface-container rounded text-on-surface-variant hover:text-on-surface transition-all" onclick="copyLogSnippet(this, 'MSG_SENT_OK')" title="Salin Payload" type="button">
+<span class="material-symbols-outlined text-[16px]">content_copy</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Entry 3: INFO webhook.payload_ingest -->
+<tr class="hover:bg-surface-container-low/40 transition-colors group" data-category="webhook" data-level="INFO">
+<td class="py-3 px-space-md whitespace-nowrap font-mono text-label-xs">
+<span class="font-bold text-on-surface">10:45:20</span>
+<span class="text-on-surface-variant">.882 WIB</span>
+</td>
+<td class="py-3 px-3 whitespace-nowrap">
+<span class="px-2 py-0.5 rounded-md bg-secondary-container/50 text-on-primary-fixed-variant font-label-xs text-label-xs font-bold inline-flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span>
+                INFO
+              </span>
+</td>
+<td class="py-3 px-3 whitespace-nowrap">
+<span class="px-2 py-1 rounded-lg bg-surface-container-low font-mono font-label-xs text-label-xs text-tertiary font-semibold">webhook.payload_ingest</span>
+</td>
+<td class="py-3 px-3 whitespace-nowrap">
+<span class="font-label-md text-label-md text-on-surface font-semibold flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-primary">smartphone</span>
+                samsung-s23-office
+              </span>
+</td>
+<td class="py-3 px-3 whitespace-nowrap text-on-surface-variant font-label-sm">Google Apps Script (35.190.x.x)</td>
+<td class="py-3 px-space-md max-w-md xl:max-w-xl">
+<p class="truncate text-on-surface font-medium" title="Trigger Google Form 'Pendaftaran Mitra' berhasil diterima dan diproses">
+                Trigger Google Form <span class="font-semibold text-tertiary">"Pendaftaran Mitra"</span> berhasil diproses
+              </p>
+<span class="font-mono text-label-xs text-on-surface-variant">hook_id: wh_849204 • method: POST • queue_time: 12ms</span>
+</td>
+<td class="py-3 px-space-md text-right whitespace-nowrap">
+<div class="inline-flex items-center gap-1.5">
+<button class="btn-inspect px-2 py-1 bg-surface-container-low hover:bg-surface-container text-primary font-label-xs text-label-xs font-bold rounded-lg transition-all" data-log-id="log-3" type="button">
+                  Inspect JSON
+                </button>
+<button class="p-1 hover:bg-surface-container rounded text-on-surface-variant hover:text-on-surface transition-all" onclick="copyLogSnippet(this, 'WEBHOOK_INGEST')" title="Salin Payload" type="button">
+<span class="material-symbols-outlined text-[16px]">content_copy</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Entry 4: ERROR message.send_failed -->
+<tr class="hover:bg-error-container/20 transition-colors group" data-category="message" data-level="ERROR">
+<td class="py-3 px-space-md whitespace-nowrap font-mono text-label-xs">
+<span class="font-bold text-on-surface">10:42:01</span>
+<span class="text-on-surface-variant">.003 WIB</span>
+</td>
+<td class="py-3 px-3 whitespace-nowrap">
+<span class="px-2 py-0.5 rounded-md bg-error-container text-on-error-container font-label-xs text-label-xs font-bold inline-flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-error"></span>
+                ERROR
+              </span>
+</td>
+<td class="py-3 px-3 whitespace-nowrap">
+<span class="px-2 py-1 rounded-lg bg-error-container/60 font-mono font-label-xs text-label-xs text-error font-semibold">message.send_failed</span>
+</td>
+<td class="py-3 px-3 whitespace-nowrap">
+<span class="font-label-md text-label-md text-on-surface font-semibold flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-error">phone_iphone</span>
+                nomer-cadangan-02
+              </span>
+</td>
+<td class="py-3 px-3 whitespace-nowrap text-on-surface-variant font-label-sm">Broadcast Worker #2</td>
+<td class="py-3 px-space-md max-w-md xl:max-w-xl">
+<p class="truncate text-error font-medium" title="Gagal mengirim pesan ke +62 800-0000-0000: Nomor tidak terdaftar di WhatsApp (404 No WA)">
+                Gagal kirim ke <span class="font-mono font-bold">+62 800-0000-0000</span>: Nomor tidak terdaftar (404 Not on WA)
+              </p>
+<span class="font-mono text-label-xs text-on-surface-variant">statusCode: 404 • retryable: false • campaignId: cmp_mei_01</span>
+</td>
+<td class="py-3 px-space-md text-right whitespace-nowrap">
+<div class="inline-flex items-center gap-1.5">
+<button class="btn-inspect px-2 py-1 bg-surface-container-low hover:bg-surface-container text-primary font-label-xs text-label-xs font-bold rounded-lg transition-all" data-log-id="log-4" type="button">
+                  Inspect JSON
+                </button>
+<button class="p-1 hover:bg-surface-container rounded text-on-surface-variant hover:text-on-surface transition-all" onclick="copyLogSnippet(this, 'ERR_SEND')" title="Salin Payload" type="button">
+<span class="material-symbols-outlined text-[16px]">content_copy</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Entry 5: INFO campaign.batch_dispatched -->
+<tr class="hover:bg-surface-container-low/40 transition-colors group" data-category="campaign" data-level="INFO">
+<td class="py-3 px-space-md whitespace-nowrap font-mono text-label-xs">
+<span class="font-bold text-on-surface">10:39:14</span>
+<span class="text-on-surface-variant">.644 WIB</span>
+</td>
+<td class="py-3 px-3 whitespace-nowrap">
+<span class="px-2 py-0.5 rounded-md bg-secondary-container/50 text-on-primary-fixed-variant font-label-xs text-label-xs font-bold inline-flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span>
+                INFO
+              </span>
+</td>
+<td class="py-3 px-3 whitespace-nowrap">
+<span class="px-2 py-1 rounded-lg bg-surface-container-low font-mono font-label-xs text-label-xs text-on-surface font-semibold">campaign.batch_dispatched</span>
+</td>
+<td class="py-3 px-3 whitespace-nowrap">
+<span class="font-label-md text-label-md text-on-surface font-semibold flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-primary">smartphone</span>
+                samsung-s23-office
+              </span>
+</td>
+<td class="py-3 px-3 whitespace-nowrap text-on-surface-variant font-label-sm">Campaign Scheduler</td>
+<td class="py-3 px-space-md max-w-md xl:max-w-xl">
+<p class="truncate text-on-surface font-medium" title="Batch 12/25 Kampanye 'Promo Gajian Mei' selesai terkirim (50/50 kontak)">
+                Batch 12/25 Kampanye <span class="font-semibold text-on-surface">"Promo Gajian Mei"</span> selesai (50/50 sukses)
+              </p>
+<span class="font-mono text-label-xs text-on-surface-variant">progress: 48% • pacingDelay: 2.8s • speed: 18 msg/min</span>
+</td>
+<td class="py-3 px-space-md text-right whitespace-nowrap">
+<div class="inline-flex items-center gap-1.5">
+<button class="btn-inspect px-2 py-1 bg-surface-container-low hover:bg-surface-container text-primary font-label-xs text-label-xs font-bold rounded-lg transition-all" data-log-id="log-5" type="button">
+                  Inspect JSON
+                </button>
+<button class="p-1 hover:bg-surface-container rounded text-on-surface-variant hover:text-on-surface transition-all" onclick="copyLogSnippet(this, 'CAMPAIGN_BATCH')" title="Salin Payload" type="button">
+<span class="material-symbols-outlined text-[16px]">content_copy</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Entry 6: SECURITY auth.admin_login -->
+<tr class="hover:bg-surface-container-high/30 transition-colors group" data-category="security" data-level="SECURITY">
+<td class="py-3 px-space-md whitespace-nowrap font-mono text-label-xs">
+<span class="font-bold text-on-surface">10:35:00</span>
+<span class="text-on-surface-variant">.011 WIB</span>
+</td>
+<td class="py-3 px-3 whitespace-nowrap">
+<span class="px-2 py-0.5 rounded-md bg-tertiary-fixed text-on-tertiary-fixed font-label-xs text-label-xs font-bold inline-flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span>
+                SECURITY
+              </span>
+</td>
+<td class="py-3 px-3 whitespace-nowrap">
+<span class="px-2 py-1 rounded-lg bg-tertiary-fixed/60 font-mono font-label-xs text-label-xs text-tertiary font-semibold">auth.admin_login</span>
+</td>
+<td class="py-3 px-3 whitespace-nowrap">
+<span class="font-label-md text-label-md text-on-surface font-semibold flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-outline">terminal</span>
+                sistem-konsol
+              </span>
+</td>
+<td class="py-3 px-3 whitespace-nowrap text-on-surface-variant font-label-sm">IP: 192.168.1.105</td>
+<td class="py-3 px-space-md max-w-md xl:max-w-xl">
+<p class="truncate text-on-surface font-medium" title="Otentikasi berhasil via sesi browser (Two-Factor Verified)">
+                Otentikasi berhasil via browser dashboard (<span class="font-semibold text-primary">Two-Factor Verified</span>)
+              </p>
+<span class="font-mono text-label-xs text-on-surface-variant">role: superadmin • agent: Chrome/124.0.0 MacOS • tokenExp: 24h</span>
+</td>
+<td class="py-3 px-space-md text-right whitespace-nowrap">
+<div class="inline-flex items-center gap-1.5">
+<button class="btn-inspect px-2 py-1 bg-surface-container-low hover:bg-surface-container text-primary font-label-xs text-label-xs font-bold rounded-lg transition-all" data-log-id="log-6" type="button">
+                  Inspect JSON
+                </button>
+<button class="p-1 hover:bg-surface-container rounded text-on-surface-variant hover:text-on-surface transition-all" onclick="copyLogSnippet(this, 'AUTH_SUCCESS')" title="Salin Payload" type="button">
+<span class="material-symbols-outlined text-[16px]">content_copy</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Entry 7: INFO group.contacts_grabbed -->
+<tr class="hover:bg-surface-container-low/40 transition-colors group" data-category="session" data-level="INFO">
+<td class="py-3 px-space-md whitespace-nowrap font-mono text-label-xs">
+<span class="font-bold text-on-surface">10:30:22</span>
+<span class="text-on-surface-variant">.519 WIB</span>
+</td>
+<td class="py-3 px-3 whitespace-nowrap">
+<span class="px-2 py-0.5 rounded-md bg-secondary-container/50 text-on-primary-fixed-variant font-label-xs text-label-xs font-bold inline-flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span>
+                INFO
+              </span>
+</td>
+<td class="py-3 px-3 whitespace-nowrap">
+<span class="px-2 py-1 rounded-lg bg-surface-container-low font-mono font-label-xs text-label-xs text-on-surface font-semibold">group.contacts_grabbed</span>
+</td>
+<td class="py-3 px-3 whitespace-nowrap">
+<span class="font-label-md text-label-md text-on-surface font-semibold flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-primary">smartphone</span>
+                samsung-s23-office
+              </span>
+</td>
+<td class="py-3 px-3 whitespace-nowrap text-on-surface-variant font-label-sm">Group Grabber Tool</td>
+<td class="py-3 px-space-md max-w-md xl:max-w-xl">
+<p class="truncate text-on-surface font-medium" title="Ekstraksi 455 kontak dari grup 'WHV Jalur Langit' selesai dan disimpan ke database">
+                Ekstraksi 455 kontak dari grup <span class="font-semibold text-on-surface">"WHV Jalur Langit"</span> berhasil disimpan
+              </p>
+<span class="font-mono text-label-xs text-on-surface-variant">groupId: 1203630248@g.us • stored: 455 • newContacts: 142</span>
+</td>
+<td class="py-3 px-space-md text-right whitespace-nowrap">
+<div class="inline-flex items-center gap-1.5">
+<button class="btn-inspect px-2 py-1 bg-surface-container-low hover:bg-surface-container text-primary font-label-xs text-label-xs font-bold rounded-lg transition-all" data-log-id="log-7" type="button">
+                  Inspect JSON
+                </button>
+<button class="p-1 hover:bg-surface-container rounded text-on-surface-variant hover:text-on-surface transition-all" onclick="copyLogSnippet(this, 'GROUP_GRAB')" title="Salin Payload" type="button">
+<span class="material-symbols-outlined text-[16px]">content_copy</span>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Table Pagination & Density Control -->
+<div class="px-space-md py-3 bg-surface-container-lowest flex flex-col sm:flex-row items-center justify-between gap-3">
+<div class="flex items-center gap-3">
+<span class="font-body-sm text-body-sm text-on-surface-variant">
+          Menampilkan <span class="font-bold text-on-surface">1 - 7</span> dari <span class="font-bold text-on-surface">14.829</span> log event
+        </span>
+<div class="flex items-center gap-1.5 pl-2">
+<span class="font-label-xs text-label-xs text-on-surface-variant">Tampilkan:</span>
+<select class="px-2 py-1 rounded bg-surface-container-low font-label-xs text-label-xs text-on-surface focus:outline-none">
+<option>10 / halaman</option>
+<option selected="">25 / halaman</option>
+<option>50 / halaman</option>
+<option>100 / halaman</option>
+</select>
+</div>
+</div>
+<div class="flex items-center gap-1 font-label-md text-label-md">
+<button class="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low disabled:opacity-40" disabled="" type="button">
+<span class="material-symbols-outlined text-[18px]">chevron_left</span>
+</button>
+<button class="w-8 h-8 rounded-lg bg-primary-container text-on-primary-container font-bold flex items-center justify-center" type="button">1</button>
+<button class="w-8 h-8 rounded-lg hover:bg-surface-container-low text-on-surface font-semibold flex items-center justify-center transition-colors" type="button">2</button>
+<button class="w-8 h-8 rounded-lg hover:bg-surface-container-low text-on-surface font-semibold flex items-center justify-center transition-colors" type="button">3</button>
+<span class="px-1 text-on-surface-variant">...</span>
+<button class="w-8 h-8 rounded-lg hover:bg-surface-container-low text-on-surface font-semibold flex items-center justify-center transition-colors" type="button">212</button>
+<button class="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Integrated Real-time JSON Payload Inspector Drawer / Accordion Section -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-3" id="jsonInspectorCard">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<div class="p-1.5 rounded-lg bg-surface-container-high text-tertiary">
+<span class="material-symbols-outlined text-[20px]">code</span>
+</div>
+<div>
+<span class="font-headline-sm text-headline-sm text-on-surface font-bold">Structured Telemetry Payload Inspector</span>
+<span class="block font-label-xs text-label-xs text-on-surface-variant">Detail metadata, request payload &amp; Baileys socket trace untuk event terpilih</span>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="px-2.5 py-1 rounded-full bg-secondary-container/40 text-primary font-mono text-label-xs font-bold" id="currentInspectorEvent">
+          EVENT: message.sent_success [log-2]
+        </span>
+<button class="px-3 py-1.5 rounded-full bg-surface-container-low hover:bg-surface-container text-on-surface font-label-xs text-label-xs font-bold transition-all flex items-center gap-1" onclick="copyInspectorContent()" type="button">
+<span class="material-symbols-outlined text-[16px]">content_copy</span>
+<span id="copyFeedback">Salin Raw JSON</span>
+</button>
+</div>
+</div>
+<!-- Monospace Terminal-like JSON Box -->
+<div class="relative bg-surface-container-low rounded-xl p-4 overflow-x-auto font-mono text-label-xs text-on-surface leading-relaxed border-none">
+<pre class="text-on-surface" id="jsonPreviewBox"><span class="text-tertiary font-bold">{</span>
+  <span class="text-primary font-bold">"timestamp"</span>: <span class="text-on-surface">"2025-05-24T10:47:55.108Z"</span>,
+  <span class="text-primary font-bold">"trace_id"</span>: <span class="text-on-surface">"tr_wa_99014ab81ef"</span>,
+  <span class="text-primary font-bold">"level"</span>: <span class="text-primary font-bold">"INFO"</span>,
+  <span class="text-primary font-bold">"event"</span>: <span class="text-on-surface">"message.sent_success"</span>,
+  <span class="text-primary font-bold">"session"</span>: {
+    <span class="text-primary font-bold">"id"</span>: <span class="text-on-surface">"samsung-s23-office"</span>,
+    <span class="text-primary font-bold">"jid"</span>: <span class="text-on-surface">"6281122334455@s.whatsapp.net"</span>,
+    <span class="text-primary font-bold">"pushName"</span>: <span class="text-on-surface">"WhatsAman Office Hub"</span>,
+    <span class="text-primary font-bold">"engine_state"</span>: <span class="text-primary font-bold">"open"</span>
+  },
+  <span class="text-primary font-bold">"payload"</span>: {
+    <span class="text-primary font-bold">"to"</span>: <span class="text-on-surface">"6281234567890@s.whatsapp.net"</span>,
+    <span class="text-primary font-bold">"message_type"</span>: <span class="text-on-surface">"conversation"</span>,
+    <span class="text-primary font-bold">"content_hash"</span>: <span class="text-on-surface">"sha256:d8e8fca2dc018b..."</span>,
+    <span class="text-primary font-bold">"baileys_message_id"</span>: <span class="text-on-surface">"3EB0A9943B21FE8190"</span>,
+    <span class="text-primary font-bold">"routing_latency_ms"</span>: <span class="text-primary font-bold">34</span>,
+    <span class="text-primary font-bold">"ack"</span>: <span class="text-primary font-bold">2</span>
+  },
+  <span class="text-primary font-bold">"actor"</span>: {
+    <span class="text-primary font-bold">"type"</span>: <span class="text-on-surface">"user"</span>,
+    <span class="text-primary font-bold">"username"</span>: <span class="text-on-surface">"admin_operasional"</span>,
+    <span class="text-primary font-bold">"ip_address"</span>: <span class="text-on-surface">"192.168.1.105"</span>
+  }
+<span class="text-tertiary font-bold">}</span></pre>
+</div>
+</div>
+</div>
+<!-- Vanilla Interactive JavaScript for Filtering, Stream Toggle, and JSON Inspection -->
+<script>
+  // JSON Mock Datasets
+  const logDataStore = {
+    'log-1': {
+      timestamp: "2025-05-24T10:48:12.412Z",
+      level: "WARN",
+      event: "session.qr_refresh",
+      session: { id: "cs-support-session", state: "pairing" },
+      payload: { qr_cycle: 9824, ttl_seconds: 45, auto_restart: true },
+      actor: { type: "system", name: "Worker_Daemon_#1" }
+    },
+    'log-2': {
+      timestamp: "2025-05-24T10:47:55.108Z",
+      trace_id: "tr_wa_99014ab81ef",
+      level: "INFO",
+      event: "message.sent_success",
+      session: { id: "samsung-s23-office", jid: "6281122334455@s.whatsapp.net", pushName: "WhatsAman Office Hub", engine_state: "open" },
+      payload: { to: "6281234567890@s.whatsapp.net", message_type: "conversation", baileys_message_id: "3EB0A9943B21FE8190", routing_latency_ms: 34, ack: 2 },
+      actor: { type: "user", username: "admin_operasional", ip_address: "192.168.1.105" }
+    },
+    'log-3': {
+      timestamp: "2025-05-24T10:45:20.882Z",
+      level: "INFO",
+      event: "webhook.payload_ingest",
+      session: { id: "samsung-s23-office" },
+      payload: { webhook_id: "wh_849204", source: "Google Forms / Apps Script", queue_duration_ms: 12, http_status: 200 },
+      actor: { ip: "35.190.22.10", user_agent: "Google-Apps-Script/1.0" }
+    },
+    'log-4': {
+      timestamp: "2025-05-24T10:42:01.003Z",
+      level: "ERROR",
+      event: "message.send_failed",
+      session: { id: "nomer-cadangan-02" },
+      payload: { recipient: "+6280000000000", error_code: 404, reason: "number_not_registered_whatsapp", campaign_id: "cmp_mei_01" },
+      actor: { service: "BroadcastWorker_2", pid: 8812 }
+    },
+    'log-5': {
+      timestamp: "2025-05-24T10:39:14.644Z",
+      level: "INFO",
+      event: "campaign.batch_dispatched",
+      session: { id: "samsung-s23-office" },
+      payload: { batch_index: 12, total_batches: 25, success_count: 50, failed_count: 0, campaign_name: "Promo Gajian Mei" },
+      actor: { scheduler: "cron_job_campaign" }
+    },
+    'log-6': {
+      timestamp: "2025-05-24T10:35:00.011Z",
+      level: "SECURITY",
+      event: "auth.admin_login",
+      session: { console: "dashboard" },
+      payload: { auth_method: "password_totp", two_factor_status: "verified", session_token_prefix: "wa_adm_49f..." },
+      actor: { username: "superadmin", ip: "192.168.1.105", browser: "Chrome/124.0.0 MacOS" }
+    },
+    'log-7': {
+      timestamp: "2025-05-24T10:30:22.519Z",
+      level: "INFO",
+      event: "group.contacts_grabbed",
+      session: { id: "samsung-s23-office" },
+      payload: { group_jid: "1203630248@g.us", group_name: "WHV Jalur Langit", participants_found: 455, saved_database: 455 },
+      actor: { tool: "Group_Grabber_V2" }
+    }
+  };
+
+  // Category Filtering
+  const pills = document.querySelectorAll('.category-pill');
+  const tableRows = document.querySelectorAll('#logTableBody tr');
+  const searchInput = document.getElementById('searchInput');
+  const levelSelect = document.getElementById('levelSelect');
+  const itemCountBadge = document.getElementById('itemCountBadge');
+
+  function filterTable() {
+    const activePill = document.querySelector('.category-pill.active');
+    const category = activePill ? activePill.getAttribute('data-filter') : 'all';
+    const level = levelSelect ? levelSelect.value : 'ALL';
+    const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+    let visibleCount = 0;
+
+    tableRows.forEach(row => {
+      const rowCat = row.getAttribute('data-category');
+      const rowLvl = row.getAttribute('data-level');
+      const text = row.innerText.toLowerCase();
+
+      const matchCat = (category === 'all' || rowCat === category);
+      const matchLvl = (level === 'ALL' || rowLvl === level);
+      const matchSearch = query === '' || text.includes(query);
+
+      if (matchCat && matchLvl && matchSearch) {
+        row.style.display = '';
+        visibleCount++;
+      } else {
+        row.style.display = 'none';
+      }
+    });
+
+    if (itemCountBadge) {
+      itemCountBadge.innerText = visibleCount + ' Ditampilkan';
+    }
+  }
+
+  pills.forEach(pill => {
+    pill.addEventListener('click', function() {
+      pills.forEach(p => {
+        p.classList.remove('active', 'bg-primary-container', 'text-on-primary-container');
+        p.classList.add('bg-surface-container-low', 'text-on-surface-variant');
+      });
+      this.classList.add('active', 'bg-primary-container', 'text-on-primary-container');
+      this.classList.remove('bg-surface-container-low', 'text-on-surface-variant');
+      filterTable();
+    });
+  });
+
+  if (searchInput) searchInput.addEventListener('input', filterTable);
+  if (levelSelect) levelSelect.addEventListener('change', filterTable);
+
+  // JSON Inspection Handler
+  document.querySelectorAll('.btn-inspect').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const logId = this.getAttribute('data-log-id');
+      const data = logDataStore[logId];
+      if (data) {
+        const preview = document.getElementById('jsonPreviewBox');
+        const badge = document.getElementById('currentInspectorEvent');
+        if (preview) {
+          preview.innerText = JSON.stringify(data, null, 2);
+        }
+        if (badge) {
+          badge.innerText = `EVENT: ${data.event} [${logId}]`;
+        }
+        document.getElementById('jsonInspectorCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    });
+  });
+
+  // Stream Pause / Resume
+  let isStreaming = true;
+  const streamToggleBtn = document.getElementById('streamToggleBtn');
+  const streamIcon = document.getElementById('streamIcon');
+  const streamText = document.getElementById('streamText');
+
+  if (streamToggleBtn) {
+    streamToggleBtn.addEventListener('click', function() {
+      isStreaming = !isStreaming;
+      if (isStreaming) {
+        streamIcon.innerText = 'pause_circle';
+        streamIcon.classList.remove('text-primary');
+        streamIcon.classList.add('text-tertiary');
+        streamText.innerText = 'Jeda Stream';
+      } else {
+        streamIcon.innerText = 'play_circle';
+        streamIcon.classList.remove('text-tertiary');
+        streamIcon.classList.add('text-primary');
+        streamText.innerText = 'Lanjutkan Stream';
+      }
+    });
+  }
+
+  // Copy Snippet
+  window.copyLogSnippet = function(button, tag) {
+    const icon = button.querySelector('.material-symbols-outlined');
+    if (icon) {
+      icon.innerText = 'check';
+      setTimeout(() => { icon.innerText = 'content_copy'; }, 1200);
+    }
+  };
+
+  // Copy Inspector Box Content
+  window.copyInspectorContent = function() {
+    const content = document.getElementById('jsonPreviewBox').innerText;
+    navigator.clipboard.writeText(content).then(() => {
+      const fb = document.getElementById('copyFeedback');
+      if (fb) {
+        fb.innerText = 'Berhasil Disalin!';
+        setTimeout(() => { fb.innerText = 'Salin Raw JSON'; }, 1500);
+      }
+    });
+  };
+</script></main></div></body></html>

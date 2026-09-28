@@ -29,6 +29,23 @@ groupRouter.get('/', async (req: Request, res: Response, next: NextFunction) => 
   }
 });
 
+// GET /api/v1/groups/export-all - Export all groups to a single consolidated Excel file
+groupRouter.get('/export-all', async (req: Request, res: Response) => {
+  try {
+    const { sessionId } = req.query;
+    if (!sessionId) {
+      res.status(400).json({ success: false, message: 'Silakan pilih sesi WhatsApp terlebih dahulu' });
+      return;
+    }
+    const { buffer, totalGroups, totalMembers } = await groupService.exportAllGroupsToExcel(String(sessionId));
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="semua_grup_members_${sessionId}.xlsx"`);
+    res.send(buffer);
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message || 'Gagal mengekspor seluruh grup' });
+  }
+});
+
 // GET /api/v1/groups/:jid - Get group details and participants
 groupRouter.get('/:jid', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -37,7 +54,7 @@ groupRouter.get('/:jid', async (req: Request, res: Response, next: NextFunction)
       res.status(400).json({ success: false, message: 'sessionId is required' });
       return;
     }
-    const jid = String(req.params.jid);
+    const jid = decodeURIComponent(String(req.params.jid));
     const group = await groupService.getGroupMetadata(String(sessionId), jid);
     res.json({ success: true, data: group });
   } catch (err) {
@@ -46,21 +63,22 @@ groupRouter.get('/:jid', async (req: Request, res: Response, next: NextFunction)
 });
 
 // GET /api/v1/groups/:jid/export - Export group members to Excel
-groupRouter.get('/:jid/export', async (req: Request, res: Response, next: NextFunction) => {
+groupRouter.get('/:jid/export', async (req: Request, res: Response) => {
   try {
     const { sessionId } = req.query;
     if (!sessionId) {
-      res.status(400).json({ success: false, message: 'sessionId is required' });
+      res.status(400).json({ success: false, message: 'Silakan pilih sesi WhatsApp terlebih dahulu' });
       return;
     }
-    const jid = String(req.params.jid);
-    const { buffer, groupName } = await groupService.exportGroupMembersToExcel(String(sessionId), jid);
-    const safeName = groupName.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const rawJid = String(req.params.jid || '');
+    const jid = decodeURIComponent(rawJid);
+    const { buffer, groupName, count } = await groupService.exportGroupMembersToExcel(String(sessionId), jid);
+    const safeName = groupName.replace(/[^a-zA-Z0-9_-]/g, '_') || 'group';
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="group_${safeName}_members.xlsx"`);
     res.send(buffer);
-  } catch (err) {
-    next(err);
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message || 'Gagal mengekspor anggota grup' });
   }
 });
 
@@ -72,7 +90,7 @@ groupRouter.post('/:jid/auto-reply', async (req: Request, res: Response, next: N
       res.status(400).json({ success: false, message: 'sessionId is required' });
       return;
     }
-    const jid = String(req.params.jid);
+    const jid = decodeURIComponent(String(req.params.jid));
     groupService.setGroupAutoReply(String(sessionId), jid, Boolean(enabled));
     res.json({
       success: true,
@@ -87,7 +105,7 @@ groupRouter.post('/:jid/auto-reply', async (req: Request, res: Response, next: N
 const handleGroupImportToContacts = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { sessionId } = req.body;
-    const jid = String(req.params.jid || req.body.jid || '');
+    const jid = decodeURIComponent(String(req.params.jid || req.body.jid || ''));
     if (!sessionId || !jid) {
       res.status(400).json({ success: false, message: 'sessionId and jid are required' });
       return;

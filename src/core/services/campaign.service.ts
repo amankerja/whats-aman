@@ -89,9 +89,13 @@ export class CampaignService {
     this.activeLoops.set(campaignId, false);
     campaignRepository.updateCampaignStatus(campaignId, 'PAUSED', reason);
     if (reason) {
+      const current = campaignRepository.findCampaignById(campaignId);
       eventBus.emit('campaign.updated', {
         campaignId,
         status: 'PAUSED',
+        sent: current?.sent_count || 0,
+        total: current?.total_recipients || 0,
+        failed: current?.failed_count || 0,
         message: reason
       });
     }

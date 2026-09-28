@@ -43,6 +43,7 @@ export interface GroupInfo {
   participants: Array<{
     jid: string;
     phone: string;
+    name?: string;
     role: 'admin' | 'superadmin' | 'member';
   }>;
 }

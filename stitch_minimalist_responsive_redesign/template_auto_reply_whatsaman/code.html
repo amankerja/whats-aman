@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{colors:{"surface-container-low":"#eff4ff","on-primary-fixed-variant":"#005236","surface-container-lowest":"#ffffff","on-surface":"#0b1c30","on-error":"#ffffff","tertiary-fixed-dim":"#93ccff","surface-variant":"#d3e4fe","on-primary":"#ffffff","surface-container-highest":"#d3e4fe","primary-fixed":"#6ffbbe","surface-tint":"#006c49","outline":"#6c7a71","on-error-container":"#93000a","on-background":"#0b1c30","outline-variant":"#bbcabf","secondary-fixed-dim":"#68dba9","on-tertiary-fixed-variant":"#004b73","background":"#f8f9ff","on-secondary-fixed-variant":"#005137","tertiary":"#006398","tertiary-fixed":"#cce5ff","on-primary-container":"#00422b","surface-container":"#e5eeff","surface-dim":"#cbdbf5","on-primary-fixed":"#002113","surface-container-high":"#dce9ff","inverse-primary":"#4edea3","on-secondary-fixed":"#002114","secondary-fixed":"#85f8c4","primary-container":"#10b981","primary-fixed-dim":"#4edea3","inverse-surface":"#213145","on-surface-variant":"#3c4a42","error":"#ba1a1a","on-tertiary-container":"#003c5e","inverse-on-surface":"#eaf1ff","on-tertiary-fixed":"#001d31","secondary":"#006c4a","primary":"#006c49","secondary-container":"#82f5c1","tertiary-container":"#4aaaef","on-secondary":"#ffffff","on-tertiary":"#ffffff","surface-bright":"#f8f9ff","error-container":"#ffdad6","on-secondary-container":"#00714e","surface":"#f8f9ff"},borderRadius:{"DEFAULT":"0.25rem","lg":"0.5rem","xl":"0.75rem","full":"9999px"},spacing:{"space-lg":"1.25rem","gutter":"1rem","margin-desktop":"1.75rem","space-xs":"0.25rem","space-md":"0.875rem","space-2xl":"2.5rem","space-sm":"0.5rem","margin":"1rem","gutter-desktop":"1.25rem","space-xl":"1.75rem"},fontFamily:{"headline-xl":["Plus Jakarta Sans"],"label-lg":["Plus Jakarta Sans"],"headline-lg":["Plus Jakarta Sans"],"label-md":["Plus Jakarta Sans"],"headline-xl-mobile":["Plus Jakarta Sans"],"label-xs":["Plus Jakarta Sans"],"body-lg":["Plus Jakarta Sans"],"body-md":["Plus Jakarta Sans"],"body-sm":["Plus Jakarta Sans"],"headline-sm":["Plus Jakarta Sans"]},fontSize:{"headline-xl":["30px",{lineHeight:"38px",letterSpacing:"-0.02em",fontWeight:"700"}],"label-lg":["13px",{lineHeight:"18px",fontWeight:"600"}],"headline-lg":["22px",{lineHeight:"28px",letterSpacing:"-0.015em",fontWeight:"700"}],"label-md":["12px",{lineHeight:"16px",letterSpacing:"0.02em",fontWeight:"600"}],"headline-xl-mobile":["24px",{lineHeight:"32px",letterSpacing:"-0.015em",fontWeight:"700"}],"label-xs":["11px",{lineHeight:"14px",letterSpacing:"0.04em",fontWeight:"700"}],"body-lg":["15px",{lineHeight:"22px",fontWeight:"400"}],"body-md":["14px",{lineHeight:"20px",fontWeight:"400"}],"body-sm":["13px",{lineHeight:"18px",fontWeight:"400"}],"headline-sm":["18px",{lineHeight:"24px",letterSpacing:"-0.01em",fontWeight:"600"}]}}}};</script></head><body class="bg-surface font-body-md text-on-surface antialiased"><aside class="fixed left-0 top-0 h-screen w-64 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-50 flex flex-col justify-between overflow-y-auto"><div class="flex flex-col"><div class="h-16 px-space-md flex items-center justify-between bg-surface-container-lowest"><div class="flex items-center gap-space-sm"><img alt="WhatsAman Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1WlOfUmew9CQf59fuHcyGEEmPJ3L9zycaF2-92sv0FxwVoOfAg3ylPAdZzoNS3mqQ3bbVa_lb_Gdm8CKLEUa24crHQm0uVxsy1Dn8JuEeKSZBjuEtJgtuWfU8N_VokXnwVVlN3jbItj1wGvavMSomek3aHtZhN4MBiQF8g4FC71AlFph8A4cmS21uK-KdTSv2b67fP4FUpRRIPGjdjWt-aRKV7cNnkR9xOKHyUrbXHDRta06ABxeJxc7qE"/><div class="flex flex-col"><span class="font-headline-sm text-headline-sm tracking-tight text-on-surface font-bold leading-none">WhatsAman</span><span class="font-label-xs text-label-xs text-on-surface-variant flex items-center gap-1.5 mt-1"><span class="w-1.5 h-1.5 rounded-full bg-primary-container animate-pulse"></span>v1.0.0 • Ready</span></div></div><button class="p-1 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low rounded-lg transition-colors" type="button"><span class="material-symbols-outlined text-[20px]">dock_to_left</span></button></div><div class="px-space-md my-space-xs"><div class="p-space-xs px-space-sm bg-surface-container-low rounded-xl flex items-center justify-between"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-primary-container ring-2 ring-secondary-container"></span><div class="flex flex-col"><span class="font-label-md text-label-md text-on-surface font-bold leading-tight">SAMSUNG S23</span><span class="font-label-xs text-label-xs text-primary font-semibold">Connected (Session 1)</span></div></div><span class="material-symbols-outlined text-on-surface-variant text-[18px]">unfold_more</span></div></div><nav class="flex flex-col gap-0.5 px-space-sm mt-space-xs" data-active-classes="bg-surface-container-low text-primary font-bold shadow-none"><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="dashboard" href="#">Dashboard</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="sesi-whatsapp" href="#">Sesi WhatsApp</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="obrolan-inbox" href="#">Obrolan (Inbox)</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="crm-pipeline" href="#">CRM &amp; Pipeline</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="kontak" href="#">Kontak</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="grup-whatsapp" href="#">Grup WhatsApp</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="broadcast-massal" href="#">Broadcast Massal</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="message-tester" href="#">Message Tester</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="template-auto-reply" href="#">Template &amp; Auto-Reply</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="webhooks-integrasi" href="#">Webhooks &amp; Integrasi</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="infrastruktur" href="#">Infrastruktur</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="audit-logs" href="#">Audit Logs</a></nav></div><div class="p-space-sm flex flex-col gap-2 bg-surface-container-low/50 m-space-sm rounded-xl"><div class="flex items-center justify-between px-space-xs"><span class="font-label-xs text-label-xs text-on-surface-variant">Mode Privasi</span><button class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-container-highest text-on-surface font-label-xs text-label-xs" type="button"><span class="material-symbols-outlined text-[14px]">visibility_off</span><span>Alt+P</span></button></div><div class="flex items-center justify-between px-space-xs pt-1"><div class="flex items-center gap-1.5"><button class="font-label-xs text-label-xs text-on-surface-variant hover:text-on-surface font-bold bg-surface-container-high px-1.5 py-0.5 rounded" type="button">ID</button><button class="font-label-xs text-label-xs text-on-surface-variant hover:text-on-surface px-1.5 py-0.5 rounded" type="button">EN</button></div><button class="p-1 text-on-surface-variant hover:text-on-surface rounded-lg hover:bg-surface-container-high transition-colors" type="button"><span class="material-symbols-outlined text-[18px]">light_mode</span></button></div><div class="pt-1 px-space-xs flex items-center justify-between"><span class="font-label-xs text-label-xs text-on-surface-variant flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-primary-container animate-ping"></span>Core Gateway</span><span class="font-label-xs text-label-xs text-primary font-bold">Online 99.98%</span></div></div></aside><div class="pl-64"><header class="fixed top-0 left-64 right-0 h-16 bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex items-center justify-between px-space-lg"><div class="flex items-center gap-space-md"><div class="hidden md:flex items-center gap-2 font-label-xs text-label-xs text-on-surface-variant"><a class="hover:text-primary transition-colors flex items-center gap-1" href="#"><span class="material-symbols-outlined text-[15px]">home</span>WhatsAman</a><span>/</span><span class="text-on-surface font-bold">Template &amp; Aturan Auto-Reply</span></div><div class="relative w-80 lg:w-96 flex items-center"><span class="material-symbols-outlined absolute left-3 text-on-surface-variant text-[20px]">search</span><input class="w-full pl-10 pr-16 py-2 bg-surface-container-lowest rounded-full font-body-sm text-body-sm text-on-surface placeholder:text-on-surface-variant/70 shadow-[0_1px_4px_rgba(0,0,0,0.03)] focus:outline-none focus:ring-2 focus:ring-primary-container" placeholder="Cari template, kata kunci, bot auto-reply..." type="text"/><span class="absolute right-3 px-1.5 py-0.5 bg-surface-container-low font-label-xs text-label-xs text-on-surface-variant rounded border border-outline-variant/30">Ctrl+K</span></div></div><div class="flex items-center gap-space-sm"><div class="flex items-center gap-2"><button class="flex items-center gap-1.5 px-3 py-1.5 bg-primary-container text-on-primary-container hover:bg-primary hover:text-on-primary rounded-full font-label-md text-label-md font-bold transition-all" type="button"><span class="material-symbols-outlined text-[18px]">send</span><span>Kirim Broadcast</span></button><button class="flex items-center gap-1.5 px-3 py-1.5 bg-surface-container-lowest text-on-surface hover:bg-surface-container-low hover:text-on-surface rounded-full font-label-md text-label-md font-semibold transition-all shadow-[0_1px_3px_rgba(0,0,0,0.04)]" type="button"><span class="material-symbols-outlined text-[18px]">edit_square</span><span>Chat Baru</span></button><button class="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low rounded-full transition-colors" title="Refresh Status" type="button"><span class="material-symbols-outlined text-[20px]">refresh</span></button></div><div class="h-6 w-px bg-outline-variant/40 mx-1"></div><div class="relative"><button class="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low rounded-full transition-colors relative" type="button"><span class="material-symbols-outlined text-[22px]">notifications</span><span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-error ring-2 ring-surface"></span></button></div><div class="flex items-center gap-2.5 pl-1"><div class="relative"><img alt="Profile" class="w-8 h-8 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBrPT2zLitf3BAk6tsmu57PNBTgUJRSjP8YLQsi8OBmdJXhp80lg92GA1M_5qEp_rXbYSbDKXnJH8G1Z9qSIbupocWerzPa8oqWoGyIAsuZJ7MITAquYZIkHoheFdYOVr8C5mYhhihy_FoXRrgtAaeg2cjM05oqMc2A_4Ukj4H9Kfpe9nd4XQIkQw3aCowq2lGLd8RIu2JYmd_whZ9GSIZpEdDa1I67v1gdbvcNo5sX61hstQPJ8cGv"/><span class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-primary-container ring-2 ring-surface"></span></div><div class="hidden xl:flex flex-col text-left"><span class="font-label-md text-label-md text-on-surface font-bold leading-tight">Admin Operasional</span><span class="font-label-xs text-label-xs text-on-surface-variant">Superadmin • Aktif</span></div><span class="material-symbols-outlined text-on-surface-variant text-[18px]">expand_more</span></div></div></header><main class="w-full pt-16 bg-surface px-space-lg py-space-md min-h-screen"><div class="flex flex-col w-full gap-space-lg pb-12">
+<!-- Page Header & Action Bar -->
+<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-surface-container-lowest p-space-lg rounded-xl shadow-sm">
+<div class="flex flex-col gap-1 max-w-2xl">
+<div class="flex items-center gap-3 flex-wrap">
+<h1 class="font-headline-lg text-headline-lg text-on-surface tracking-tight">Template &amp; Aturan Auto-Reply</h1>
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-secondary-container/50 text-secondary font-label-xs text-label-xs font-bold tracking-wide">
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container animate-pulse"></span>
+          7 ATURAN AKTIF
+        </span>
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-label-xs text-label-xs">
+<span class="material-symbols-outlined text-[14px] text-primary">bolt</span>
+          Spintax v2 Engine
+        </span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant">
+        Otomatisasi balasan cerdas 24/7 dengan pencocokan kata kunci, variasi spintax humanis, pembatasan jam operasional, dan proteksi anti-spam WhatsApp API.
+      </p>
+</div>
+<!-- Action Group Buttons -->
+<div class="flex items-center gap-2 flex-wrap self-start lg:self-center">
+<button class="inline-flex items-center gap-1.5 px-3 py-2 bg-surface-container-lowest text-on-surface hover:bg-surface-container-low rounded-lg font-label-md text-label-md font-semibold transition-all shadow-sm shadow-slate-900/5 hover:-translate-y-0.5" type="button">
+<span class="material-symbols-outlined text-[18px] text-on-surface-variant">file_download</span>
+<span>Ekspor Aturan (.json)</span>
+</button>
+<button class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-surface-container text-tertiary hover:bg-surface-container-high rounded-lg font-label-md text-label-md font-bold transition-all hover:-translate-y-0.5" onclick="document.getElementById('simulator-input').focus(); document.getElementById('simulator-input').scrollIntoView({behavior: 'smooth', block: 'center'});" type="button">
+<span class="material-symbols-outlined text-[18px]">play_circle</span>
+<span>Simulasi Chatbot</span>
+</button>
+<button class="inline-flex items-center gap-1.5 px-4 py-2 bg-primary-container text-on-primary-container hover:bg-primary hover:text-on-primary rounded-full font-label-md text-label-md font-bold transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5" type="button">
+<span class="material-symbols-outlined text-[18px]">add</span>
+<span>+ Aturan Baru (New Rule)</span>
+</button>
+</div>
+</div>
+<!-- Top Quick Settings & Engine Protection Cards (2-Column Grid) -->
+<div class="grid grid-cols-1 xl:grid-cols-2 gap-space-lg">
+<!-- Card 1: Pengaturan Jam Operasional & Jadwal Otomatis -->
+<div class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm flex flex-col justify-between gap-space-md relative overflow-hidden">
+<div class="absolute -right-6 -bottom-6 opacity-[0.03] text-primary pointer-events-none">
+<span class="material-symbols-outlined text-[160px]">schedule</span>
+</div>
+<div class="flex flex-col gap-space-sm">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-9 h-9 rounded-lg bg-surface-container-low flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[22px]">schedule</span>
+</div>
+<div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-bold leading-tight">Jam Operasional &amp; Jadwal Otomatis</h2>
+<span class="font-label-xs text-label-xs text-on-surface-variant">Atur jadwal layanan offline &amp; pesan penampung otomatis</span>
+</div>
+</div>
+<!-- Toggle Business Hours -->
+<label class="relative inline-flex items-center cursor-pointer" title="Aktifkan pembatasan jam kerja">
+<input checked="" class="sr-only peer" id="toggle-business-hours" type="checkbox"/>
+<div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-container"></div>
+</label>
+</div>
+<div class="flex items-center justify-between bg-surface-container-low/70 px-3.5 py-2.5 rounded-lg mt-1">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[18px]">timelapse</span>
+<span class="font-label-md text-label-md text-on-surface font-semibold">08:00 - 17:00 WIB</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">(Senin - Sabtu)</span>
+</div>
+<button class="text-primary hover:text-on-primary-container font-label-xs text-label-xs font-bold inline-flex items-center gap-0.5 hover:underline" type="button">
+            Ubah Jadwal
+            <span class="material-symbols-outlined text-[14px]">edit</span>
+</button>
+</div>
+<!-- Offline Reply Box -->
+<div class="flex flex-col gap-1.5 mt-2">
+<div class="flex items-center justify-between">
+<span class="font-label-xs text-label-xs font-bold uppercase tracking-wider text-on-surface-variant flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+              Balasan Otomatis Di Luar Jam Kerja (Offline Reply)
+            </span>
+<span class="font-label-xs text-label-xs text-primary font-medium bg-secondary-container/40 px-2 py-0.5 rounded">
+              Spintax Ready
+            </span>
+</div>
+<div class="relative bg-surface-bright rounded-lg p-3 shadow-inner">
+<textarea class="w-full bg-transparent resize-none border-none p-0 focus:outline-none font-body-sm text-body-sm text-on-surface leading-relaxed" id="offline-reply-text" readonly="" rows="3">Halo kak {name}! 👋 Terima kasih telah menghubungi kami. Tim kami sedang beristirahat di luar jam operasional ({jam_buka}). Pesan Anda akan kami prioritaskan besok pagi!</textarea>
+<div class="flex items-center justify-between pt-2 mt-2 bg-surface-container-low/40 -mx-3 -mb-3 px-3 py-2 rounded-b-lg">
+<div class="flex items-center gap-1.5 flex-wrap">
+<span class="font-label-xs text-label-xs text-on-surface-variant">Variabel:</span>
+<button class="px-1.5 py-0.5 rounded bg-surface-container font-label-xs text-label-xs text-primary font-bold hover:bg-surface-container-high transition-colors" type="button">{name}</button>
+<button class="px-1.5 py-0.5 rounded bg-surface-container font-label-xs text-label-xs text-primary font-bold hover:bg-surface-container-high transition-colors" type="button">{phone}</button>
+<button class="px-1.5 py-0.5 rounded bg-surface-container font-label-xs text-label-xs text-primary font-bold hover:bg-surface-container-high transition-colors" type="button">{jam_buka}</button>
+</div>
+<span class="font-label-xs text-label-xs text-on-surface-variant italic">{Halo|Hai|Selamat datang}</span>
+</div>
+</div>
+</div>
+</div>
+<div class="flex items-center justify-between pt-1">
+<span class="font-label-xs text-label-xs text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px] text-primary">verified</span>
+          Status: Aktif untuk semua kontak baru
+        </span>
+<button class="font-label-sm text-label-md text-primary font-bold hover:underline inline-flex items-center gap-1" type="button">
+          Kustomisasi Format
+          <span class="material-symbols-outlined text-[16px]">chevron_right</span>
+</button>
+</div>
+</div>
+<!-- Card 2: Proteksi Anti-Banned & Humanis Engine -->
+<div class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm flex flex-col justify-between gap-space-md relative overflow-hidden">
+<div class="absolute -right-6 -bottom-6 opacity-[0.03] text-primary pointer-events-none">
+<span class="material-symbols-outlined text-[160px]">shield</span>
+</div>
+<div class="flex flex-col gap-space-sm">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-9 h-9 rounded-lg bg-surface-container-low flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[22px]">security</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-bold leading-tight">Proteksi Anti-Banned &amp; Humanis</h2>
+<span class="px-2 py-0.5 rounded bg-secondary-container/60 text-secondary font-label-xs text-label-xs font-bold">PRO</span>
+</div>
+<span class="font-label-xs text-label-xs text-on-surface-variant">Konfigurasi interval waktu dan ritme pengetikan bot</span>
+</div>
+</div>
+<span class="w-2.5 h-2.5 rounded-full bg-primary-container ring-4 ring-secondary-container/50"></span>
+</div>
+<div class="flex flex-col gap-3 mt-1">
+<!-- Item 1: Typing Presence -->
+<div class="flex items-start justify-between gap-4 p-2.5 rounded-lg bg-surface-bright hover:bg-surface-container-low/50 transition-colors">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md font-bold text-on-surface flex items-center gap-1.5">
+                Simulasi Mengetik (Human Typing Presence)
+                <span class="material-symbols-outlined text-primary text-[15px]">keyboard</span>
+</span>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-tight mt-0.5">
+                Kirim status "sedang mengetik..." 1.5 - 3 detik sebelum mengirim agar natural &amp; terhindar dari deteksi spam WhatsApp.
+              </p>
+</div>
+<label class="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-9 h-5 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-container"></div>
+</label>
+</div>
+<!-- Item 2: Cooldown per contact -->
+<div class="flex items-center justify-between gap-4 p-2.5 rounded-lg bg-surface-bright hover:bg-surface-container-low/50 transition-colors">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md font-bold text-on-surface">Jeda Cooldown per Kontak</span>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-tight mt-0.5">
+                Mencegah bot mengirim pesan berulang-kali jika kontak mengetik chat berkali-kali secara beruntun.
+              </p>
+</div>
+<div class="flex items-center gap-1.5 shrink-0">
+<div class="flex items-center bg-surface-container-lowest shadow-sm rounded-lg px-2.5 py-1">
+<input class="w-10 text-center font-label-md text-label-md font-bold text-on-surface bg-transparent focus:outline-none" max="60" min="0" type="number" value="5"/>
+<span class="font-label-xs text-label-xs text-on-surface-variant">Menit</span>
+</div>
+</div>
+</div>
+<!-- Item 3: Fallback Reply -->
+<div class="flex items-start justify-between gap-4 p-2.5 rounded-lg bg-surface-bright hover:bg-surface-container-low/50 transition-colors">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md font-bold text-on-surface">Balasan Standar (Fallback Default Reply)</span>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-tight mt-0.5">
+                Kirim menu bantuan saat pesan kontak tidak cocok dengan kata kunci apapun.
+              </p>
+</div>
+<label class="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+<input class="sr-only peer" type="checkbox"/>
+<div class="w-9 h-5 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-container"></div>
+</label>
+</div>
+</div>
+</div>
+<div class="flex items-center justify-end pt-1">
+<button class="inline-flex items-center gap-1.5 px-4 py-2 bg-primary-container text-on-primary-container hover:bg-primary hover:text-on-primary rounded-lg font-label-md text-label-md font-bold transition-all shadow-sm hover:shadow" type="button">
+<span class="material-symbols-outlined text-[17px]">check_circle</span>
+<span>Simpan Konfigurasi Engine</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Live Spintax & Bot Simulator Widget (Interactive Test Playground) -->
+<div class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm flex flex-col gap-4">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-2 pb-2">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-lg bg-secondary-container/60 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]">smart_toy</span>
+</div>
+<div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-bold leading-tight">Live Spintax &amp; Bot Simulator</h2>
+<span class="font-label-xs text-label-xs text-on-surface-variant">Ketik kalimat atau pilih kata kunci untuk menguji apakah bot merespon dengan aturan yang tepat</span>
+</div>
+</div>
+<div class="flex items-center gap-2 self-start md:self-auto">
+<span class="font-label-xs text-label-xs text-on-surface-variant flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-primary-container"></span>
+          Simulasi Sesi: SAMSUNG S23 (Online)
+        </span>
+</div>
+</div>
+<!-- Playground Split Panel -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+<!-- Left: Simulator Input -->
+<div class="lg:col-span-5 flex flex-col justify-between bg-surface-container-low/60 rounded-xl p-4 gap-3">
+<div class="flex flex-col gap-2">
+<label class="font-label-md text-label-md font-bold text-on-surface flex items-center justify-between" for="simulator-input">
+<span>Uji Pesan Masuk (Percakapan Pelanggan):</span>
+<span class="font-label-xs text-label-xs text-on-surface-variant">Case-Insensitive</span>
+</label>
+<div class="relative">
+<input class="w-full bg-surface-container-lowest rounded-lg pl-3 pr-10 py-2.5 font-body-sm text-body-sm text-on-surface placeholder:text-on-surface-variant/60 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-container" id="simulator-input" placeholder="Ketik pesan simulasi..." type="text" value="halo kak, minta info harga paket promo dong"/>
+<button class="absolute right-2 top-2 p-1 text-primary hover:text-on-primary-container" onclick="testSimulator()" title="Jalankan Tes" type="button">
+<span class="material-symbols-outlined text-[20px]">search</span>
+</button>
+</div>
+<div class="flex flex-col gap-1.5 mt-1">
+<span class="font-label-xs text-label-xs text-on-surface-variant font-semibold">Coba kata kunci cepat:</span>
+<div class="flex items-center gap-1.5 flex-wrap">
+<button class="px-2.5 py-1 rounded-full bg-surface-container-lowest hover:bg-surface-container-high text-on-surface font-label-xs text-label-xs font-semibold shadow-sm transition-all" onclick="setSimText('halo, apa kabar?')" type="button">halo</button>
+<button class="px-2.5 py-1 rounded-full bg-surface-container-lowest hover:bg-surface-container-high text-on-surface font-label-xs text-label-xs font-semibold shadow-sm transition-all" onclick="setSimText('berapa harga paket broadcast tahunan?')" type="button">harga</button>
+<button class="px-2.5 py-1 rounded-full bg-surface-container-lowest hover:bg-surface-container-high text-on-surface font-label-xs text-label-xs font-semibold shadow-sm transition-all" onclick="setSimText('bisa minta katalog produk terbaru?')" type="button">katalog</button>
+<button class="px-2.5 py-1 rounded-full bg-surface-container-lowest hover:bg-surface-container-high text-on-surface font-label-xs text-label-xs font-semibold shadow-sm transition-all" onclick="setSimText('menu')" type="button">menu</button>
+<button class="px-2.5 py-1 rounded-full bg-surface-container-lowest hover:bg-surface-container-high text-on-surface font-label-xs text-label-xs font-semibold shadow-sm transition-all" onclick="setSimText('saya mau komplain barang rusak')" type="button">komplain</button>
+<button class="px-2.5 py-1 rounded-full bg-surface-container-lowest hover:bg-surface-container-high text-on-surface font-label-xs text-label-xs font-semibold shadow-sm transition-all" onclick="setSimText('status pesanan #INV-9901')" type="button">status pesanan</button>
+</div>
+</div>
+</div>
+<div class="flex items-center justify-between text-on-surface-variant pt-2">
+<span class="font-label-xs text-label-xs">Latency Simulator: ~42ms</span>
+<button class="text-on-surface-variant hover:text-error font-label-xs text-label-xs inline-flex items-center gap-1" onclick="clearSim()" type="button">
+<span class="material-symbols-outlined text-[14px]">backspace</span>
+            Bersihkan Input
+          </button>
+</div>
+</div>
+<!-- Right: Simulator Output & Bubble -->
+<div class="lg:col-span-7 flex flex-col justify-between bg-surface-container-lowest rounded-xl p-4 shadow-sm bg-gradient-to-br from-surface-container-low/30 to-surface-bright">
+<div class="flex flex-col gap-3">
+<div class="flex items-center justify-between flex-wrap gap-2">
+<span class="font-label-md text-label-md font-bold text-on-surface flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[18px] text-primary">chat</span>
+              Hasil Deteksi &amp; Respon Otomatis
+            </span>
+<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondary-container/60 text-secondary font-label-xs text-label-xs font-bold" id="match-badge">
+<span class="material-symbols-outlined text-[14px]">check_circle</span>
+<span id="match-text">Aturan Cocok: Auto Reply Info Harga &amp; Paket (contains "harga")</span>
+</div>
+</div>
+<!-- Chat bubble preview inside phone mockup card -->
+<div class="bg-surface-container-low/50 rounded-xl p-3 flex flex-col gap-2">
+<!-- Simulated Inbound Bubble -->
+<div class="flex items-end justify-start gap-2 max-w-[85%]">
+<div class="w-6 h-6 rounded-full bg-surface-container-highest flex items-center justify-center text-on-surface-variant text-[11px] font-bold">DP</div>
+<div class="bg-surface-container-lowest p-2.5 rounded-2xl rounded-bl-none shadow-sm flex flex-col">
+<span class="font-label-xs text-label-xs text-primary font-bold">Dian Permata (+62812****882)</span>
+<span class="font-body-sm text-body-sm text-on-surface mt-0.5" id="sim-inbound-preview">halo kak, minta info harga paket promo dong</span>
+<span class="font-label-xs text-label-xs text-on-surface-variant self-end mt-1 text-[10px]">10:42 WIB</span>
+</div>
+</div>
+<!-- Simulated Outbound Reply Bubble -->
+<div class="flex items-end justify-end gap-2 max-w-[90%] self-end">
+<div class="bg-primary/10 text-on-surface p-3 rounded-2xl rounded-br-none shadow-sm flex flex-col">
+<div class="flex items-center gap-1.5 mb-1">
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span>
+<span class="font-label-xs text-label-xs text-primary font-bold">WhatsAman Bot • Spintax #2</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface leading-relaxed" id="sim-reply-body">
+                  Halo Bapak/Ibu Dian Permata! 👋 Terima kasih telah menghubungi WhatsAman. Kami menawarkan Paket Starter (Rp 149k/bln) dan Paket Ultimate Multi-Agent (Rp 399k/bln). Apakah ada kebutuhan integrasi API tertentu?
+                </p>
+<div class="flex items-center justify-between gap-3 mt-1.5 pt-1.5 border-t border-primary/10">
+<div class="flex items-center gap-1">
+<span class="px-1.5 py-0.2 rounded bg-surface-container text-primary font-label-xs text-label-xs text-[10px] font-bold">+Tag: Hot Lead</span>
+<span class="px-1.5 py-0.2 rounded bg-surface-container text-tertiary font-label-xs text-label-xs text-[10px] font-bold">+CRM: Follow Up</span>
+</div>
+<span class="font-label-xs text-label-xs text-on-surface-variant text-[10px] flex items-center gap-0.5">
+                    10:42 WIB
+                    <span class="material-symbols-outlined text-[13px] text-primary">done_all</span>
+</span>
+</div>
+</div>
+<div class="w-6 h-6 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-[10px]">WA</div>
+</div>
+</div>
+</div>
+<div class="flex items-center justify-between pt-2">
+<span class="font-label-xs text-label-xs text-on-surface-variant">Variasi Spintax dievaluasi secara acak per simulasi</span>
+<button class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-surface-container-high hover:bg-surface-container text-on-surface font-label-xs text-label-xs font-bold transition-all shadow-sm" onclick="rerunSpintax()" type="button">
+<span class="material-symbols-outlined text-[16px] text-primary">shuffle</span>
+<span>Uji Ulang (Re-run Spintax)</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Daftar Aturan Balasan Otomatis (Rules Management Table Container) -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm flex flex-col overflow-hidden">
+<!-- Filter Bar & Search -->
+<div class="p-space-md bg-surface-bright flex flex-col md:flex-row md:items-center justify-between gap-4">
+<!-- Tabs -->
+<div class="flex items-center gap-1 overflow-x-auto">
+<button class="px-3.5 py-1.5 rounded-lg font-label-md text-label-md font-bold bg-surface-container-lowest text-primary shadow-sm" type="button">
+          Semua Aturan (7)
+        </button>
+<button class="px-3.5 py-1.5 rounded-lg font-label-md text-label-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low transition-colors" type="button">
+          Aktif (6)
+        </button>
+<button class="px-3.5 py-1.5 rounded-lg font-label-md text-label-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low transition-colors" type="button">
+          Nonaktif (1)
+        </button>
+<button class="px-3.5 py-1.5 rounded-lg font-label-md text-label-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low transition-colors" type="button">
+          Spintax (4)
+        </button>
+</div>
+<!-- Search Input within table -->
+<div class="relative w-full md:w-80">
+<span class="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-[18px]">search</span>
+<input class="w-full pl-9 pr-10 py-1.5 bg-surface-container-lowest rounded-lg font-body-sm text-body-sm text-on-surface placeholder:text-on-surface-variant/70 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-container" id="rule-search-input" placeholder="Cari aturan, kata kunci, atau respon..." type="text"/>
+<span class="absolute right-2.5 top-2 px-1 py-0.5 bg-surface-container font-label-xs text-label-xs text-on-surface-variant rounded">/</span>
+</div>
+</div>
+<!-- Table Responsive Wrap -->
+<div class="w-full overflow-x-auto">
+<table class="w-full text-left font-body-sm text-body-sm text-on-surface border-collapse">
+<thead>
+<tr class="bg-surface-container-low/40 text-on-surface-variant font-label-xs text-label-xs uppercase tracking-wider">
+<th class="py-3 px-4 w-12 text-center">Status</th>
+<th class="py-3 px-4 min-w-[220px]">Nama Aturan &amp; Kategori</th>
+<th class="py-3 px-4 min-w-[190px]">Kondisi Pemicu (Trigger)</th>
+<th class="py-3 px-4 min-w-[320px]">Pesan Balasan &amp; Aksi CRM</th>
+<th class="py-3 px-4 w-28 text-center">Hit Count</th>
+<th class="py-3 px-4 w-28 text-right pr-6">Aksi</th>
+</tr>
+</thead>
+<tbody class="divide-y-0" id="rules-table-body">
+<!-- Row 1: Info Harga -->
+<tr class="hover:bg-surface-container-low/40 transition-colors group">
+<td class="py-3.5 px-4 text-center">
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-8 h-4 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-primary-container"></div>
+</label>
+</td>
+<td class="py-3.5 px-4">
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<span class="font-label-md text-label-md font-bold text-on-surface">Auto Reply Info Harga &amp; Paket</span>
+</div>
+<div class="flex items-center gap-1.5 mt-0.5">
+<span class="px-1.5 py-0.5 rounded bg-surface-container-high text-primary font-label-xs text-label-xs font-bold text-[10px]">Sales &amp; Pipeline</span>
+<span class="font-label-xs text-label-xs text-on-surface-variant">• Prioritas 1</span>
+</div>
+</div>
+</td>
+<td class="py-3.5 px-4">
+<div class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-surface-container-low font-mono text-[12px] font-medium text-on-surface">
+<span class="text-tertiary font-bold">contains</span>
+<span class="text-primary font-bold">"harga"</span>
+</div>
+</td>
+<td class="py-3.5 px-4">
+<div class="flex flex-col gap-1 max-w-md">
+<span class="font-body-sm text-body-sm text-on-surface truncate">"Halo {kak|bapak|ibu} {name}, terima kasih telah menghubungi WhatsAman! Berikut daftar harga..."</span>
+<div class="flex items-center gap-1.5 flex-wrap">
+<span class="px-2 py-0.5 rounded bg-secondary-container/70 text-secondary font-label-xs text-label-xs font-semibold">+Tag: Hot Lead</span>
+<span class="px-2 py-0.5 rounded bg-surface-container text-tertiary font-label-xs text-label-xs font-semibold">Kirim Brosur PDF</span>
+<span class="px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-label-xs text-label-xs text-[10px]">Spintax (3)</span>
+</div>
+</div>
+</td>
+<td class="py-3.5 px-4 text-center">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-surface-container font-label-md text-label-md font-bold text-on-surface">
+                142x
+              </span>
+</td>
+<td class="py-3.5 px-4 text-right pr-6">
+<div class="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 text-on-surface-variant hover:text-primary hover:bg-surface-container-low rounded-lg transition-colors" title="Edit Aturan" type="button">
+<span class="material-symbols-outlined text-[18px]">edit</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-primary hover:bg-surface-container-low rounded-lg transition-colors" title="Duplikasi" type="button">
+<span class="material-symbols-outlined text-[18px]">content_copy</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-error hover:bg-surface-container-low rounded-lg transition-colors" title="Hapus" type="button">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 2: Greeting & Sambutan Hangat -->
+<tr class="hover:bg-surface-container-low/40 transition-colors group">
+<td class="py-3.5 px-4 text-center">
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-8 h-4 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-primary-container"></div>
+</label>
+</td>
+<td class="py-3.5 px-4">
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<span class="font-label-md text-label-md font-bold text-on-surface">Greeting &amp; Sambutan Hangat</span>
+</div>
+<div class="flex items-center gap-1.5 mt-0.5">
+<span class="px-1.5 py-0.5 rounded bg-surface-container-high text-tertiary font-label-xs text-label-xs font-bold text-[10px]">Greeting</span>
+<span class="font-label-xs text-label-xs text-on-surface-variant">• Fast Reply</span>
+</div>
+</div>
+</td>
+<td class="py-3.5 px-4">
+<div class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-surface-container-low font-mono text-[12px] font-medium text-on-surface">
+<span class="text-tertiary font-bold">contains</span>
+<span class="text-primary font-bold">"halo|hai|pagi|siang"</span>
+</div>
+</td>
+<td class="py-3.5 px-4">
+<div class="flex flex-col gap-1 max-w-md">
+<span class="font-body-sm text-body-sm text-on-surface truncate">"{Halo|Hai|Selamat pagi/siang} {name}! 👋 Senang terhubung dengan Anda..."</span>
+<div class="flex items-center gap-1.5 flex-wrap">
+<span class="px-2 py-0.5 rounded bg-surface-container text-on-surface-variant font-label-xs text-label-xs font-semibold">Tampilkan Menu Cepat</span>
+<span class="px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-label-xs text-label-xs text-[10px]">Spintax (4 Variasi)</span>
+</div>
+</div>
+</td>
+<td class="py-3.5 px-4 text-center">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-secondary-container/50 font-label-md text-label-md font-bold text-secondary">
+                310x
+              </span>
+</td>
+<td class="py-3.5 px-4 text-right pr-6">
+<div class="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 text-on-surface-variant hover:text-primary hover:bg-surface-container-low rounded-lg transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">edit</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-primary hover:bg-surface-container-low rounded-lg transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">content_copy</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-error hover:bg-surface-container-low rounded-lg transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 3: Katalog Produk & Brosur PDF -->
+<tr class="hover:bg-surface-container-low/40 transition-colors group">
+<td class="py-3.5 px-4 text-center">
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-8 h-4 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-primary-container"></div>
+</label>
+</td>
+<td class="py-3.5 px-4">
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<span class="font-label-md text-label-md font-bold text-on-surface">Katalog Produk &amp; Brosur PDF</span>
+</div>
+<div class="flex items-center gap-1.5 mt-0.5">
+<span class="px-1.5 py-0.5 rounded bg-surface-container-high text-primary font-label-xs text-label-xs font-bold text-[10px]">Dokumen</span>
+</div>
+</div>
+</td>
+<td class="py-3.5 px-4">
+<div class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-surface-container-low font-mono text-[12px] font-medium text-on-surface">
+<span class="text-tertiary font-bold">contains</span>
+<span class="text-primary font-bold">"minta katalog|brosur"</span>
+</div>
+</td>
+<td class="py-3.5 px-4">
+<div class="flex flex-col gap-1 max-w-md">
+<span class="font-body-sm text-body-sm text-on-surface truncate">"Baik kak {name}, dokumen katalog resmi WhatsAman dapat diunduh langsung..."</span>
+<div class="flex items-center gap-1.5 flex-wrap">
+<span class="px-2 py-0.5 rounded bg-surface-container text-tertiary font-label-xs text-label-xs font-semibold">Lampiran: Katalog2024.pdf</span>
+<span class="px-2 py-0.5 rounded bg-secondary-container/70 text-secondary font-label-xs text-label-xs font-semibold">+Tag: Minat Katalog</span>
+</div>
+</div>
+</td>
+<td class="py-3.5 px-4 text-center">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-surface-container font-label-md text-label-md font-bold text-on-surface">
+                85x
+              </span>
+</td>
+<td class="py-3.5 px-4 text-right pr-6">
+<div class="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 text-on-surface-variant hover:text-primary hover:bg-surface-container-low rounded-lg transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">edit</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-primary hover:bg-surface-container-low rounded-lg transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">content_copy</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-error hover:bg-surface-container-low rounded-lg transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 4: Cek Status Pesanan / Resi -->
+<tr class="hover:bg-surface-container-low/40 transition-colors group">
+<td class="py-3.5 px-4 text-center">
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-8 h-4 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-primary-container"></div>
+</label>
+</td>
+<td class="py-3.5 px-4">
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<span class="font-label-md text-label-md font-bold text-on-surface">Cek Status Pesanan / Resi</span>
+</div>
+<div class="flex items-center gap-1.5 mt-0.5">
+<span class="px-1.5 py-0.5 rounded bg-surface-container-high text-tertiary font-label-xs text-label-xs font-bold text-[10px]">API &amp; Webhook</span>
+</div>
+</div>
+</td>
+<td class="py-3.5 px-4">
+<div class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-surface-container-low font-mono text-[12px] font-medium text-on-surface">
+<span class="text-tertiary font-bold">contains</span>
+<span class="text-primary font-bold">"status pesanan|resi"</span>
+</div>
+</td>
+<td class="py-3.5 px-4">
+<div class="flex flex-col gap-1 max-w-md">
+<span class="font-body-sm text-body-sm text-on-surface truncate">"Silakan masukkan nomor invoice Anda (contoh: INV-1029) untuk pelacakan langsung..."</span>
+<div class="flex items-center gap-1.5 flex-wrap">
+<span class="px-2 py-0.5 rounded bg-surface-container text-tertiary font-label-xs text-label-xs font-semibold">Cek API Gateway</span>
+<span class="px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-label-xs text-label-xs text-[10px]">Auto Webhook</span>
+</div>
+</div>
+</td>
+<td class="py-3.5 px-4 text-center">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-surface-container font-label-md text-label-md font-bold text-on-surface">
+                64x
+              </span>
+</td>
+<td class="py-3.5 px-4 text-right pr-6">
+<div class="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 text-on-surface-variant hover:text-primary hover:bg-surface-container-low rounded-lg transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">edit</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-primary hover:bg-surface-container-low rounded-lg transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">content_copy</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-error hover:bg-surface-container-low rounded-lg transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 5: Menu Layanan Utama -->
+<tr class="hover:bg-surface-container-low/40 transition-colors group">
+<td class="py-3.5 px-4 text-center">
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-8 h-4 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-primary-container"></div>
+</label>
+</td>
+<td class="py-3.5 px-4">
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<span class="font-label-md text-label-md font-bold text-on-surface">Menu Layanan Utama</span>
+</div>
+<div class="flex items-center gap-1.5 mt-0.5">
+<span class="px-1.5 py-0.5 rounded bg-surface-container-high text-primary font-label-xs text-label-xs font-bold text-[10px]">Interaktif</span>
+</div>
+</div>
+</td>
+<td class="py-3.5 px-4">
+<div class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-surface-container-low font-mono text-[12px] font-medium text-on-surface">
+<span class="text-tertiary font-bold">equals</span>
+<span class="text-primary font-bold">"menu"</span>
+</div>
+</td>
+<td class="py-3.5 px-4">
+<div class="flex flex-col gap-1 max-w-md">
+<span class="font-body-sm text-body-sm text-on-surface truncate">"📋 *MENU LAYANAN WHATSAMAN* Halo {name}, silakan pilih opsi: 1. Paket &amp; Harga..."</span>
+<div class="flex items-center gap-1.5 flex-wrap">
+<span class="px-2 py-0.5 rounded bg-surface-container text-on-surface-variant font-label-xs text-label-xs font-semibold">List Message Interaktif</span>
+<span class="px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-label-xs text-label-xs text-[10px]">3 Tombol Quick Reply</span>
+</div>
+</div>
+</td>
+<td class="py-3.5 px-4 text-center">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-surface-container font-label-md text-label-md font-bold text-on-surface">
+                47x
+              </span>
+</td>
+<td class="py-3.5 px-4 text-right pr-6">
+<div class="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 text-on-surface-variant hover:text-primary hover:bg-surface-container-low rounded-lg transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">edit</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-primary hover:bg-surface-container-low rounded-lg transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">content_copy</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-error hover:bg-surface-container-low rounded-lg transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 6: Handling Komplain & Bantuan CS -->
+<tr class="hover:bg-surface-container-low/40 transition-colors group">
+<td class="py-3.5 px-4 text-center">
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-8 h-4 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-primary-container"></div>
+</label>
+</td>
+<td class="py-3.5 px-4">
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<span class="font-label-md text-label-md font-bold text-on-surface">Handling Komplain &amp; Bantuan CS</span>
+</div>
+<div class="flex items-center gap-1.5 mt-0.5">
+<span class="px-1.5 py-0.5 rounded bg-error-container/60 text-error font-label-xs text-label-xs font-bold text-[10px]">Support &amp; Escalation</span>
+</div>
+</div>
+</td>
+<td class="py-3.5 px-4">
+<div class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-surface-container-low font-mono text-[12px] font-medium text-on-surface">
+<span class="text-tertiary font-bold">contains</span>
+<span class="text-primary font-bold">"komplain|batal|rusak"</span>
+</div>
+</td>
+<td class="py-3.5 px-4">
+<div class="flex flex-col gap-1 max-w-md">
+<span class="font-body-sm text-body-sm text-on-surface truncate">"Mohon maaf atas ketidaknyamanannya kak {name}. Percakapan ini segera diteruskan ke Senior Agent..."</span>
+<div class="flex items-center gap-1.5 flex-wrap">
+<span class="px-2 py-0.5 rounded bg-error-container text-on-error-container font-label-xs text-label-xs font-semibold">+Tag: Priority Support</span>
+<span class="px-2 py-0.5 rounded bg-surface-container text-tertiary font-label-xs text-label-xs font-semibold">Forward ke Human Agent</span>
+</div>
+</div>
+</td>
+<td class="py-3.5 px-4 text-center">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-surface-container font-label-md text-label-md font-bold text-on-surface">
+                19x
+              </span>
+</td>
+<td class="py-3.5 px-4 text-right pr-6">
+<div class="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 text-on-surface-variant hover:text-primary hover:bg-surface-container-low rounded-lg transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">edit</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-primary hover:bg-surface-container-low rounded-lg transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">content_copy</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-error hover:bg-surface-container-low rounded-lg transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 7: Promo Gajian Weekend (Nonaktif) -->
+<tr class="hover:bg-surface-container-low/40 transition-colors group opacity-60">
+<td class="py-3.5 px-4 text-center">
+<label class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" type="checkbox"/>
+<div class="w-8 h-4 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-primary-container"></div>
+</label>
+</td>
+<td class="py-3.5 px-4">
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<span class="font-label-md text-label-md font-bold text-on-surface line-through">Promo Gajian Weekend</span>
+<span class="px-1.5 py-0.2 rounded bg-surface-container font-label-xs text-label-xs text-on-surface-variant text-[10px]">Nonaktif</span>
+</div>
+<div class="flex items-center gap-1.5 mt-0.5">
+<span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant font-label-xs text-label-xs font-bold text-[10px]">Seasonal Campaign</span>
+</div>
+</div>
+</td>
+<td class="py-3.5 px-4">
+<div class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-surface-container-low font-mono text-[12px] font-medium text-on-surface">
+<span class="text-tertiary font-bold">contains</span>
+<span class="text-on-surface-variant font-bold">"promo gajian"</span>
+</div>
+</td>
+<td class="py-3.5 px-4">
+<div class="flex flex-col gap-1 max-w-md">
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate">"🎉 PROMO GAJIAN KHUSUS HARI INI! Dapatkan cashback hingga 35% dengan kode..."</span>
+<div class="flex items-center gap-1.5 flex-wrap">
+<span class="px-2 py-0.5 rounded bg-surface-container text-on-surface-variant font-label-xs text-label-xs font-semibold">Kupon Diskon</span>
+</div>
+</div>
+</td>
+<td class="py-3.5 px-4 text-center">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-surface-container font-label-md text-label-md font-bold text-on-surface-variant">
+                0x
+              </span>
+</td>
+<td class="py-3.5 px-4 text-right pr-6">
+<div class="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 text-on-surface-variant hover:text-primary hover:bg-surface-container-low rounded-lg transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">edit</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-primary hover:bg-surface-container-low rounded-lg transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">content_copy</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-error hover:bg-surface-container-low rounded-lg transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Table Pagination & Summary Footer -->
+<div class="p-space-md bg-surface-container-lowest flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-surface-container/60">
+<div class="flex items-center gap-2">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Menampilkan 1 - 7 dari 7 aturan</span>
+<span class="font-label-xs text-label-xs text-on-surface-variant/60">• Engine Version 4.8.2-stable</span>
+</div>
+<div class="flex items-center gap-1.5">
+<button class="p-1.5 rounded-lg text-on-surface-variant opacity-40 cursor-not-allowed" disabled="" type="button">
+<span class="material-symbols-outlined text-[18px]">chevron_left</span>
+</button>
+<span class="px-3 py-1 rounded-md bg-surface-container text-primary font-label-sm text-label-sm font-bold">1</span>
+<button class="p-1.5 rounded-lg text-on-surface-variant opacity-40 cursor-not-allowed" disabled="" type="button">
+<span class="material-symbols-outlined text-[18px]">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<script>
+  // Simple interactive simulator logic
+  const spintaxResponses = {
+    harga: [
+      "Halo Bapak/Ibu Dian Permata! 👋 Terima kasih telah menghubungi WhatsAman. Kami menyediakan Paket Starter (Rp 149k/bln) dan Paket Ultimate Multi-Agent (Rp 399k/bln). Apakah ada kebutuhan integrasi API tertentu?",
+      "Hai kak Dian Permata! 😊 Paket WhatsAman mulai dari Rp 149.000/bulan dengan fitur broadcast massal dan multi-device. Mau kami kirimkan file perbandingan fiturnya sekarang?",
+      "Selamat pagi/siang kak Dian! Terkait info harga WhatsAman CRM, kami memiliki promo tahunan hemat 2 bulan gratis. Tim sales kami siap mendampingi demo sistem."
+    ],
+    greeting: [
+      "Halo kak Dian Permata! 👋 Terima kasih sudah menyapa kami. Ada yang bisa WhatsAman bantu seputar broadcast atau CRM WhatsApp hari ini?",
+      "Hai Dian Permata! Selamat datang di WhatsAman Official. Silakan balas dengan 'MENU' untuk melihat daftar layanan utama kami.",
+      "Halo kak! Tim WhatsAman siap membantu operasional WhatsApp bisnis Anda. Butuh info paket atau bantuan teknis?"
+    ],
+    katalog: [
+      "Baik kak Dian Permata! 📄 Brosur dan katalog fitur WhatsAman 2024 telah disiapkan. Anda dapat mengunduh dokumen PDF lengkap melalui link berikut: https://whatsaman.id/katalog",
+      "Katalog WhatsAman segera dikirimkan ke chat ini ya kak Dian! Berisi ringkasan arsitektur API gateway dan fitur auto-reply cerdas."
+    ],
+    menu: [
+      "📋 *MENU LAYANAN WHATSAMAN*\nHalo Dian Permata, silakan pilih nomor berikut:\n1. Info Harga & Paket Langganan\n2. Cek Integrasi Webhook & API\n3. Bantuan CS & Solusi Kendala",
+      "Halo kak! Berikut menu cepat WhatsAman:\n[1] Layanan Broadcast\n[2] Multi-Agent Inbox\n[3] Konsultasi Sales"
+    ],
+    komplain: [
+      "Mohon maaf atas kendala yang dialami kak Dian Permata! 🙏 Tiket pengaduan #CS-8812 telah kami buka dan notifikasi diteruskan langsung ke Team Lead Customer Success WhatsAman.",
+      "Kami mohon maaf atas ketidaknyamanannya. Mohon kirimkan detail nomor invoice atau kendala tangkapan layar, agen kami akan segera bergabung dalam chat ini."
+    ],
+    pesanan: [
+      "Halo kak Dian! Untuk melacak resi dan invoice otomatis, silakan ketik nomor transaksi lengkap (Contoh: INV-202409). Sistem kami akan mengambil data langsung dari gateway database.",
+      "Pengecekan resi otomatis aktif! Masukkan 10 digit kode order Anda untuk mengetahui posisi paket pengiriman terkini."
+    ]
+  };
+
+  function setSimText(txt) {
+    const input = document.getElementById('simulator-input');
+    input.value = txt;
+    testSimulator();
+  }
+
+  function clearSim() {
+    const input = document.getElementById('simulator-input');
+    input.value = '';
+    input.focus();
+    testSimulator();
+  }
+
+  function testSimulator() {
+    const val = (document.getElementById('simulator-input').value || '').toLowerCase().trim();
+    const inboundPreview = document.getElementById('sim-inbound-preview');
+    const replyBody = document.getElementById('sim-reply-body');
+    const matchText = document.getElementById('match-text');
+    const matchBadge = document.getElementById('match-badge');
+
+    inboundPreview.textContent = val || "(Pesan kosong)";
+
+    if (val.includes("harga") || val.includes("biaya") || val.includes("promo") && val.includes("paket")) {
+      matchText.textContent = 'Aturan Cocok: Auto Reply Info Harga & Paket (contains "harga")';
+      matchBadge.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondary-container/60 text-secondary font-label-xs text-label-xs font-bold';
+      replyBody.textContent = spintaxResponses.harga[Math.floor(Math.random() * spintaxResponses.harga.length)];
+    } else if (val.includes("halo") || val.includes("hai") || val.includes("pagi") || val.includes("siang")) {
+      matchText.textContent = 'Aturan Cocok: Greeting & Sambutan Hangat (contains "halo|hai")';
+      matchBadge.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondary-container/60 text-secondary font-label-xs text-label-xs font-bold';
+      replyBody.textContent = spintaxResponses.greeting[Math.floor(Math.random() * spintaxResponses.greeting.length)];
+    } else if (val.includes("katalog") || val.includes("brosur")) {
+      matchText.textContent = 'Aturan Cocok: Katalog Produk & Brosur PDF (contains "katalog")';
+      matchBadge.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondary-container/60 text-secondary font-label-xs text-label-xs font-bold';
+      replyBody.textContent = spintaxResponses.katalog[Math.floor(Math.random() * spintaxResponses.katalog.length)];
+    } else if (val.includes("menu")) {
+      matchText.textContent = 'Aturan Cocok: Menu Layanan Utama (equals "menu")';
+      matchBadge.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondary-container/60 text-secondary font-label-xs text-label-xs font-bold';
+      replyBody.textContent = spintaxResponses.menu[Math.floor(Math.random() * spintaxResponses.menu.length)];
+    } else if (val.includes("komplain") || val.includes("rusak") || val.includes("batal")) {
+      matchText.textContent = 'Aturan Cocok: Handling Komplain & Bantuan CS (contains "komplain")';
+      matchBadge.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-error-container/60 text-error font-label-xs text-label-xs font-bold';
+      replyBody.textContent = spintaxResponses.komplain[Math.floor(Math.random() * spintaxResponses.komplain.length)];
+    } else if (val.includes("pesanan") || val.includes("resi")) {
+      matchText.textContent = 'Aturan Cocok: Cek Status Pesanan / Resi (contains "status pesanan")';
+      matchBadge.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondary-container/60 text-secondary font-label-xs text-label-xs font-bold';
+      replyBody.textContent = spintaxResponses.pesanan[Math.floor(Math.random() * spintaxResponses.pesanan.length)];
+    } else if (val.length === 0) {
+      matchText.textContent = 'Menunggu input teks simulasi...';
+      matchBadge.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-container text-on-surface-variant font-label-xs text-label-xs font-bold';
+      replyBody.textContent = "Ketik sesuatu di kotak sebelah kiri untuk melihat deteksi pencocokan aturan kata kunci secara langsung.";
+    } else {
+      matchText.textContent = 'Tidak Ada Aturan Yang Cocok (Menerapkan Fallback Default)';
+      matchBadge.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-container-high text-on-surface-variant font-label-xs text-label-xs font-bold';
+      replyBody.textContent = "Halo Dian Permata, maaf kami belum memahami pesan Anda. Silakan ketik 'MENU' untuk panduan layanan atau tunggu customer service kami merespons.";
+    }
+  }
+
+  function rerunSpintax() {
+    testSimulator();
+  }
+
+  // Quick listener for simulator input
+  document.getElementById('simulator-input').addEventListener('input', testSimulator);
+
+  // Quick shortcut key '/' to focus search
+  document.addEventListener('keydown', function(e) {
+    if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+      e.preventDefault();
+      const s = document.getElementById('rule-search-input');
+      if (s) {
+        s.focus();
+        s.select();
+      }
+    }
+  });
+</script></main></div></body></html>

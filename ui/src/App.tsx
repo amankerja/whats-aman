@@ -1,4 +1,33 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { ChatAvatar, ChatInputBox, ChatMessageBubble } from './components/chat';
+import { ToastProvider, ConfirmDialogHost, useToast, appConfirm } from './components/toast';
+import {
+  parsePhoneFromJid,
+  isSameChat,
+  formatPhoneForDisplay,
+  formatWhatsAppTimestamp,
+  formatDateSeparator,
+  parseRecipientLines
+} from './utils/format';
+import type {
+  IntegrationConfig,
+  OutgoingWebhook,
+  IntegrationLog,
+  SessionMeta,
+  Campaign,
+  Contact,
+  FollowUpTask,
+  Sequence,
+  SalesAnalytics,
+  AutoReplyConfig,
+  Group,
+  AutoRule,
+  AuditLog,
+  ChatItem,
+  ChatMessage,
+  SystemStatus,
+  PrivacySettings
+} from './types';
 import {
   LayoutDashboard,
   Smartphone,
@@ -64,674 +93,26 @@ import {
   Languages
 } from 'lucide-react';
 import { translations, Language } from './i18n';
+import { PrivacyPopover } from './components/PrivacyPopover';
 
-export interface IntegrationConfig {
-  id: string;
-  sessionId?: string;
-  provider: 'google_form' | 'cf7' | 'woocommerce' | 'elementor' | 'caldera' | 'formidable' | 'custom';
-  name: string;
-  secretToken?: string;
-  templateText: string;
-  adminPhone?: string;
-  adminTemplateText?: string;
-  isActive: boolean;
-  createdAt: number;
-  updatedAt: number;
-}
+// Lazy-loaded per-tab panels — each page only ships when first visited
+const DashboardPanel = React.lazy(() => import('./panels/DashboardPanel'));
+const SessionsPanel = React.lazy(() => import('./panels/SessionsPanel'));
+const ChatsPanel = React.lazy(() => import('./panels/ChatsPanel'));
+const CrmPanel = React.lazy(() => import('./panels/CrmPanel'));
+const ContactsPanel = React.lazy(() => import('./panels/ContactsPanel'));
+const GroupsPanel = React.lazy(() => import('./panels/GroupsPanel'));
+const CampaignsPanel = React.lazy(() => import('./panels/CampaignsPanel'));
+const TesterPanel = React.lazy(() => import('./panels/TesterPanel'));
+const AutomationPanel = React.lazy(() => import('./panels/AutomationPanel'));
+const IntegrationsPanel = React.lazy(() => import('./panels/IntegrationsPanel'));
+const InfrastructurePanel = React.lazy(() => import('./panels/InfrastructurePanel'));
+const LogsPanel = React.lazy(() => import('./panels/LogsPanel'));
+import type { PanelCtx } from './panels/ctx';
 
-export interface OutgoingWebhook {
-  id: string;
-  name: string;
-  targetUrl: string;
-  events?: string[];
-  sessionId?: string;
-  secretKey?: string;
-  isActive: boolean;
-  failureCount: number;
-  lastDeliveredAt?: number;
-  createdAt: number;
-}
+function AppShell() {
+  const { showToast } = useToast();
 
-export interface IntegrationLog {
-  id: string;
-  provider: string;
-  sessionId: string;
-  targetPhone: string;
-  status: 'SUCCESS' | 'FAILED';
-  payload: any;
-  errorMessage?: string;
-  createdAt: number;
-}
-
-interface SessionMeta {
-  id: string;
-  name: string;
-  phoneNumber?: string;
-  status: 'DISCONNECTED' | 'QR_READY' | 'PAIRING_READY' | 'CONNECTING' | 'CONNECTED';
-  qrCode?: string;
-  pairingCode?: string;
-  lastConnectedAt?: number;
-  createdAt?: number;
-}
-
-interface Campaign {
-  id: string;
-  session_id: string;
-  name: string;
-  template_text: string;
-  status: 'DRAFT' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
-  total_recipients: number;
-  sent_count: number;
-  failed_count: number;
-  last_message?: string;
-  created_at: number;
-}
-
-interface Contact {
-  id: string;
-  phone: string;
-  name?: string;
-  push_name?: string;
-  tags: string[];
-  pipeline_stage?: 'lead' | 'prospect' | 'customer' | 'churned';
-  notes?: string;
-  opt_out: boolean;
-  jid?: string;
-}
-
-export interface FollowUpTask {
-  id: string;
-  session_id: string;
-  contact_phone: string;
-  contact_name?: string;
-  title: string;
-  message_template: string;
-  due_at: number;
-  status: 'PENDING' | 'COMPLETED' | 'CANCELLED';
-  sequence_id?: string;
-  step_number: number;
-  notes?: string;
-  created_at: number;
-}
-
-export interface Sequence {
-  id: string;
-  session_id: string;
-  name: string;
-  description?: string;
-  steps: Array<{ stepNumber: number; delayDays: number; delayHours?: number; title: string; template: string }>;
-}
-
-export interface SalesAnalytics {
-  timeRange: string;
-  totalLeads: number;
-  newLeads: number;
-  hotLeads: number;
-  convertedCustomers: number;
-  conversionRate: number;
-  followUpDue: number;
-  followUpCompleted: number;
-  totalSent: number;
-  totalRecv: number;
-  replyRate: number;
-  stageCounts: { lead: number; prospect: number; customer: number; churned: number };
-}
-
-export interface AutoReplyConfig {
-  autoReplyEnabled: boolean;
-  businessHoursEnabled: boolean;
-  businessHoursStart: string;
-  businessHoursEnd: string;
-  businessDays: number[];
-  offlineReplyEnabled: boolean;
-  offlineReplyText: string;
-  cooldownMinutes: number;
-  fallbackEnabled: boolean;
-  fallbackReplyText: string;
-  simulateTyping: boolean;
-}
-
-interface Group {
-  jid: string;
-  name: string;
-  topic?: string;
-  memberCount: number;
-}
-
-interface AutoRule {
-  id: string;
-  name: string;
-  conditions: Array<{ field: string; operator: string; value: string }>;
-  actions: Array<{ type: string; text?: string; tag?: string; stage?: string }>;
-  is_active: boolean;
-  hit_count: number;
-}
-
-interface AuditLog {
-  id: string;
-  event_type: string;
-  payload: any;
-  created_at: number;
-}
-
-interface ChatItem {
-  chat_jid: string;
-  last_message: string;
-  last_from_me?: number;
-  last_status?: string;
-  timestamp: number;
-  name?: string;
-  push_name?: string;
-  unread_count?: number;
-  resolved_phone?: string;
-}
-
-interface ChatMessage {
-  id: string;
-  session_id: string;
-  message_id: string;
-  chat_jid: string;
-  sender_jid: string;
-  from_me: number;
-  content_text?: string;
-  media_type?: string;
-  media_url?: string;
-  caption?: string;
-  status: 'PENDING' | 'SENT' | 'DELIVERED' | 'READ' | 'FAILED';
-  timestamp: number;
-}
-
-interface SystemStatus {
-  appName: string;
-  version: string;
-  uptimeSeconds: number;
-  isPortable: boolean;
-  storageDir: string;
-  memory: {
-    rssMb: number;
-    heapUsedMb: number;
-    totalSystemMemMb: number;
-    freeSystemMemMb: number;
-  };
-  sessions: {
-    total: number;
-    connected: number;
-  };
-}
-
-// WhatsAman Phone Formatting Utilities
-function parsePhoneFromJid(jid: string): string | null {
-  if (!jid) return null;
-  const [local, domain] = jid.split('@');
-  if (domain && !domain.startsWith('c.us') && domain !== 's.whatsapp.net') return null;
-  const user = local.split(':')[0];
-  if (!/^\d+$/.test(user)) return null;
-  return user;
-}
-
-function isSameChat(
-  chatJidA?: string | null,
-  chatJidB?: string | null,
-  phoneA?: string | null,
-  phoneB?: string | null
-): boolean {
-  if (!chatJidA || !chatJidB) return false;
-  if (chatJidA === chatJidB) return true;
-
-  // Normalize device extensions (e.g. 628123:0@s.whatsapp.net -> 628123@s.whatsapp.net)
-  const cleanA = chatJidA.includes(':') && chatJidA.includes('@') ? chatJidA.replace(/:[0-9]+@/, '@') : chatJidA;
-  const cleanB = chatJidB.includes(':') && chatJidB.includes('@') ? chatJidB.replace(/:[0-9]+@/, '@') : chatJidB;
-  if (cleanA === cleanB) return true;
-
-  // Groups and Channels must match strictly
-  if (cleanA.endsWith('@g.us') || cleanB.endsWith('@g.us') || cleanA.endsWith('@newsletter') || cleanB.endsWith('@newsletter')) {
-    return cleanA === cleanB;
-  }
-
-  // Extract phone numbers from JID if available
-  const digitsA = phoneA || parsePhoneFromJid(cleanA);
-  const digitsB = phoneB || parsePhoneFromJid(cleanB);
-
-  if (digitsA && digitsB) {
-    return digitsA === digitsB;
-  }
-
-  if (digitsA && (cleanB.startsWith(digitsA) || cleanB.includes(digitsA))) return true;
-  if (digitsB && (cleanA.startsWith(digitsB) || cleanA.includes(digitsB))) return true;
-
-  return false;
-}
-
-const TWO_DIGIT_COUNTRY_CODE = /^(?:2[07]|3[0-469]|4[013-9]|5[1-8]|6[0-6]|8[1246]|9[0-58])/;
-
-function formatPhoneForDisplay(phoneOrJid: string): string {
-  if (!phoneOrJid) return '';
-  if (phoneOrJid.includes('@g.us')) return 'Grup WhatsApp';
-  if (phoneOrJid.includes('@newsletter')) return 'Saluran WhatsApp';
-  if (phoneOrJid.includes('broadcast')) return 'Status';
-  if (phoneOrJid.includes('@lid')) return 'WhatsApp User (LID)';
-
-  const digits = /^\d+$/.test(phoneOrJid) ? phoneOrJid : parsePhoneFromJid(phoneOrJid);
-  if (!digits) {
-    return phoneOrJid;
-  }
-  // Reject tokens longer than 15 digits (e.g. raw anonymous LID tokens)
-  if (digits.length > 15) {
-    return 'WhatsApp Contact';
-  }
-  if (digits.length <= 4) return `+${digits}`;
-
-  let ccLen = 3;
-  if (digits.length <= 6 || digits[0] === '1' || digits[0] === '7') ccLen = 1;
-  else if (TWO_DIGIT_COUNTRY_CODE.test(digits)) ccLen = 2;
-
-  const cc = digits.slice(0, ccLen);
-  const rest = digits.slice(ccLen);
-  if (rest.length <= 4) return `+${cc} ${rest}`;
-  const last4 = rest.slice(-4);
-  const prefix = rest.slice(0, -4);
-  const prefixGroups = prefix.match(/.{1,3}/g) ?? [prefix];
-  return `+${cc} ${[...prefixGroups, last4].join(' ')}`;
-}
-
-/**
- * Shared parser for "phone,name" recipient lines.
- * Used by both the Quick Chat Broadcast and New Campaign forms so their
- * name-parsing logic can never diverge again (bug fix: broadcast form
- * previously flattened every line to just the phone, dropping names).
- */
-function parseRecipientLines(raw: string): Array<{ phone: string; name?: string; customVars: any }> {
-  return raw
-    .split('\n')
-    .map(line => {
-      const parts = line.split(',');
-      const phone = parts[0]?.trim().replace(/[^0-9]/g, '');
-      const name = parts[1]?.trim();
-      if (!phone || phone.length < 7) return null;
-      return { phone, name: name || undefined, customVars: {} };
-    })
-    .filter(Boolean) as Array<{ phone: string; name?: string; customVars: any }>;
-}
-
-function formatWhatsAppTimestamp(timestamp: number): string {
-  if (!timestamp) return '';
-  const date = new Date(timestamp);
-  const now = new Date();
-
-  const isToday = date.toDateString() === now.toDateString();
-  if (isToday) {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }
-
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  if (date.toDateString() === yesterday.toDateString()) {
-    return 'Kemarin';
-  }
-
-  const diffDays = Math.round((now.getTime() - date.getTime()) / (1000 * 3600 * 24));
-  if (diffDays < 7) {
-    const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-    return days[date.getDay()];
-  }
-
-  return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
-}
-
-function formatDateSeparator(timestamp: number): string {
-  if (!timestamp) return '';
-  const date = new Date(timestamp);
-  const now = new Date();
-
-  const isToday = date.toDateString() === now.toDateString();
-  if (isToday) return 'HARI INI';
-
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  if (date.toDateString() === yesterday.toDateString()) return 'KEMARIN';
-
-  const diffDays = Math.round((now.getTime() - date.getTime()) / (1000 * 3600 * 24));
-  if (diffDays < 7) {
-    const days = ['MINGGU', 'SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU'];
-    return days[date.getDay()];
-  }
-
-  const months = ['JANUARI', 'FEBRUARI', 'MARET', 'APRIL', 'MEI', 'JUNI', 'JULI', 'AGUSTUS', 'SEPTEMBER', 'OKTOBER', 'NOVEMBER', 'DESEMBER'];
-  return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
-}
-
-function getChatDisplayName(
-  chatJid: string,
-  rawName?: string,
-  pushName?: string,
-  contactsList: Contact[] = [],
-  groupsList: Group[] = []
-): string {
-  if (!chatJid) return '';
-  if (chatJid.endsWith('@g.us')) {
-    const g = groupsList.find(item => item.jid === chatJid);
-    return g?.name || rawName || 'Grup WhatsApp';
-  }
-  if (chatJid.endsWith('@newsletter')) {
-    return rawName || 'Saluran WhatsApp';
-  }
-
-  const cleanPhone = chatJid.split('@')[0];
-  const matched = contactsList.find(c => c.phone === cleanPhone || chatJid.includes(c.phone));
-  if (matched?.name) return matched.name;
-  if (rawName && !rawName.includes('@') && !/^\d+$/.test(rawName)) return rawName;
-  if (pushName && !pushName.includes('@') && !/^\d+$/.test(pushName)) return pushName;
-
-  return formatPhoneForDisplay(cleanPhone) || `+${cleanPhone}`;
-}
-
-function getChatSubtitle(
-  chatJid: string,
-  rawName?: string,
-  pushName?: string,
-  contactsList: Contact[] = [],
-  groupsList: Group[] = []
-): string {
-  if (!chatJid) return '';
-  if (chatJid.endsWith('@g.us')) {
-    const g = groupsList.find(item => item.jid === chatJid);
-    return g?.memberCount ? `${g.memberCount} peserta` : 'Grup WhatsApp';
-  }
-  if (chatJid.endsWith('@newsletter')) {
-    return 'Saluran Publik';
-  }
-  const cleanPhone = chatJid.split('@')[0];
-  const matched = contactsList.find(c => c.phone === cleanPhone || chatJid.includes(c.phone));
-  if (matched?.name) {
-    return formatPhoneForDisplay(cleanPhone) || `+${cleanPhone}`;
-  }
-  if (rawName || pushName) {
-    return formatPhoneForDisplay(cleanPhone) || `+${cleanPhone}`;
-  }
-  return 'online';
-}
-
-function getAvatarBgColor(str: string): string {
-  if (!str) return '#00a884';
-  const colors = [
-    '#00a884', '#0284c7', '#7c3aed', '#db2777', '#ea580c', '#059669', '#d97706', '#4f46e5', '#0891b2', '#0d9488'
-  ];
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return colors[Math.abs(hash) % colors.length];
-}
-
-interface ChatAvatarProps {
-  sessionId?: string;
-  jid?: string;
-  name?: string;
-  isGroup?: boolean;
-  isNewsletter?: boolean;
-  className?: string;
-  size?: number;
-  style?: React.CSSProperties;
-}
-
-const loadedAvatarUrls = new Set<string>();
-const failedAvatarUrls = new Set<string>();
-
-const ChatAvatar: React.FC<ChatAvatarProps> = React.memo(({
-  sessionId,
-  jid,
-  name,
-  isGroup,
-  isNewsletter,
-  className = 'chat-avatar',
-  size = 18,
-  style
-}) => {
-  const avatarUrl = sessionId && jid ? `/api/v1/sessions/${sessionId}/avatar?jid=${encodeURIComponent(jid)}` : null;
-
-  const [hasError, setHasError] = useState(() => avatarUrl ? failedAvatarUrls.has(avatarUrl) : false);
-  const [isLoaded, setIsLoaded] = useState(() => avatarUrl ? loadedAvatarUrls.has(avatarUrl) : false);
-
-  useEffect(() => {
-    if (!avatarUrl) {
-      setHasError(false);
-      setIsLoaded(false);
-      return;
-    }
-    if (loadedAvatarUrls.has(avatarUrl)) {
-      setIsLoaded(true);
-      setHasError(false);
-    } else if (failedAvatarUrls.has(avatarUrl)) {
-      setIsLoaded(false);
-      setHasError(true);
-    } else {
-      setIsLoaded(false);
-      setHasError(false);
-    }
-  }, [avatarUrl]);
-
-  const displayName = name || jid || '';
-  const bgColor = isGroup ? '#e2e8f0' : isNewsletter ? '#fef3c7' : getAvatarBgColor(displayName);
-  const textColor = isGroup ? '#475569' : isNewsletter ? '#b45309' : '#ffffff';
-
-  return (
-    <div
-      className={className}
-      style={{
-        backgroundColor: (!isLoaded || hasError) ? bgColor : 'transparent',
-        color: textColor,
-        fontWeight: 700,
-        position: 'relative',
-        overflow: 'hidden',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        ...style
-      }}
-    >
-      {avatarUrl && !hasError && (
-        <img
-          src={avatarUrl}
-          alt={displayName}
-          referrerPolicy="no-referrer"
-          crossOrigin="anonymous"
-          onLoad={() => {
-            loadedAvatarUrls.add(avatarUrl);
-            failedAvatarUrls.delete(avatarUrl);
-            setIsLoaded(true);
-            setHasError(false);
-          }}
-          onError={() => {
-            failedAvatarUrls.add(avatarUrl);
-            loadedAvatarUrls.delete(avatarUrl);
-            setHasError(true);
-            setIsLoaded(false);
-          }}
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            borderRadius: '50%',
-            display: isLoaded ? 'block' : 'none'
-          }}
-        />
-      )}
-      {(!isLoaded || hasError) && (
-        isGroup ? (
-          <Users size={size} />
-        ) : isNewsletter ? (
-          <Radio size={size} />
-        ) : displayName && !displayName.startsWith('+') && displayName !== jid ? (
-          displayName.slice(0, 2).toUpperCase()
-        ) : (
-          <Smartphone size={size} />
-        )
-      )}
-    </div>
-  );
-});
-
-interface ChatInputBoxProps {
-  onSend: (text: string) => void;
-  onAttach: () => void;
-  disabled?: boolean;
-  placeholder?: string;
-  sendTitle?: string;
-  attachTitle?: string;
-}
-
-const ChatInputBox: React.FC<ChatInputBoxProps> = React.memo(({
-  onSend,
-  onAttach,
-  disabled = false,
-  placeholder,
-  sendTitle,
-  attachTitle,
-}) => {
-  const [text, setText] = useState('');
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = text.trim();
-    if (!trimmed || disabled) return;
-    onSend(trimmed);
-    setText('');
-  };
-
-  return (
-    <div className="room-input-footer">
-      <form className="input-form" onSubmit={handleSubmit}>
-        <button
-          type="button"
-          className="btn-input-accessory"
-          title="Emoji"
-          onClick={() => setText(prev => prev + ' 😊')}
-        >
-          <Smile size={20} />
-        </button>
-        <button
-          type="button"
-          className="btn-input-accessory"
-          title={attachTitle || 'Lampirkan File'}
-          onClick={onAttach}
-        >
-          <Paperclip size={20} />
-        </button>
-        <input
-          type="text"
-          placeholder={placeholder || 'Ketik pesan...'}
-          value={text}
-          onChange={e => setText(e.target.value)}
-          className="message-text-input"
-          disabled={disabled}
-        />
-        <button
-          type="submit"
-          disabled={!text.trim() || disabled}
-          className="btn-send-message"
-          title={sendTitle || 'Kirim'}
-        >
-          <Send size={18} style={{ marginLeft: '2px' }} />
-        </button>
-      </form>
-    </div>
-  );
-});
-
-interface ChatMessageBubbleProps {
-  message: ChatMessage;
-  isMe: boolean;
-  showDateSeparator: boolean;
-  dateSeparatorText?: string;
-  senderDisplayName?: string;
-  isGroupChat: boolean;
-}
-
-const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = React.memo(({
-  message: m,
-  isMe,
-  showDateSeparator,
-  dateSeparatorText,
-  senderDisplayName,
-  isGroupChat
-}) => {
-  return (
-    <React.Fragment key={m.id}>
-      {showDateSeparator && dateSeparatorText && (
-        <div className="chat-date-separator">
-          <span>{dateSeparatorText}</span>
-        </div>
-      )}
-      <div className={`message-bubble-wrapper ${isMe ? 'outgoing' : 'incoming'}`}>
-        <div className={`message-bubble ${isMe ? 'outgoing' : 'incoming'}`}>
-          {!isMe && isGroupChat && senderDisplayName && (
-            <div className="message-sender">
-              {senderDisplayName}
-            </div>
-          )}
-          {m.media_url && m.media_type === 'audio' && (
-            <div className="chat-audio-media">
-              <audio controls preload="metadata" className="chat-audio-player" src={m.media_url}>
-                Browser tidak mendukung pemutar audio.
-              </audio>
-            </div>
-          )}
-          {m.media_url && m.media_type === 'video' && (
-            <div className="chat-video-media">
-              <video controls preload="metadata" className="chat-video-player" src={m.media_url}>
-                Browser tidak mendukung pemutar video.
-              </video>
-            </div>
-          )}
-          {m.media_url && m.media_type === 'document' && (
-            <div className="chat-document-media">
-              <a href={m.media_url} target="_blank" rel="noreferrer" download className="chat-doc-card">
-                <FileText size={26} className="chat-doc-icon" />
-                <div className="chat-doc-info">
-                  <span className="chat-doc-name">{m.caption || 'Dokumen File'}</span>
-                  <span className="chat-doc-action">Klik untuk Mengunduh</span>
-                </div>
-              </a>
-            </div>
-          )}
-          {m.media_url && (m.media_type === 'image' || m.media_type === 'sticker' || !m.media_type) && (
-            <div style={{ marginBottom: '0.375rem', borderRadius: '8px', overflow: 'hidden' }}>
-              <img
-                src={m.media_url}
-                alt="Media message"
-                className={m.media_type === 'sticker' ? 'chat-sticker-media' : 'chat-image-media'}
-                onClick={() => window.open(m.media_url, '_blank')}
-              />
-            </div>
-          )}
-          {!m.media_url && m.media_type && (
-            <div className="chat-media-badge">
-              {m.media_type === 'audio' ? <Mic size={14} /> : m.media_type === 'video' ? <Video size={14} /> : m.media_type === 'document' ? <FileText size={14} /> : <Image size={14} />}
-              <span>{m.media_type === 'audio' ? 'Voice Note' : m.media_type === 'video' ? 'Video' : m.media_type === 'document' ? 'Dokumen' : 'Foto'}</span>
-            </div>
-          )}
-          <div className="message-text">{m.content_text || m.caption}</div>
-          <div className="message-meta">
-            <span className="message-time">
-              {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </span>
-            {isMe && (
-              <CheckCheck
-                size={14}
-                className={`message-status-icon ${m.status === 'READ' ? 'read' : ''}`}
-              />
-            )}
-          </div>
-        </div>
-      </div>
-    </React.Fragment>
-  );
-});
-
-export default function App() {
   // Theme state: light or dark (supports URL param ?theme=dark / ?theme=light)
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const urlTheme = new URLSearchParams(window.location.search).get('theme');
@@ -760,6 +141,16 @@ export default function App() {
   const [privacyMode, setPrivacyMode] = useState<boolean>(() => {
     return localStorage.getItem('whatsaman_privacy') === 'true';
   });
+
+  // Granular privacy-blur settings, persisted and edited via the privacy popover
+  const [privacySettings, setPrivacySettings] = useState<PrivacySettings>(() => {
+    try {
+      const raw = localStorage.getItem('whatsaman_privacy_settings');
+      if (raw) return { blurPics: true, blurRecentChats: true, blurChatNames: true, blurChatMessages: true, ...JSON.parse(raw) };
+    } catch { /* ignore malformed localStorage */ }
+    return { blurPics: true, blurRecentChats: true, blurChatNames: true, blurChatMessages: true };
+  });
+  const [isPrivacyMenuOpen, setIsPrivacyMenuOpen] = useState(false);
 
   // Multilingual Support (i18n: Indonesian / English)
   const [lang, setLang] = useState<Language>(() => {
@@ -945,11 +336,22 @@ export default function App() {
   const [isChatAutoReplyModal, setIsChatAutoReplyModal] = useState(false);
 
   // Message Tester State
-  const [testerType, setTesterType] = useState<'text' | 'media'>('text');
+  const [testerType, setTesterType] = useState<'text' | 'media' | 'poll' | 'location' | 'contact'>('text');
   const [testerRecipient, setTesterRecipient] = useState('');
   const [testerMessage, setTesterMessage] = useState('Halo, ini pesan pengujian dari WhatsAman!');
   const [testerMediaFile, setTesterMediaFile] = useState<File | null>(null);
   const [testerMediaCaption, setTesterMediaCaption] = useState('Lampiran file WhatsAman');
+  // Poll / Location / Contact tester state
+  const [testerPollName, setTesterPollName] = useState('Layanan apa yang Anda butuhkan?');
+  const [testerPollValues, setTesterPollValues] = useState('Konsultasi\nPemesanan\nKeluhan');
+  const [testerPollMulti, setTesterPollMulti] = useState(1);
+  const [testerLatitude, setTesterLatitude] = useState('-6.2088');
+  const [testerLongitude, setTesterLongitude] = useState('106.8456');
+  const [testerLocName, setTesterLocName] = useState('Kantor Pusat');
+  const [testerLocAddress, setTesterLocAddress] = useState('Jl. Jend. Sudirman No. 1, Jakarta');
+  const [testerContactName, setTesterContactName] = useState('Budi Santoso');
+  const [testerContactPhone, setTesterContactPhone] = useState('628123456789');
+  const [testerContactOrg, setTesterContactOrg] = useState('Aman Kerja Studio');
   const [testerLoading, setTesterLoading] = useState(false);
   const [testerResponse, setTesterResponse] = useState<any | null>(null);
 
@@ -1004,6 +406,9 @@ export default function App() {
 
   // Contact Groups / Tags State
   const [availableTags, setAvailableTags] = useState<Array<{ tag: string; count: number }>>([]);
+  // Message templates (previously backend-only feature, now surfaced in UI)
+  interface MessageTemplate { id: string; name: string; category: string; content: string; }
+  const [messageTemplates, setMessageTemplates] = useState<MessageTemplate[]>([]);
   const [selectedTagFilter, setSelectedTagFilter] = useState<string>('ALL');
   const [isEditContactTagsModal, setIsEditContactTagsModal] = useState(false);
   const [editingContactPhone, setEditingContactPhone] = useState('');
@@ -1140,6 +545,18 @@ export default function App() {
       if (data.success) setCampaigns(data.data);
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const fetchMessageTemplates = async () => {
+    try {
+      const res = await fetch('/api/v1/templates');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        setMessageTemplates(data.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch message templates', err);
     }
   };
 
@@ -1299,12 +716,13 @@ export default function App() {
       const data = await res.json();
       if (data.success) {
         addLog(`Circuit breaker sesi ${sessionId} direset`, 'success');
+        showToast(`Circuit breaker sesi ${sessionId} berhasil direset`, 'success');
         fetchAntiBlockingHealth(sessionId);
       } else {
-        alert(data.message || 'Gagal reset circuit breaker');
+        showToast(data.message || 'Gagal reset circuit breaker', 'error');
       }
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message, 'error');
     } finally {
       setAbResetting(null);
     }
@@ -1373,16 +791,16 @@ export default function App() {
         fetchIntegrationConfigs();
         setIsEditIntegrationModal(false);
       } else {
-        alert(data.message || 'Gagal menyimpan konfigurasi');
+        showToast(data.message || 'Gagal menyimpan konfigurasi', 'error');
       }
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message, 'error');
     }
   };
 
   const handleTestIncomingWebhook = async () => {
     if (!testIntegrationPhone.trim()) {
-      alert('Masukkan nomor WhatsApp tujuan uji coba!');
+      showToast('Masukkan nomor WhatsApp tujuan uji coba!', 'warn');
       return;
     }
     setTestIntegrationLoading(true);
@@ -1420,7 +838,7 @@ export default function App() {
 
   const handleCreateOutgoingWebhook = async () => {
     if (!newWebhookName.trim() || !newWebhookUrl.trim()) {
-      alert('Nama dan URL Webhook wajib diisi!');
+      showToast('Nama dan URL Webhook wajib diisi!', 'warn');
       return;
     }
     try {
@@ -1444,15 +862,15 @@ export default function App() {
         setNewWebhookSecret('');
         fetchOutgoingWebhooks();
       } else {
-        alert(data.message || 'Gagal menambahkan webhook');
+        showToast(data.message || 'Gagal menambahkan webhook', 'error');
       }
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message, 'error');
     }
   };
 
   const handleDeleteOutgoingWebhook = async (id: string) => {
-    if (!confirm('Hapus webhook subscription ini?')) return;
+    if (!(await appConfirm('Hapus webhook subscription ini?', { danger: true, confirmLabel: 'Ya, Hapus' }))) return;
     try {
       const res = await fetch(`/api/v1/webhooks/${id}`, { method: 'DELETE' });
       const data = await res.json();
@@ -1461,7 +879,7 @@ export default function App() {
         fetchOutgoingWebhooks();
       }
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message, 'error');
     }
   };
 
@@ -1470,13 +888,13 @@ export default function App() {
       const res = await fetch(`/api/v1/webhooks/${id}/test`, { method: 'POST' });
       const data = await res.json();
       if (data.success) {
-        alert(`Test Ping terkirim! Status Code: ${data.data?.status || 200}`);
+        showToast(`Test Ping terkirim! Status Code: ${data.data?.status || 200}`, 'success');
         fetchOutgoingWebhooks();
       } else {
-        alert(`Gagal kirim test ping: ${data.message}`);
+        showToast(`Gagal kirim test ping: ${data.message}`, 'error');
       }
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message, 'error');
     }
   };
 
@@ -1488,6 +906,7 @@ export default function App() {
     fetchSystemStatus();
     fetchBackups();
     fetchAuditLogs();
+    fetchMessageTemplates();
 
     let isMounted = true;
     let ws: WebSocket | null = null;
@@ -1818,7 +1237,7 @@ export default function App() {
         addLog(`Otomatis Kirim Follow-up (Auto-Dispatch) ${data.enabled ? 'Diaktifkan' : 'Dinonaktifkan'}`, data.enabled ? 'success' : 'warn');
       }
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message, 'error');
     }
   };
 
@@ -1844,21 +1263,21 @@ export default function App() {
       const data = await res.json();
       if (data.success) {
         addLog('Pengaturan Auto-Reply Bot berhasil disimpan', 'success');
-        alert('Pengaturan jam operasional & auto-reply bot berhasil disimpan!');
+        showToast('Pengaturan jam operasional & auto-reply bot berhasil disimpan!', 'success');
       }
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message, 'error');
     }
   };
 
   const handleSendChatBroadcast = async () => {
     const sId = chatBroadcastSessionId || selectedSessionId;
     if (!sId) {
-      alert('Silakan pilih sesi WhatsApp terlebih dahulu!');
+      showToast('Silakan pilih sesi WhatsApp terlebih dahulu!', 'warn');
       return;
     }
     if (!chatBroadcastMessage.trim()) {
-      alert('Pesan broadcast tidak boleh kosong!');
+      showToast('Pesan broadcast tidak boleh kosong!', 'warn');
       return;
     }
 
@@ -1866,7 +1285,7 @@ export default function App() {
 
     if (chatBroadcastMode === 'manual') {
       if (!chatBroadcastManualNumbers.trim()) {
-        alert('Masukkan minimal 1 nomor tujuan!');
+        showToast('Masukkan minimal 1 nomor tujuan!', 'warn');
         return;
       }
       // Bug fix: previously every line was flattened to phone-only via flatMap(','),
@@ -1877,7 +1296,7 @@ export default function App() {
       }));
     } else if (chatBroadcastMode === 'select') {
       if (chatBroadcastSelectedPhones.length === 0) {
-        alert('Pilih minimal 1 kontak / chat penerima!');
+        showToast('Pilih minimal 1 kontak / chat penerima!', 'warn');
         return;
       }
       recipients = chatBroadcastSelectedPhones.map(phone => {
@@ -1902,13 +1321,13 @@ export default function App() {
             }));
         }
       } catch (err: any) {
-        alert('Gagal mengambil kontak tag: ' + err.message);
+        showToast('Gagal mengambil kontak tag: ' + err.message, 'error');
         return;
       }
     }
 
     if (recipients.length === 0) {
-      alert('Tidak ada penerima nomor telepon yang valid!');
+      showToast('Tidak ada penerima nomor telepon yang valid!', 'warn');
       return;
     }
 
@@ -1933,14 +1352,14 @@ export default function App() {
       if (campData.success && campData.data?.id) {
         await fetch(`/api/v1/campaigns/${campData.data.id}/start`, { method: 'POST' });
         addLog(`Broadcast ke ${recipients.length} nomor berhasil dimulai!`, 'success');
-        alert(`🚀 Broadcast berhasil dikirimkan ke antrian (${recipients.length} penerima)! Cek menu Campaigns untuk status detail.`);
+        showToast(`Broadcast berhasil dikirim ke antrian (${recipients.length} penerima). Cek menu Campaigns untuk status.`, 'success');
         setIsChatBroadcastModal(false);
         fetchCampaigns();
       } else {
-        alert(campData.message || 'Gagal membuat pesan broadcast');
+        showToast(campData.message || 'Gagal membuat pesan broadcast', 'error');
       }
     } catch (err: any) {
-      alert(`Gagal mengirim broadcast: ${err.message}`);
+      showToast(`Gagal mengirim broadcast: ${err.message}`, 'error');
     } finally {
       setChatBroadcastSending(false);
     }
@@ -1971,13 +1390,14 @@ export default function App() {
       const data = await res.json();
       if (data.success) {
         addLog(`Follow-up task berhasil terkirim!`, 'success');
+        showToast('Follow-up task berhasil terkirim!', 'success');
         fetchCRMTasks(selectedSessionId);
         fetchSalesAnalytics(selectedSessionId, crmTimeRange);
       } else {
-        alert(data.message || 'Gagal mengeksekusi follow-up task');
+        showToast(data.message || 'Gagal mengeksekusi follow-up task', 'error');
       }
     } catch (err: any) {
-      alert(`Error: ${err.message}`);
+      showToast(`Error: ${err.message}`, 'error');
     }
   };
 
@@ -1991,18 +1411,18 @@ export default function App() {
       fetchCRMTasks(selectedSessionId);
       addLog('Follow-up task dibatalkan', 'warn');
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message, 'error');
     }
   };
 
   const handleDeleteFollowUp = async (taskId: string) => {
-    if (!confirm('Hapus task follow-up ini?')) return;
+    if (!(await appConfirm('Hapus task follow-up ini?', { danger: true, confirmLabel: 'Ya, Hapus' }))) return;
     try {
       await fetch(`/api/v1/crm/tasks/${taskId}`, { method: 'DELETE' });
       fetchCRMTasks(selectedSessionId);
       addLog('Follow-up task dihapus', 'info');
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message, 'error');
     }
   };
 
@@ -2030,10 +1450,10 @@ export default function App() {
         fetchCRMTasks(selectedSessionId);
         addLog(`Follow-up task baru dijadwalkan untuk ${newTaskPhone}`, 'success');
       } else {
-        alert(data.message || 'Gagal membuat task');
+        showToast(data.message || 'Gagal membuat task', 'error');
       }
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message, 'error');
     }
   };
 
@@ -2056,10 +1476,10 @@ export default function App() {
         fetchCRMTasks(selectedSessionId);
         addLog(`Sequence berhasil diterapkan ke ${applySeqContact.phone}. Auto-stop aktif saat dibalas.`, 'success');
       } else {
-        alert(data.message || 'Gagal menerapkan sequence');
+        showToast(data.message || 'Gagal menerapkan sequence', 'error');
       }
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message, 'error');
     }
   };
 
@@ -2075,7 +1495,7 @@ export default function App() {
       fetchSalesAnalytics(selectedSessionId, crmTimeRange);
       addLog(`Status pipeline kontak ${phone} diubah menjadi ${stage.toUpperCase()}`, 'info');
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message, 'error');
       fetchContacts(selectedSessionId);
     }
   };
@@ -2092,7 +1512,7 @@ export default function App() {
       fetchContacts(selectedSessionId);
       addLog(`Catatan kontak ${selectedContactForNotes.phone} disimpan`, 'success');
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message, 'error');
     }
   };
 
@@ -2108,8 +1528,14 @@ export default function App() {
       fetchCRMSequences(selectedSessionId);
       fetchBotConfig(selectedSessionId);
       fetchCrmAutoDispatch();
+      fetchAntiBlockingHealth(selectedSessionId);
     }
   }, [selectedSessionId]);
+
+  // Refresh anti-blocking health whenever session list/status changes (cheap call)
+  useEffect(() => {
+    sessions.forEach(s => fetchAntiBlockingHealth(s.id));
+  }, [sessions.map(s => `${s.id}:${s.status}`).join(',')]);
 
   useEffect(() => {
     if (selectedSessionId) {
@@ -2180,7 +1606,7 @@ export default function App() {
         fetchSessions();
       }
     } catch (err: any) {
-      alert(`Gagal membuat sesi: ${err.message}`);
+      showToast(`Gagal membuat sesi: ${err.message}`, 'error');
     }
   };
 
@@ -2191,14 +1617,14 @@ export default function App() {
   };
 
   const handleLogoutSession = async (id: string) => {
-    if (!confirm(`Logout akun WhatsApp dari sesi "${id}"? Anda harus scan QR / pairing ulang untuk terhubung kembali.`)) return;
+    if (!(await appConfirm(`Logout akun WhatsApp dari sesi "${id}"? Anda harus scan QR / pairing ulang untuk terhubung kembali.`, { danger: true, confirmLabel: 'Ya, Logout' }))) return;
     await fetch(`/api/v1/sessions/${id}/logout`, { method: 'POST' });
     fetchSessions();
     addLog(`Sesi ${id} berhasil logout dari WhatsApp`, 'warn');
   };
 
   const handleDeleteSession = async (id: string) => {
-    if (!confirm(`Hapus sesi ${id} dan seluruh file autentikasinya?`)) return;
+    if (!(await appConfirm(`Hapus sesi ${id} dan seluruh file autentikasinya?`, { danger: true, confirmLabel: 'Ya, Hapus' }))) return;
     await fetch(`/api/v1/sessions/${id}`, { method: 'DELETE' });
     fetchSessions();
     addLog(`Sesi ${id} dihapus permanen`, 'warn');
@@ -2244,10 +1670,10 @@ export default function App() {
         fetchChatMessages(selectedSessionId, activeChatJid);
         fetchChats(selectedSessionId);
       } else {
-        alert(data.message || 'Gagal mengirim pesan');
+        showToast(data.message || 'Gagal mengirim pesan', 'error');
       }
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message, 'error');
     }
   }, [selectedSessionId, activeChatJid, chatReplyText]);
 
@@ -2297,21 +1723,21 @@ export default function App() {
         fetchChats(selectedSessionId);
         addLog('Media berhasil dikirim', 'success');
       } else {
-        alert(data.message || 'Gagal mengirim media');
+        showToast(data.message || 'Gagal mengirim media', 'error');
       }
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message, 'error');
     }
   };
 
   // Message Tester Handler
   const handleRunTester = async () => {
     if (!selectedSessionId) {
-      alert('Pilih sesi aktif terlebih dahulu');
+      showToast('Pilih sesi aktif terlebih dahulu', 'warn');
       return;
     }
     if (!testerRecipient.trim()) {
-      alert('Masukkan nomor WhatsApp tujuan');
+      showToast('Masukkan nomor WhatsApp tujuan', 'warn');
       return;
     }
     setTesterLoading(true);
@@ -2319,6 +1745,11 @@ export default function App() {
     try {
       const cleanPhone = testerRecipient.replace(/[^0-9]/g, '');
       const toJid = `${cleanPhone}@s.whatsapp.net`;
+      const recordResponse = async (res: Response) => {
+        const data = await res.json();
+        setTesterResponse({ status: res.status, data, timestamp: new Date().toISOString() });
+        return data;
+      };
 
       if (testerType === 'text') {
         const res = await fetch('/api/v1/messages/text', {
@@ -2330,16 +1761,78 @@ export default function App() {
             text: testerMessage
           })
         });
-        const data = await res.json();
-        setTesterResponse({ status: res.status, data, timestamp: new Date().toISOString() });
+        const data = await recordResponse(res);
         if (data.success) {
           addLog(`Pesan tester terkirim ke +${cleanPhone}`, 'success');
         } else {
           addLog(`Tester gagal: ${data.message || 'Unknown error'}`, 'warn');
         }
+      } else if (testerType === 'poll') {
+        // NEW: interactive poll tester (backend endpoint already existed, UI was missing)
+        const values = testerPollValues.split('\n').map(v => v.trim()).filter(Boolean);
+        const res = await fetch('/api/v1/messages/poll', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: selectedSessionId,
+            to: toJid,
+            poll: {
+              name: testerPollName,
+              values,
+              selectableCount: testerPollMulti
+            }
+          })
+        });
+        const data = await recordResponse(res);
+        if (data.success) {
+          addLog(`Poll tester terkirim ke +${cleanPhone}`, 'success');
+        } else {
+          addLog(`Tester poll gagal: ${data.message || 'Unknown error'}`, 'warn');
+        }
+      } else if (testerType === 'location') {
+        // NEW: location tester
+        const res = await fetch('/api/v1/messages/location', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: selectedSessionId,
+            to: toJid,
+            latitude: Number(testerLatitude),
+            longitude: Number(testerLongitude),
+            name: testerLocName || undefined,
+            address: testerLocAddress || undefined
+          })
+        });
+        const data = await recordResponse(res);
+        if (data.success) {
+          addLog(`Lokasi tester terkirim ke +${cleanPhone}`, 'success');
+        } else {
+          addLog(`Tester lokasi gagal: ${data.message || 'Unknown error'}`, 'warn');
+        }
+      } else if (testerType === 'contact') {
+        // NEW: vCard contact tester
+        const res = await fetch('/api/v1/messages/contact', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: selectedSessionId,
+            to: toJid,
+            contact: {
+              name: testerContactName,
+              phone: testerContactPhone,
+              organization: testerContactOrg || undefined
+            }
+          })
+        });
+        const data = await recordResponse(res);
+        if (data.success) {
+          addLog(`Kontak tester terkirim ke +${cleanPhone}`, 'success');
+        } else {
+          addLog(`Tester kontak gagal: ${data.message || 'Unknown error'}`, 'warn');
+        }
       } else {
         if (!testerMediaFile) {
-          alert('Pilih file media terlebih dahulu');
+          showToast('Pilih file media terlebih dahulu', 'warn');
           setTesterLoading(false);
           return;
         }
@@ -2352,8 +1845,7 @@ export default function App() {
           method: 'POST',
           body: fd
         });
-        const data = await res.json();
-        setTesterResponse({ status: res.status, data, timestamp: new Date().toISOString() });
+        const data = await recordResponse(res);
         if (data.success) {
           addLog(`Media tester terkirim ke +${cleanPhone}`, 'success');
         } else {
@@ -2388,9 +1880,10 @@ export default function App() {
         setNewContactName('');
         fetchContacts(selectedSessionId);
         addLog(`Kontak +${newContactPhone} ditambahkan`, 'success');
+        showToast(`Kontak +${newContactPhone} ditambahkan`, 'success');
       }
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message, 'error');
     }
   };
 
@@ -2408,13 +1901,13 @@ export default function App() {
         addLog(`Status opt-out +${phone} diubah menjadi ${!currentStatus ? 'Opt-Out' : 'Aktif'}`, 'info');
       }
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message, 'error');
     }
   };
 
   const handleDeleteContact = async (phone: string) => {
     if (!selectedSessionId) return;
-    if (!confirm(lang === 'id' ? `Hapus kontak +${phone} dari database?` : `Delete contact +${phone} from database?`)) return;
+    if (!(await appConfirm(lang === 'id' ? `Hapus kontak +${phone} dari database?` : `Delete contact +${phone} from database?`, { danger: true, confirmLabel: 'Ya, Hapus' }))) return;
     try {
       setContacts(prev => prev.filter(c => c.phone !== phone));
       const res = await fetch(`/api/v1/contacts/${phone}?sessionId=${selectedSessionId}`, { method: 'DELETE' });
@@ -2426,14 +1919,14 @@ export default function App() {
         fetchContacts(selectedSessionId);
       }
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message, 'error');
       fetchContacts(selectedSessionId);
     }
   };
 
   const handleImportGroupToContacts = async (jid: string) => {
     if (!selectedSessionId) return;
-    if (!confirm(`Import seluruh anggota grup ke database kontak audiens?`)) return;
+    if (!(await appConfirm('Import seluruh anggota grup ke database kontak audiens?', { confirmLabel: 'Ya, Import' }))) return;
     try {
       const res = await fetch('/api/v1/groups/import-to-contacts', {
         method: 'POST',
@@ -2442,12 +1935,12 @@ export default function App() {
       });
       const data = await res.json();
       if (data.success) {
-        alert(data.message);
+        showToast(data.message, 'success');
         fetchContacts(selectedSessionId);
         addLog(data.message, 'success');
       }
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message, 'error');
     }
   };
 
@@ -2481,10 +1974,10 @@ export default function App() {
         fetchTags(selectedSessionId);
         addLog(`Group kontak +${editingContactPhone} disimpan: [${parsedTags.join(', ')}]`, 'success');
       } else {
-        alert(data.message || 'Gagal memperbarui group kontak');
+        showToast(data.message || 'Gagal memperbarui group kontak', 'error');
       }
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message, 'error');
     }
   };
 
@@ -2501,7 +1994,7 @@ export default function App() {
         addLog(`Berhasil memuat ${activeContacts.length} kontak dari group "${campSelectedTag}" ke editor teks`, 'info');
       }
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message, 'error');
     }
   };
 
@@ -2525,21 +2018,21 @@ export default function App() {
             }));
         }
       } catch (err: any) {
-        alert('Gagal mengambil kontak audiens grup: ' + err.message);
+        showToast('Gagal mengambil kontak audiens grup: ' + err.message, 'error');
         return;
       }
     } else {
       if (!campRecipientsRaw.trim()) {
-        alert('Daftar nomor penerima tidak boleh kosong!');
+        showToast('Daftar nomor penerima tidak boleh kosong!', 'warn');
         return;
       }
       recipients = parseRecipientLines(campRecipientsRaw);
     }
 
     if (recipients.length === 0) {
-      alert(campAudienceMode === 'group'
+      showToast(campAudienceMode === 'group'
         ? `Tidak ditemukan kontak aktif (non opt-out) dalam group "${campSelectedTag === 'ALL' ? 'Semua Kontak' : campSelectedTag}". Silakan tambahkan kontak ke group ini terlebih dahulu.`
-        : 'Daftar nomor penerima tidak boleh kosong!');
+        : 'Daftar nomor penerima tidak boleh kosong!', 'warn');
       return;
     }
 
@@ -2565,11 +2058,12 @@ export default function App() {
         setCampRecipientsRaw('');
         fetchCampaigns();
         addLog(`Broadcast "${campName}" berhasil dibuat dengan ${recipients.length} penerima`, 'success');
+        showToast(`Broadcast "${campName}" dibuat dengan ${recipients.length} penerima`, 'success');
       } else {
-        alert(data.message || 'Gagal membuat broadcast');
+        showToast(data.message || 'Gagal membuat broadcast', 'error');
       }
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message, 'error');
     }
   };
 
@@ -2586,10 +2080,11 @@ export default function App() {
   };
 
   const handleDeleteCampaign = async (id: string) => {
-    if (!confirm('Hapus campaign broadcast ini beserta antreannya?')) return;
+    if (!(await appConfirm('Hapus campaign broadcast ini beserta antreannya?', { danger: true, confirmLabel: 'Ya, Hapus' }))) return;
     await fetch(`/api/v1/campaigns/${id}`, { method: 'DELETE' });
     fetchCampaigns();
     addLog(`Broadcast ${id} dihapus`, 'info');
+    showToast('Broadcast dihapus', 'info');
   };
 
   const handleViewRecipients = async (id: string, title: string) => {
@@ -2620,7 +2115,7 @@ export default function App() {
         addLog(`Rule "${id}" ${!currentActive ? 'diaktifkan' : 'dinonaktifkan'}`, 'info');
       }
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message, 'error');
     }
   };
 
@@ -2659,9 +2154,10 @@ export default function App() {
         setRuleSetStageEnabled(false);
         fetchRules();
         addLog(`Rule "${ruleName}" berhasil disimpan`, 'success');
+        showToast(`Rule "${ruleName}" berhasil disimpan`, 'success');
       }
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message, 'error');
     }
   };
 
@@ -2696,17 +2192,19 @@ export default function App() {
         setIsEditRuleModal(false);
         fetchRules();
         addLog(`Rule "${editRuleName}" diperbarui`, 'success');
+        showToast(`Rule "${editRuleName}" diperbarui`, 'success');
       }
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message, 'error');
     }
   };
 
   const handleDeleteRule = async (id: string) => {
-    if (!confirm('Hapus aturan auto-responder ini?')) return;
+    if (!(await appConfirm('Hapus aturan auto-responder ini?', { danger: true, confirmLabel: 'Ya, Hapus' }))) return;
     await fetch(`/api/v1/automation/${id}`, { method: 'DELETE' });
     fetchRules();
     addLog(`Rule dihapus`, 'info');
+    showToast('Rule dihapus', 'info');
   };
 
   // Rule Tester Evaluation
@@ -2752,14 +2250,347 @@ export default function App() {
       if (data.success) {
         fetchBackups();
         addLog(`Cadangan berhasil dibuat: ${data.data.fileName}`, 'success');
+        showToast(`Cadangan berhasil dibuat: ${data.data.fileName}`, 'success');
       }
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message, 'error');
     }
   };
 
   const activeSession = sessions.find(s => s.id === selectedSessionId) || sessions[0] || null;
   const isGlobalConnected = sessions.some(s => s.status === 'CONNECTED');
+
+  // Everything the lazy panels need, provided as one typed object
+  const panelCtx: PanelCtx = {
+    t,
+    privacyMode,
+    setPrivacyMode,
+    privacySettings,
+    setPrivacySettings,
+    isPrivacyMenuOpen,
+    setIsPrivacyMenuOpen,
+    lang,
+    showToast,
+    appConfirm,
+    previewTemplate,
+    addLog,
+    messagesEndRef,
+    liveLogs,
+    sessions,
+    selectedSessionId,
+    setSelectedSessionId,
+    campaigns,
+    contacts,
+    setContacts,
+    groups,
+    rules,
+    activeSession,
+    isGlobalConnected,
+    setActiveTab,
+    fetchSessions,
+    fetchSystemStatus,
+    fetchCampaigns,
+    fetchContacts,
+    fetchGroups,
+    fetchChats,
+    fetchChatMessages,
+    fetchTags,
+    fetchCRMTasks,
+    fetchCRMSequences,
+    fetchSalesAnalytics,
+    fetchAuditLogs,
+    fetchBackups,
+    fetchIntegrationLogs,
+    chats,
+    setChats,
+    activeChatJid,
+    setActiveChatJid,
+    chatMessages,
+    setChatMessages,
+    chatSearchQuery,
+    setChatSearchQuery,
+    chatsSidebarTab,
+    setChatsSidebarTab,
+    chatFilter,
+    setChatFilter,
+    chatReplyText,
+    setChatReplyText,
+    isNewChatModal,
+    setIsNewChatModal,
+    newChatPhone,
+    setNewChatPhone,
+    isRefreshingChats,
+    refreshSuccess,
+    isRefreshingThread,
+    setIsRefreshingThread,
+    isSendMediaModal,
+    setIsSendMediaModal,
+    chatMediaFile,
+    setChatMediaFile,
+    chatMediaCaption,
+    setChatMediaCaption,
+    unreadChatsCount,
+    contactsMap,
+    groupsMap,
+    filteredChats,
+    filteredContacts,
+    filteredGroups,
+    filteredChannels,
+    findContact,
+    handleManualRefreshChats,
+    handleRefreshActiveThread,
+    handleSendChatMessage,
+    handleSendChatMedia,
+    handleStartNewChat,
+    botConfig,
+    setBotConfig,
+    handleToggleAutoReplyGlobal,
+    setIsChatAutoReplyModal,
+    setIsChatBroadcastModal,
+    sessionSearchQuery,
+    setSessionSearchQuery,
+    sessionStatusFilter,
+    setSessionStatusFilter,
+    copiedPairingCode,
+    setCopiedPairingCode,
+    abHealth,
+    abResetting,
+    handleResetCircuitBreaker,
+    handleDisconnectSession,
+    handleLogoutSession,
+    handleDeleteSession,
+    handleConnectSessionDirect,
+    activeQrModal,
+    setActiveQrModal,
+    connectOptionModal,
+    setConnectOptionModal,
+    crmStageFilter,
+    setCrmStageFilter,
+    crmSearchQuery,
+    setCrmSearchQuery,
+    crmTasks,
+    crmTaskFilter,
+    setCrmTaskFilter,
+    crmSequences,
+    crmAnalytics,
+    crmTimeRange,
+    setCrmTimeRange,
+    crmAutoDispatch,
+    handleToggleCrmAutoDispatch,
+    isNewTaskModal,
+    setIsNewTaskModal,
+    newTaskPhone,
+    setNewTaskPhone,
+    newTaskName,
+    setNewTaskName,
+    newTaskTitle,
+    setNewTaskTitle,
+    newTaskTemplate,
+    setNewTaskTemplate,
+    newTaskDueHours,
+    setNewTaskDueHours,
+    handleCreateFollowUpTask,
+    handleExecuteFollowUp,
+    handleCancelFollowUp,
+    handleDeleteFollowUp,
+    isApplySeqModal,
+    setIsApplySeqModal,
+    applySeqContact,
+    setApplySeqContact,
+    selectedSeqId,
+    setSelectedSeqId,
+    handleApplySequence,
+    isNotesModal,
+    setIsNotesModal,
+    selectedContactForNotes,
+    setSelectedContactForNotes,
+    contactNotesText,
+    setContactNotesText,
+    handleSaveContactNotes,
+    contactSearchQuery,
+    setContactSearchQuery,
+    availableTags,
+    selectedTagFilter,
+    setSelectedTagFilter,
+    isAddContactModal,
+    setIsAddContactModal,
+    newContactPhone,
+    setNewContactPhone,
+    newContactName,
+    setNewContactName,
+    newContactTags,
+    setNewContactTags,
+    handleAddContact,
+    isEditContactTagsModal,
+    setIsEditContactTagsModal,
+    editingContactPhone,
+    editingContactName,
+    editingContactTags,
+    setEditingContactTags,
+    openEditTagsModal,
+    handleSaveContactTags,
+    handleToggleOptOut,
+    handleDeleteContact,
+    handleImportGroupToContacts,
+    handleUpdateContactStage,
+    handleOpenChatWithContact,
+    isNewCampaignModal,
+    setIsNewCampaignModal,
+    campName,
+    setCampName,
+    campAudienceMode,
+    setCampAudienceMode,
+    campSelectedTag,
+    setCampSelectedTag,
+    campTemplate,
+    setCampTemplate,
+    campRecipientsRaw,
+    setCampRecipientsRaw,
+    campRandomDelayMin,
+    setCampRandomDelayMin,
+    campRandomDelayMax,
+    setCampRandomDelayMax,
+    messageTemplates,
+    handleCreateCampaign,
+    handleStartCampaign,
+    handlePauseCampaign,
+    handleDeleteCampaign,
+    isViewRecipientsModal,
+    setIsViewRecipientsModal,
+    viewRecipientsList,
+    viewCampaignTitle,
+    handleViewRecipients,
+    handleFillRecipientsFromGroup,
+    isNewRuleModal,
+    setIsNewRuleModal,
+    ruleName,
+    setRuleName,
+    ruleTriggerText,
+    setRuleTriggerText,
+    ruleOperator,
+    setRuleOperator,
+    ruleReplyText,
+    setRuleReplyText,
+    ruleAddTagEnabled,
+    setRuleAddTagEnabled,
+    ruleActionTag,
+    setRuleActionTag,
+    ruleSetStageEnabled,
+    setRuleSetStageEnabled,
+    ruleActionStage,
+    setRuleActionStage,
+    isEditRuleModal,
+    setIsEditRuleModal,
+    editRuleId,
+    editRuleName,
+    setEditRuleName,
+    editRuleTriggerText,
+    setEditRuleTriggerText,
+    editRuleOperator,
+    setEditRuleOperator,
+    editRuleReplyText,
+    setEditRuleReplyText,
+    editRuleAddTagEnabled,
+    setEditRuleAddTagEnabled,
+    editRuleActionTag,
+    setEditRuleActionTag,
+    editRuleSetStageEnabled,
+    setEditRuleSetStageEnabled,
+    editRuleActionStage,
+    setEditRuleActionStage,
+    simTestInput,
+    setSimTestInput,
+    simMatchedRule,
+    simEvaluatedReply,
+    handleToggleRule,
+    handleCreateRule,
+    handleSaveEditRule,
+    handleDeleteRule,
+    handleSaveBotConfig,
+    testerType,
+    setTesterType,
+    testerRecipient,
+    setTesterRecipient,
+    testerMessage,
+    setTesterMessage,
+    testerMediaFile,
+    setTesterMediaFile,
+    testerMediaCaption,
+    setTesterMediaCaption,
+    testerPollName,
+    setTesterPollName,
+    testerPollValues,
+    setTesterPollValues,
+    testerPollMulti,
+    setTesterPollMulti,
+    testerLatitude,
+    setTesterLatitude,
+    testerLongitude,
+    setTesterLongitude,
+    testerLocName,
+    setTesterLocName,
+    testerLocAddress,
+    setTesterLocAddress,
+    testerContactName,
+    setTesterContactName,
+    testerContactPhone,
+    setTesterContactPhone,
+    testerContactOrg,
+    setTesterContactOrg,
+    testerLoading,
+    testerResponse,
+    handleRunTester,
+    integrationConfigs,
+    outgoingWebhooks,
+    integrationLogs,
+    selectedIntegrationTab,
+    setSelectedIntegrationTab,
+    copiedWebhookUrl,
+    setCopiedWebhookUrl,
+    copiedScriptCode,
+    setCopiedScriptCode,
+    isTestIntegrationModal,
+    setIsTestIntegrationModal,
+    testIntegrationPhone,
+    setTestIntegrationPhone,
+    testIntegrationName,
+    setTestIntegrationName,
+    testIntegrationFormName,
+    setTestIntegrationFormName,
+    testIntegrationResult,
+    testIntegrationLoading,
+    handleTestIncomingWebhook,
+    handleSaveIntegrationConfig,
+    handleTestOutgoingWebhook,
+    handleCreateOutgoingWebhook,
+    handleDeleteOutgoingWebhook,
+    isAddOutgoingWebhookModal,
+    setIsAddOutgoingWebhookModal,
+    newWebhookName,
+    setNewWebhookName,
+    newWebhookUrl,
+    setNewWebhookUrl,
+    newWebhookSecret,
+    setNewWebhookSecret,
+    newWebhookEvents,
+    editIntegrationConfig,
+    setEditIntegrationConfig,
+    isEditIntegrationModal,
+    setIsEditIntegrationModal,
+    systemStatus,
+    backups,
+    handleCreateBackup,
+    auditLogs,
+    logFilter,
+    setLogFilter,
+    setIsAddSessionModal,
+    setChatBroadcastSessionId,
+    setEditingContactPhone,
+    setEditingContactName,
+    setEditRuleId,
+    fetchIntegrationConfigs,
+    fetchOutgoingWebhooks
+  };
 
   const navItems = [
     { id: 'dashboard', label: t.nav.dashboard, icon: LayoutDashboard },
@@ -2933,7 +2764,7 @@ export default function App() {
           </button>
 
           {/* Theme Toggle Button */}
-          <button className="theme-toggle-btn" onClick={toggleTheme} title="Ganti Mode Tampilan (Terang / Gelap)">
+          <button className="theme-toggle-btn" data-action="toggle-theme" onClick={toggleTheme} title="Ganti Mode Tampilan (Terang / Gelap)">
             {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
             {!isCollapsed && <span className="text-xs font-medium">{theme === 'dark' ? t.common.lightTheme : t.common.darkTheme}</span>}
           </button>
@@ -2954,3876 +2785,32 @@ export default function App() {
       {/* Main View Area */}
       <main className={`main-content ${isCollapsed ? 'expanded' : ''} p-6 sm:p-8`}>
         {/* ==================== 1. DASHBOARD OVERVIEW ==================== */}
-        {activeTab === 'dashboard' && (
-          <div className="space-y-6">
-            <header className="page-header">
-              <div className="page-header__title-group">
-                <h1>{t.dashboard.title}</h1>
-                <span className={`status-badge ${isGlobalConnected ? 'connected' : 'disconnected'}`}>
-                  {isGlobalConnected ? t.common.connected : t.common.disconnected}
-                </span>
-              </div>
-              <div className="page-header__actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await fetchSessions();
-                    await fetchSystemStatus();
-                    if (selectedSessionId) await fetchChats(selectedSessionId);
-                  }}
-                  className="btn-secondary"
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                  title="Refresh Dashboard"
-                >
-                  <RefreshCw size={15} />
-                  <span>{t.common.refresh}</span>
-                </button>
-                <button onClick={() => setIsAddSessionModal(true)} className="btn-primary">
-                  <Plus size={16} />
-                  <span>{t.dashboard.newSession}</span>
-                </button>
-              </div>
-              <p className="page-header__subtitle">{t.dashboard.subtitle}</p>
-            </header>
 
-            {/* WhatsAman 4-Card Stats Grid */}
-            <div className="stats-grid">
-              <div className="stat-card">
-                <MessageSquare className="stat-watermark" />
-                <div className="stat-header">
-                  <span className="stat-label">{t.dashboard.activeSessions}</span>
-                  <Smartphone size={20} className="stat-icon" />
-                </div>
-                <div className="stat-value">{sessions.filter(s => s.status === 'CONNECTED').length}</div>
-                <div className="stat-detail">
-                  {sessions.filter(s => s.status === 'CONNECTED').length} {t.dashboard.runningOf} {sessions.length} registered
-                </div>
-              </div>
+        {/* Per-tab panels — lazy-loaded so each page only ships when visited */}
+        <PrivacyPopover
+          isOpen={isPrivacyMenuOpen}
+          onClose={() => setIsPrivacyMenuOpen(false)}
+          privacyMode={privacyMode}
+          setPrivacyMode={setPrivacyMode}
+          privacySettings={privacySettings}
+          setPrivacySettings={setPrivacySettings}
+        />
+
+        <React.Suspense fallback={<div style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-muted)' }}>Memuat halaman...</div>}>
+          {activeTab === 'dashboard' && <DashboardPanel ctx={panelCtx} />}
+          {activeTab === 'sessions' && <SessionsPanel ctx={panelCtx} />}
+          {activeTab === 'chats' && <ChatsPanel ctx={panelCtx} />}
+          {activeTab === 'crm' && <CrmPanel ctx={panelCtx} />}
+          {activeTab === 'contacts' && <ContactsPanel ctx={panelCtx} />}
+          {activeTab === 'groups' && <GroupsPanel ctx={panelCtx} />}
+          {activeTab === 'campaigns' && <CampaignsPanel ctx={panelCtx} />}
+          {activeTab === 'tester' && <TesterPanel ctx={panelCtx} />}
+          {activeTab === 'automation' && <AutomationPanel ctx={panelCtx} />}
+          {activeTab === 'integrations' && <IntegrationsPanel ctx={panelCtx} />}
+          {activeTab === 'infrastructure' && <InfrastructurePanel ctx={panelCtx} />}
+          {activeTab === 'logs' && <LogsPanel ctx={panelCtx} />}
+        </React.Suspense>
 
-              <div className="stat-card">
-                <Send className="stat-watermark" />
-                <div className="stat-header">
-                  <span className="stat-label">{t.dashboard.broadcastSent}</span>
-                  <Send size={20} className="stat-icon" />
-                </div>
-                <div className="stat-value">{campaigns.reduce((acc, c) => acc + (c.sent_count || 0), 0)}</div>
-                <div className="stat-detail">{campaigns.length} {t.campaigns.totalCampaigns.toLowerCase()}</div>
-              </div>
-
-              <div className="stat-card">
-                <Users className="stat-watermark" />
-                <div className="stat-header">
-                  <span className="stat-label">{t.dashboard.totalContacts}</span>
-                  <Users size={20} className="stat-icon" />
-                </div>
-                <div className="stat-value">{contacts.length}</div>
-                <div className="stat-detail">{contacts.filter(c => !c.opt_out).length} active opted-in</div>
-              </div>
-
-              <div className="stat-card">
-                <Activity className="stat-watermark" />
-                <div className="stat-header">
-                  <span className="stat-label">{t.dashboard.systemHealth}</span>
-                  <Server size={20} className="stat-icon" />
-                </div>
-                <div className="stat-value">{systemStatus ? `${systemStatus.memory.heapUsedMb} MB` : '—'}</div>
-                <div className="stat-detail">Portable Mode: {systemStatus?.isPortable ? 'Enabled' : 'Standard'}</div>
-              </div>
-            </div>
-
-            {/* AMAN CHAT Pro: Sales CRM & Conversion Funnel Analytics */}
-            <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">{t.crm.title}</h2>
-                    <span className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                      Pro Analytics
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {t.crm.subtitle}
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2 flex-wrap">
-                  {/* Time Range Selector */}
-                  <div className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 p-0.5 bg-slate-50 dark:bg-slate-900 text-xs">
-                    {(['today', '7d', '30d', '90d', 'all'] as const).map((r) => (
-                      <button
-                        key={r}
-                        onClick={() => {
-                          setCrmTimeRange(r);
-                          fetchSalesAnalytics(selectedSessionId, r);
-                        }}
-                        className={`px-2.5 py-1 rounded-md font-semibold transition-all ${
-                          crmTimeRange === r
-                            ? 'bg-white dark:bg-slate-800 shadow-sm text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700'
-                            : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
-                        }`}
-                      >
-                        {r === 'today' ? t.crm.timeRangeToday : r === '7d' ? t.crm.timeRange7d : r === '30d' ? t.crm.timeRange30d : r === '90d' ? '90 Days' : t.crm.timeRangeAll}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Export CSV Button */}
-                  <a
-                    href={`/api/v1/crm/export-csv?sessionId=${selectedSessionId}`}
-                    download
-                    className="btn-secondary btn-sm flex items-center gap-1.5"
-                    title="Export CSV"
-                  >
-                    <Download size={14} />
-                    <span>Export CSV</span>
-                  </a>
-                </div>
-              </div>
-
-              {/* 8-Card Sales Funnel Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-                <div className="crm-stat-card">
-                  <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{t.crm.totalLeads}</div>
-                  <div className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 mt-1">{crmAnalytics?.totalLeads ?? contacts.length}</div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">{t.contacts.totalContacts}</div>
-                </div>
-
-                <div className="crm-stat-card">
-                  <div className="text-[11px] font-bold text-sky-600 uppercase tracking-wider">New Leads</div>
-                  <div className="text-2xl font-extrabold text-sky-700 dark:text-sky-400 mt-1">{crmAnalytics?.newLeads ?? 0}</div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">Pipeline Leads</div>
-                </div>
-
-                <div className="crm-stat-card">
-                  <div className="text-[11px] font-bold text-amber-600 uppercase tracking-wider">Hot Leads 🔥</div>
-                  <div className="text-2xl font-extrabold text-amber-700 dark:text-amber-400 mt-1">{crmAnalytics?.hotLeads ?? 0}</div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">High Priority</div>
-                </div>
-
-                <div className="crm-stat-card">
-                  <div className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">{t.crm.customer} (💰)</div>
-                  <div className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-400 mt-1">{crmAnalytics?.convertedCustomers ?? 0}</div>
-                  <div className="text-[11px] text-emerald-600 mt-0.5 font-medium">Converted</div>
-                </div>
-
-                <div className="crm-stat-card">
-                  <div className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">{t.crm.conversionRate}</div>
-                  <div className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-400 mt-1">{crmAnalytics?.conversionRate ?? 0}%</div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">Customer / Leads</div>
-                </div>
-
-                <div className="crm-stat-card">
-                  <div className="text-[11px] font-bold text-rose-600 uppercase tracking-wider">{t.crm.pendingTasks}</div>
-                  <div className="text-2xl font-extrabold text-rose-700 dark:text-rose-400 mt-1">{crmAnalytics?.followUpDue ?? 0}</div>
-                  <div className="text-[11px] text-rose-500 mt-0.5 font-semibold">Due Follow-ups</div>
-                </div>
-
-                <div className="crm-stat-card">
-                  <div className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider">Follow-up Done</div>
-                  <div className="text-2xl font-extrabold text-indigo-700 dark:text-indigo-400 mt-1">{crmAnalytics?.followUpCompleted ?? 0}</div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">Tasks Completed</div>
-                </div>
-
-                <div className="crm-stat-card">
-                  <div className="text-[11px] font-bold text-purple-600 uppercase tracking-wider">Reply Rate</div>
-                  <div className="text-2xl font-extrabold text-purple-700 dark:text-purple-400 mt-1">{crmAnalytics?.replyRate ?? 0}%</div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">Inbound / Outbound</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Sessions Overview Table */}
-            <section className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-base font-bold text-slate-900">{t.sessions.title}</h2>
-                  <p className="text-xs text-slate-500">{t.sessions.subtitle}</p>
-                </div>
-                <button onClick={() => setActiveTab('sessions')} className="btn-secondary btn-sm">
-                  <span>{t.common.actions}</span>
-                  <ChevronRight size={14} />
-                </button>
-              </div>
-
-              <div className="keys-table-container">
-                <table className="keys-table">
-                  <thead>
-                    <tr className="table-row header">
-                      <th>SESSION ID</th>
-                      <th>{t.sessions.phoneLabel.toUpperCase()}</th>
-                      <th>{t.common.status.toUpperCase()}</th>
-                      <th>{t.sessions.lastConnected.toUpperCase()}</th>
-                      <th style={{ textAlign: 'right' }}>{t.common.actions.toUpperCase()}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sessions.length === 0 ? (
-                      <tr>
-                        <td colSpan={5}>
-                          <div className="p-8 text-center text-slate-400 text-sm">
-                            {t.sessions.noSessions}
-                          </div>
-                        </td>
-                      </tr>
-                    ) : (
-                      sessions.map(s => (
-                        <tr key={s.id} className="table-row">
-                          <td>
-                            <span className="mono font-semibold text-slate-900 text-xs px-2.5 py-1 rounded-md bg-slate-100 border border-slate-200">
-                              {s.id}
-                            </span>
-                          </td>
-                          <td>
-                            <div className="flex items-center gap-2.5">
-                              {s.status === 'CONNECTED' ? (
-                                <ChatAvatar
-                                  sessionId={s.id}
-                                  jid={s.phoneNumber ? `${s.phoneNumber}@s.whatsapp.net` : undefined}
-                                  name={s.name}
-                                  className="chat-avatar"
-                                  size={14}
-                                  style={{ width: '32px', height: '32px', fontSize: '0.75rem', flexShrink: 0 }}
-                                />
-                              ) : (
-                                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', flexShrink: 0 }}>
-                                  <Smartphone size={16} />
-                                </div>
-                              )}
-                              <div className="flex flex-col min-w-0">
-                                <span className="font-semibold text-slate-800 text-xs truncate">{s.name}</span>
-                                <span className="text-[11px] text-slate-400 mono">+{s.phoneNumber || 'Unpaired'}</span>
-                              </div>
-                            </div>
-                          </td>
-                          <td>
-                            <span className={`status-pill ${s.status.toLowerCase()}`}>
-                              {s.status === 'CONNECTED' ? t.common.online : s.status.toLowerCase().replace('_', ' ')}
-                            </span>
-                          </td>
-                          <td>
-                            <span className="text-xs text-slate-500 font-medium">
-                              {s.lastConnectedAt ? new Date(s.lastConnectedAt).toLocaleTimeString() : '—'}
-                            </span>
-                          </td>
-                          <td style={{ textAlign: 'right' }}>
-                            <div className="flex items-center justify-end gap-1.5">
-                              <button
-                                onClick={() => {
-                                  setSelectedSessionId(s.id);
-                                  setActiveTab('sessions');
-                                }}
-                                className="btn-secondary btn-sm"
-                              >
-                                {t.chats.tabChats}
-                              </button>
-                              {s.status === 'CONNECTED' ? (
-                                <button onClick={() => handleDisconnectSession(s.id)} className="btn-danger btn-sm">
-                                  {t.sessions.disconnectSession}
-                                </button>
-                              ) : (
-                                <button onClick={() => handleConnectSessionDirect(s.id)} className="btn-primary btn-sm">
-                                  {t.sessions.connectSession}
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-
-            {/* Quick Actions & Recent Live Log Activity */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3">
-                <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                  <Zap size={16} className="text-emerald-600" />
-                  <span>{t.dashboard.testMessaging}</span>
-                </h3>
-                <p className="text-xs text-slate-500">
-                  {t.tester.subtitle}
-                </p>
-                <button onClick={() => setActiveTab('tester')} className="btn-secondary w-full text-xs">
-                  <span>{t.tester.title}</span>
-                  <ChevronRight size={14} />
-                </button>
-              </div>
-
-              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3">
-                <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                  <MessageSquare size={16} className="text-blue-600" />
-                  <span>{t.chats.title}</span>
-                </h3>
-                <p className="text-xs text-slate-500">
-                  {t.chats.subtitle}
-                </p>
-                <button onClick={() => setActiveTab('chats')} className="btn-secondary w-full text-xs">
-                  <span>{t.chats.title}</span>
-                  <ChevronRight size={14} />
-                </button>
-              </div>
-
-              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3">
-                <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                  <Bot size={16} className="text-indigo-600" />
-                  <span>{t.automation.title}</span>
-                </h3>
-                <p className="text-xs text-slate-500">
-                  {t.automation.subtitle}
-                </p>
-                <button onClick={() => setActiveTab('automation')} className="btn-secondary w-full text-xs">
-                  <span>{t.automation.title}</span>
-                  <ChevronRight size={14} />
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ==================== 2. SESSIONS PAGE ==================== */}
-        {activeTab === 'sessions' && (
-          <div className="space-y-6">
-            <header className="page-header">
-              <div className="page-header__title-group">
-                <h1>{t.sessions.title}</h1>
-                <span className="status-badge connected">{sessions.length} {t.common.active}</span>
-              </div>
-              <div className="page-header__actions">
-                <button onClick={() => setIsAddSessionModal(true)} className="btn-primary">
-                  <Plus size={16} />
-                  <span>{t.sessions.newSession}</span>
-                </button>
-              </div>
-              <p className="page-header__subtitle">{t.sessions.subtitle}</p>
-            </header>
-
-            {/* Filter and Search Bar */}
-            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
-              <div className="relative w-full sm:w-80">
-                <Search size={16} className="absolute left-3 top-2.5 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder={t.common.search}
-                  value={sessionSearchQuery}
-                  onChange={e => setSessionSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <span className="text-xs text-slate-500 font-medium">{t.common.status}:</span>
-                <select
-                  value={sessionStatusFilter}
-                  onChange={e => setSessionStatusFilter(e.target.value)}
-                  className="text-xs font-semibold py-2 px-3 bg-white border border-slate-200 rounded-lg text-slate-800"
-                >
-                  <option value="ALL">{t.common.all}</option>
-                  <option value="CONNECTED">{t.common.connected}</option>
-                  <option value="QR_READY">{t.common.qrReady}</option>
-                  <option value="DISCONNECTED">{t.common.disconnected}</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Sessions Cards Grid */}
-            <div className="sessions-grid">
-              {sessions.length === 0 ? (
-                <div className="col-span-full bg-white rounded-xl border border-slate-200 p-12 text-center text-slate-400 space-y-3">
-                  <Smartphone size={40} className="mx-auto text-slate-300" />
-                  <h3 className="font-semibold text-slate-700">{t.sessions.noSessions}</h3>
-                  <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                    {t.sessions.subtitle}
-                  </p>
-                  <button onClick={() => setIsAddSessionModal(true)} className="btn-primary mt-2">
-                    <Plus size={16} />
-                    <span>{t.sessions.newSession}</span>
-                  </button>
-                </div>
-              ) : (
-                sessions
-                  .filter(s => {
-                    const matchText = `${s.id} ${s.name} ${s.phoneNumber || ''}`.toLowerCase().includes(sessionSearchQuery.toLowerCase());
-                    const matchStatus = sessionStatusFilter === 'ALL' || s.status === sessionStatusFilter;
-                    return matchText && matchStatus;
-                  })
-                  .map(s => (
-                    <div key={s.id} className="session-card">
-                      <div className="card-header">
-                        <div className="flex items-center gap-3 min-w-0">
-                          {s.status === 'CONNECTED' ? (
-                            <ChatAvatar
-                              sessionId={s.id}
-                              jid={s.phoneNumber ? `${s.phoneNumber}@s.whatsapp.net` : undefined}
-                              name={s.name}
-                              className="chat-avatar"
-                              size={16}
-                              style={{ width: '38px', height: '38px', fontSize: '0.85rem', flexShrink: 0 }}
-                            />
-                          ) : (
-                            <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', flexShrink: 0 }}>
-                              <Smartphone size={18} />
-                            </div>
-                          )}
-                          <h3 title={s.name}>{s.name}</h3>
-                        </div>
-                        <span className={`status-pill ${s.status.toLowerCase()}`}>
-                          {s.status === 'CONNECTED' ? t.common.online : s.status.toLowerCase().replace('_', ' ')}
-                        </span>
-                      </div>
-
-                      {/* QR Preview box if waiting for QR */}
-                      {s.status === 'QR_READY' && s.qrCode && (
-                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-center mb-4">
-                          <img src={s.qrCode} alt="Scan QR" className="w-44 h-44 mx-auto rounded-lg shadow-sm border border-slate-200" />
-                          <p className="text-xs font-semibold text-slate-700 mt-2">{t.sessions.scanQrTitle}</p>
-                          <p className="text-[11px] text-slate-400">{t.sessions.scanQrDesc}</p>
-                        </div>
-                      )}
-
-                      {/* Pairing Code Display box if waiting for Pairing */}
-                      {s.status === 'PAIRING_READY' && s.pairingCode && (
-                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center mb-4">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">{t.sessions.pairingCodeTitle}</span>
-                          <div className="text-2xl font-black mono text-emerald-900 tracking-widest my-2 select-all">
-                            {s.pairingCode}
-                          </div>
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(s.pairingCode || '');
-                              setCopiedPairingCode(true);
-                              setTimeout(() => setCopiedPairingCode(false), 2000);
-                            }}
-                            className="btn-sm bg-white text-emerald-800 border-emerald-300 mx-auto"
-                          >
-                            {copiedPairingCode ? <Check size={14} /> : <Copy size={14} />}
-                            <span>{copiedPairingCode ? t.common.copied : t.common.copy}</span>
-                          </button>
-                        </div>
-                      )}
-
-                      <div className="session-info">
-                        <div className="info-row">
-                          <span className="info-label">ENGINE</span>
-                          <span className="info-value">Baileys (MultiDevice)</span>
-                        </div>
-                        <div className="info-row">
-                          <span className="info-label">{t.sessions.phoneLabel.toUpperCase()}</span>
-                          <span className="info-value mono">{s.phoneNumber ? formatPhoneForDisplay(s.phoneNumber) : 'Unpaired'}</span>
-                        </div>
-                        <div className="info-row">
-                          <span className="info-label">SESSION ID</span>
-                          <span className="info-value mono text-xs">{s.id}</span>
-                        </div>
-                        <div className="info-row">
-                          <span className="info-label">{t.sessions.lastConnected.toUpperCase()}</span>
-                          <span className="info-value">
-                            {s.lastConnectedAt ? new Date(s.lastConnectedAt).toLocaleTimeString() : '—'}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="card-actions">
-                        <button
-                          onClick={() => setActiveQrModal({ open: true, session: s })}
-                          className="btn-action"
-                          title="QR / Pairing"
-                        >
-                          <QrCode size={14} />
-                          <span>QR / Pair</span>
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            setSelectedSessionId(s.id);
-                            setActiveTab('chats');
-                          }}
-                          className="btn-action"
-                          title={t.chats.title}
-                        >
-                          <MessageSquare size={14} />
-                          <span>{t.chats.tabChats}</span>
-                        </button>
-
-                        {s.status === 'CONNECTED' ? (
-                          <>
-                            <button
-                              onClick={() => handleDisconnectSession(s.id)}
-                              className="btn-action danger"
-                              title={t.sessions.disconnectSession}
-                            >
-                              <Pause size={14} />
-                              <span>{t.sessions.disconnectSession}</span>
-                            </button>
-                            <button
-                              onClick={() => handleLogoutSession(s.id)}
-                              className="btn-action danger"
-                              title={t.sessions.logoutSession}
-                            >
-                              <LogOut size={14} />
-                              <span>{t.sessions.logoutSession}</span>
-                            </button>
-                          </>
-                        ) : (
-                          <button
-                            onClick={() =>
-                              setConnectOptionModal({
-                                open: true,
-                                sessionId: s.id,
-                                method: 'qr',
-                                phone: s.phoneNumber || ''
-                              })
-                            }
-                            className="btn-action"
-                            title={t.sessions.connectSession}
-                          >
-                            <Play size={14} />
-                            <span>{t.sessions.connectSession}</span>
-                          </button>
-                        )}
-
-                        <button
-                          onClick={() => handleDeleteSession(s.id)}
-                          className="btn-action danger ml-auto"
-                          title={t.sessions.deleteSession}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  ))
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ==================== 3. CHATS (WHATSAMAN INBOX) ==================== */}
-        {activeTab === 'chats' && (
-          <div className="chats-page">
-            <header className="page-header">
-              <div className="page-header__title-group">
-                <h1>{t.chats.title}</h1>
-                <span className="status-badge connected">{chats.length} {t.chats.activeChats}</span>
-              </div>
-              <div className="page-header__actions" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                {/* Auto Reply Quick Status & Config Pill */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  backgroundColor: botConfig.autoReplyEnabled !== false ? '#ecfdf5' : '#f8fafc',
-                  border: `1px solid ${botConfig.autoReplyEnabled !== false ? '#a7f3d0' : '#e2e8f0'}`,
-                  padding: '4px 10px',
-                  borderRadius: '9999px',
-                  fontSize: '0.75rem',
-                  fontWeight: 600
-                }}>
-                  <Bot size={15} style={{ color: botConfig.autoReplyEnabled !== false ? '#059669' : '#94a3b8' }} />
-                  <span style={{ color: botConfig.autoReplyEnabled !== false ? '#065f46' : '#64748b' }}>
-                    {t.chats.autoReply}: <strong>{botConfig.autoReplyEnabled !== false ? t.chats.autoReplyOn : t.chats.autoReplyOff}</strong>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => handleToggleAutoReplyGlobal(botConfig.autoReplyEnabled === false)}
-                    style={{ border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }}
-                    title={t.chats.toggleAutoReply}
-                  >
-                    {botConfig.autoReplyEnabled !== false ? (
-                      <ToggleRight size={22} style={{ color: '#10b981' }} />
-                    ) : (
-                      <ToggleLeft size={22} style={{ color: '#94a3b8' }} />
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsChatAutoReplyModal(true)}
-                    style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#475569', padding: '2px', display: 'flex', alignItems: 'center' }}
-                    title="Auto Reply Settings"
-                  >
-                    <Settings size={14} />
-                  </button>
-                </div>
-
-                {/* Manual Refresh Button */}
-                <button
-                  type="button"
-                  onClick={handleManualRefreshChats}
-                  disabled={isRefreshingChats}
-                  className="btn-secondary"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    backgroundColor: refreshSuccess ? '#ecfdf5' : '#ffffff',
-                    color: refreshSuccess ? '#059669' : '#334155',
-                    borderColor: refreshSuccess ? '#a7f3d0' : '#cbd5e1',
-                    fontWeight: 600,
-                    cursor: isRefreshingChats ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                  title={t.chats.refreshChat}
-                >
-                  <RefreshCw size={15} className={isRefreshingChats ? 'animate-spin' : ''} />
-                  <span>{isRefreshingChats ? t.common.refreshing : refreshSuccess ? t.common.synced : t.chats.refreshChat}</span>
-                </button>
-
-                {/* Broadcast Button */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setChatBroadcastSessionId(selectedSessionId);
-                    setIsChatBroadcastModal(true);
-                  }}
-                  className="btn-secondary"
-                  style={{ backgroundColor: '#0284c7', color: '#ffffff', border: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}
-                >
-                  <Send size={15} />
-                  <span>{t.chats.sendBroadcast}</span>
-                </button>
-
-                <button onClick={() => setIsNewChatModal(true)} className="btn-primary">
-                  <Plus size={16} />
-                  <span>{t.chats.newChat}</span>
-                </button>
-              </div>
-              <p className="page-header__subtitle">{t.chats.subtitle}</p>
-            </header>
-
-            <div className="chats-layout">
-              {/* Left Column: WhatsAman Sidebar (320px) */}
-              <aside className="chats-sidebar">
-                <div className="sidebar-header-box">
-                  {/* Session Selector */}
-                  <div className="session-select-group">
-                    <label className="form-label" htmlFor="chat-session-select">
-                      {t.common.session}
-                    </label>
-                    <select
-                      id="chat-session-select"
-                      value={selectedSessionId}
-                      onChange={e => setSelectedSessionId(e.target.value)}
-                      className="session-selector"
-                    >
-                      {sessions.map(s => (
-                        <option key={s.id} value={s.id}>
-                          {s.name} ({s.status})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Segmented control: Chats | Contacts | Groups | Channels */}
-                  <div className="chats-tabs" role="tablist">
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={chatsSidebarTab === 'chats'}
-                      className={`chats-tab ${chatsSidebarTab === 'chats' ? 'active' : ''}`}
-                      onClick={() => setChatsSidebarTab('chats')}
-                    >
-                      {t.chats.tabChats} ({chats.filter(c => !c.chat_jid.endsWith('@newsletter')).length})
-                    </button>
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={chatsSidebarTab === 'contacts'}
-                      className={`chats-tab ${chatsSidebarTab === 'contacts' ? 'active' : ''}`}
-                      onClick={() => setChatsSidebarTab('contacts')}
-                    >
-                      {t.chats.tabContacts} ({contacts.length})
-                    </button>
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={chatsSidebarTab === 'groups'}
-                      className={`chats-tab ${chatsSidebarTab === 'groups' ? 'active' : ''}`}
-                      onClick={() => setChatsSidebarTab('groups')}
-                    >
-                      {t.chats.tabGroups} ({groups.length})
-                    </button>
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={chatsSidebarTab === 'channels'}
-                      className={`chats-tab ${chatsSidebarTab === 'channels' ? 'active' : ''}`}
-                      onClick={() => setChatsSidebarTab('channels')}
-                    >
-                      {t.chats.tabChannels} ({chats.filter(c => c.chat_jid.endsWith('@newsletter')).length})
-                    </button>
-                  </div>
-
-                  {/* Search Input & Quick Refresh */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <div className="chat-search-input" style={{ flex: 1 }}>
-                      <Search size={16} />
-                      <input
-                        type="text"
-                        placeholder={
-                          chatsSidebarTab === 'chats'
-                            ? t.chats.searchChats
-                            : chatsSidebarTab === 'contacts'
-                            ? t.chats.searchContacts
-                            : chatsSidebarTab === 'groups'
-                            ? t.chats.searchGroups
-                            : t.chats.searchChannels
-                        }
-                        value={chatSearchQuery}
-                        onChange={e => setChatSearchQuery(e.target.value)}
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleManualRefreshChats}
-                      disabled={isRefreshingChats}
-                      style={{
-                        padding: '0.45rem',
-                        borderRadius: '8px',
-                        border: '1px solid var(--border, #e2e8f0)',
-                        backgroundColor: '#ffffff',
-                        cursor: isRefreshingChats ? 'not-allowed' : 'pointer',
-                        color: isRefreshingChats ? '#2563eb' : '#64748b',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0
-                      }}
-                      title={t.chats.refreshChat}
-                    >
-                      <RefreshCw size={15} className={isRefreshingChats ? 'animate-spin' : ''} />
-                    </button>
-                  </div>
-
-                  {chatsSidebarTab === 'chats' && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 12px', borderBottom: '1px solid var(--border-color, #e2e8f0)', overflowX: 'auto', fontSize: '0.75rem' }}>
-                      <button
-                        type="button"
-                        onClick={() => setChatFilter('all')}
-                        style={{
-                          padding: '4px 10px',
-                          borderRadius: '9999px',
-                          fontWeight: 600,
-                          fontSize: '0.72rem',
-                          cursor: 'pointer',
-                          border: 'none',
-                          backgroundColor: chatFilter === 'all' ? '#10b981' : '#f1f5f9',
-                          color: chatFilter === 'all' ? '#ffffff' : '#64748b',
-                          whiteSpace: 'nowrap'
-                        }}
-                      >
-                        {t.chats.filterAll} ({chats.filter(c => !c.chat_jid.includes('broadcast')).length})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setChatFilter('personal')}
-                        style={{
-                          padding: '4px 10px',
-                          borderRadius: '9999px',
-                          fontWeight: 600,
-                          fontSize: '0.72rem',
-                          cursor: 'pointer',
-                          border: 'none',
-                          backgroundColor: chatFilter === 'personal' ? '#10b981' : '#f1f5f9',
-                          color: chatFilter === 'personal' ? '#ffffff' : '#64748b',
-                          whiteSpace: 'nowrap'
-                        }}
-                      >
-                        {t.chats.filterPersonal} ({chats.filter(c => !c.chat_jid.endsWith('@g.us') && !c.chat_jid.endsWith('@newsletter') && !c.chat_jid.includes('broadcast')).length})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setChatFilter('groups')}
-                        style={{
-                          padding: '4px 10px',
-                          borderRadius: '9999px',
-                          fontWeight: 600,
-                          fontSize: '0.72rem',
-                          cursor: 'pointer',
-                          border: 'none',
-                          backgroundColor: chatFilter === 'groups' ? '#10b981' : '#f1f5f9',
-                          color: chatFilter === 'groups' ? '#ffffff' : '#64748b',
-                          whiteSpace: 'nowrap'
-                        }}
-                      >
-                        {t.chats.filterGroups} ({chats.filter(c => c.chat_jid.endsWith('@g.us')).length})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setChatFilter('channels')}
-                        style={{
-                          padding: '4px 10px',
-                          borderRadius: '9999px',
-                          fontWeight: 600,
-                          fontSize: '0.72rem',
-                          cursor: 'pointer',
-                          border: 'none',
-                          backgroundColor: chatFilter === 'channels' ? '#10b981' : '#f1f5f9',
-                          color: chatFilter === 'channels' ? '#ffffff' : '#64748b',
-                          whiteSpace: 'nowrap'
-                        }}
-                      >
-                        {t.chats.filterChannels} ({chats.filter(c => c.chat_jid.endsWith('@newsletter')).length})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setChatFilter('unread')}
-                        style={{
-                          padding: '4px 10px',
-                          borderRadius: '9999px',
-                          fontWeight: 600,
-                          fontSize: '0.72rem',
-                          cursor: 'pointer',
-                          border: 'none',
-                          backgroundColor: chatFilter === 'unread' ? '#10b981' : '#f1f5f9',
-                          color: chatFilter === 'unread' ? '#ffffff' : '#64748b',
-                          whiteSpace: 'nowrap'
-                        }}
-                      >
-                        {t.chats.filterUnread} ({unreadChatsCount})
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* List Container */}
-                <div className="chats-list">
-                  {chatsSidebarTab === 'chats' && (
-                    <>
-                      {filteredChats.length === 0 ? (
-                        <div className="empty-table-state" style={{ padding: '3rem 1.5rem' }}>
-                          <MessageSquare size={36} />
-                          <h3>No conversations yet</h3>
-                          <p>Click "New Chat" or switch to "Contacts" to start messaging.</p>
-                        </div>
-                      ) : (
-                        filteredChats.map(c => {
-                          const isActive = activeChatJid === c.chat_jid;
-                          const isGroup = c.chat_jid.endsWith('@g.us');
-                          const isNewsletter = c.chat_jid.endsWith('@newsletter');
-                          const groupMatch = isGroup ? groupsMap.get(c.chat_jid) : null;
-                          const currentSession = sessions.find(s => s.id === selectedSessionId);
-                          const isSelf = Boolean(
-                            (c.resolved_phone && currentSession?.phoneNumber && c.resolved_phone === currentSession.phoneNumber) ||
-                            (currentSession?.phoneNumber && c.chat_jid.startsWith(currentSession.phoneNumber))
-                          );
-                          const phoneDisplay = c.resolved_phone ? formatPhoneForDisplay(c.resolved_phone) : formatPhoneForDisplay(c.chat_jid);
-                          const matchedContact = (c.resolved_phone ? contactsMap.get(c.resolved_phone) : null) || contactsMap.get(c.chat_jid);
-                          const displayName = isSelf 
-                            ? 'Anda (Catatan Anda)'
-                            : (
-                                groupMatch?.name || 
-                                matchedContact?.name || 
-                                (c.name && !c.name.includes('@') && !/^\d+$/.test(c.name) ? c.name : null) || 
-                                matchedContact?.push_name || 
-                                c.push_name || 
-                                phoneDisplay || 
-                                c.chat_jid
-                              );
-                          return (
-                            <div
-                              key={c.chat_jid}
-                              role="button"
-                              tabIndex={0}
-                              className={`chat-item-card ${isActive ? 'active' : ''}`}
-                              onClick={() => {
-                                setActiveChatJid(c.chat_jid);
-                                if (selectedSessionId) {
-                                  fetchChatMessages(selectedSessionId, c.chat_jid);
-                                }
-                              }}
-                            >
-                              <ChatAvatar
-                                sessionId={selectedSessionId}
-                                jid={c.resolved_phone ? `${c.resolved_phone}@s.whatsapp.net` : c.chat_jid}
-                                name={displayName}
-                                isGroup={isGroup}
-                                isNewsletter={isNewsletter}
-                                size={18}
-                              />
-                              <div className="chat-item-info">
-                                <div className="chat-item-top">
-                                  <span className="chat-item-name privacy-blur" title={displayName}>
-                                    {displayName}
-                                  </span>
-                                  {isGroup && <span className="chat-kind-badge">Group</span>}
-                                  {isNewsletter && <span className="chat-kind-badge">Channel</span>}
-                                  {c.timestamp ? (
-                                    <span className="chat-item-time">
-                                      {new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </span>
-                                  ) : null}
-                                </div>
-                                <div className="chat-item-bottom">
-                                  <span className="chat-item-snippet privacy-blur" title={c.last_message || ''}>
-                                    {c.last_message || <span className="no-message">No messages yet</span>}
-                                  </span>
-                                  {(c.unread_count || 0) > 0 && (
-                                    <span className="chat-unread-badge">
-                                      {c.unread_count! > 99 ? '99+' : c.unread_count}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </>
-                  )}
-
-                  {chatsSidebarTab === 'contacts' && (
-                    <>
-                      {filteredContacts.length === 0 ? (
-                        <div className="empty-table-state" style={{ padding: '3rem 1.5rem' }}>
-                          <Users size={36} />
-                          <h3>No contacts saved</h3>
-                          <p>Add contacts in the Contacts menu or import via Excel.</p>
-                        </div>
-                      ) : (
-                        filteredContacts.map(c => {
-                          const contactJid = `${c.phone}@s.whatsapp.net`;
-                          const isActive = activeChatJid === contactJid;
-                          const displayName = c.name || c.push_name || formatPhoneForDisplay(c.phone) || `+${c.phone}`;
-                          return (
-                            <div
-                              key={c.id}
-                              role="button"
-                              tabIndex={0}
-                              className={`chat-item-card ${isActive ? 'active' : ''}`}
-                              onClick={() => {
-                                setActiveChatJid(contactJid);
-                                if (selectedSessionId) {
-                                  fetchChatMessages(selectedSessionId, contactJid);
-                                }
-                              }}
-                            >
-                              <ChatAvatar
-                                sessionId={selectedSessionId}
-                                jid={c.phone ? `${c.phone}@s.whatsapp.net` : (c.jid || undefined)}
-                                name={displayName}
-                                size={18}
-                              />
-                              <div className="chat-item-info">
-                                <div className="chat-item-top">
-                                  <span className="chat-item-name privacy-blur" title={displayName}>
-                                    {displayName}
-                                  </span>
-                                  {c.tags.length > 0 && (
-                                    <span className="chat-kind-badge">{c.tags[0]}</span>
-                                  )}
-                                </div>
-                                <div className="chat-item-bottom">
-                                  <span className="chat-item-snippet privacy-blur">
-                                    {formatPhoneForDisplay(c.phone) || `+${c.phone}`}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </>
-                  )}
-
-                  {chatsSidebarTab === 'groups' && (
-                    <>
-                      {filteredGroups.length === 0 ? (
-                        <div className="empty-table-state" style={{ padding: '3rem 1.5rem' }}>
-                          <Users size={36} />
-                          <h3>No groups found</h3>
-                          <p>WhatsApp groups for this session will appear here.</p>
-                        </div>
-                      ) : (
-                        filteredGroups.map(g => {
-                          const isActive = activeChatJid === g.jid;
-                          return (
-                            <div
-                              key={g.jid}
-                              role="button"
-                              tabIndex={0}
-                              className={`chat-item-card ${isActive ? 'active' : ''}`}
-                              onClick={() => {
-                                setActiveChatJid(g.jid);
-                                if (selectedSessionId) {
-                                  fetchChatMessages(selectedSessionId, g.jid);
-                                }
-                              }}
-                            >
-                              <ChatAvatar
-                                sessionId={selectedSessionId}
-                                jid={g.jid}
-                                name={g.name}
-                                isGroup={true}
-                                size={18}
-                              />
-                              <div className="chat-item-info">
-                                <div className="chat-item-top">
-                                  <span className="chat-item-name" title={g.name}>
-                                    {g.name}
-                                  </span>
-                                  <span className="chat-kind-badge">Group</span>
-                                </div>
-                                <div className="chat-item-bottom">
-                                  <span className="chat-item-snippet">
-                                    {g.memberCount ? `${g.memberCount} members` : 'WhatsApp Group'}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </>
-                  )}
-
-                  {chatsSidebarTab === 'channels' && (
-                    <>
-                      {filteredChannels.length === 0 ? (
-                        <div className="empty-table-state" style={{ padding: '3rem 1.5rem' }}>
-                          <Radio size={36} />
-                          <h3>Tidak ada Saluran</h3>
-                          <p>Saluran / Channel WhatsApp yang Anda ikuti akan muncul di sini.</p>
-                        </div>
-                      ) : (
-                        filteredChannels.map(c => {
-                            const isActive = activeChatJid === c.chat_jid;
-                            const displayName = c.name || c.push_name || 'Saluran WhatsApp';
-                            return (
-                              <div
-                                key={c.chat_jid}
-                                role="button"
-                                tabIndex={0}
-                                className={`chat-item-card ${isActive ? 'active' : ''}`}
-                                onClick={() => {
-                                  setActiveChatJid(c.chat_jid);
-                                  if (selectedSessionId) {
-                                    fetchChatMessages(selectedSessionId, c.chat_jid);
-                                  }
-                                }}
-                              >
-                                <ChatAvatar
-                                  sessionId={selectedSessionId}
-                                  jid={c.chat_jid}
-                                  name={displayName}
-                                  isNewsletter={true}
-                                  size={18}
-                                />
-                                <div className="chat-item-info">
-                                  <div className="chat-item-top">
-                                    <span className="chat-item-name privacy-blur" title={displayName}>
-                                      {displayName}
-                                    </span>
-                                    <span className="chat-kind-badge bg-amber-50 text-amber-700 border border-amber-200">Channel</span>
-                                    {c.timestamp ? (
-                                      <span className="chat-item-time">
-                                        {new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                      </span>
-                                    ) : null}
-                                  </div>
-                                  <div className="chat-item-bottom">
-                                    <span className="chat-item-snippet privacy-blur" title={c.last_message || ''}>
-                                      {c.last_message || <span className="no-message">Belum ada postingan</span>}
-                                    </span>
-                                    {(c.unread_count || 0) > 0 && (
-                                      <span className="chat-unread-badge">
-                                        {c.unread_count! > 99 ? '99+' : c.unread_count}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })
-                      )}
-                    </>
-                  )}
-                </div>
-              </aside>
-
-              {/* Right Column: WhatsAman Chat Room */}
-              <main className="chats-room">
-                {activeChatJid ? (
-                  <div className="room-container">
-                    {/* Room Header */}
-                    <div className="room-header">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', minWidth: 0 }}>
-                        {(() => {
-                          const activeChat = chats.find(c => c.chat_jid === activeChatJid);
-                          const currentSession = sessions.find(s => s.id === selectedSessionId);
-                          const isSelf = Boolean(
-                            (activeChat?.resolved_phone && currentSession?.phoneNumber && activeChat.resolved_phone === currentSession.phoneNumber) ||
-                            (currentSession?.phoneNumber && activeChatJid.startsWith(currentSession.phoneNumber))
-                          );
-                          const phoneDisplay = activeChat?.resolved_phone 
-                            ? formatPhoneForDisplay(activeChat.resolved_phone) 
-                            : formatPhoneForDisplay(activeChatJid);
-                          const isGroup = activeChatJid.endsWith('@g.us');
-                          const isNewsletter = activeChatJid.endsWith('@newsletter');
-                          const groupMatch = isGroup ? groupsMap.get(activeChatJid) : null;
-                          const matchedContact = (activeChat?.resolved_phone ? contactsMap.get(activeChat.resolved_phone) : null) || contactsMap.get(activeChatJid);
-                          
-                          const headerTitle = isGroup
-                            ? groupMatch?.name || 'Grup WhatsApp'
-                            : isNewsletter
-                            ? 'Saluran WhatsApp'
-                            : isSelf
-                            ? 'Anda (Catatan Anda)'
-                            : matchedContact?.name ||
-                              (activeChat?.name && !activeChat.name.includes('@') && !/^\d+$/.test(activeChat.name) ? activeChat.name : null) ||
-                              matchedContact?.push_name ||
-                              activeChat?.push_name ||
-                              phoneDisplay ||
-                              activeChatJid;
-                              
-                          let headerSubtitle = '';
-                          if (isGroup) {
-                            headerSubtitle = groupMatch?.memberCount ? `${groupMatch.memberCount} peserta` : 'Grup WhatsApp';
-                          } else if (isNewsletter) {
-                            headerSubtitle = 'Saluran WhatsApp';
-                          } else if (isSelf) {
-                            headerSubtitle = currentSession?.phoneNumber ? formatPhoneForDisplay(currentSession.phoneNumber) : 'Pesan ke nomor sendiri';
-                          } else if (phoneDisplay && headerTitle !== phoneDisplay) {
-                            headerSubtitle = `${phoneDisplay} • online`;
-                          } else {
-                            headerSubtitle = 'online';
-                          }
-
-                          return (
-                            <>
-                              <ChatAvatar
-                                sessionId={selectedSessionId}
-                                jid={activeChat?.resolved_phone ? `${activeChat.resolved_phone}@s.whatsapp.net` : activeChatJid}
-                                name={headerTitle}
-                                isGroup={isGroup}
-                                isNewsletter={isNewsletter}
-                                className="room-avatar"
-                                size={20}
-                              />
-                              <div className="room-contact-info">
-                                <h3 className="privacy-blur">{headerTitle}</h3>
-                                <span className="room-contact-phone privacy-blur">{headerSubtitle}</span>
-                              </div>
-                            </>
-                          );
-                        })()}
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                        <button
-                          type="button"
-                          onClick={handleRefreshActiveThread}
-                          disabled={isRefreshingThread}
-                          className="btn-secondary"
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            padding: '4px 10px',
-                            fontSize: '0.75rem',
-                            borderRadius: '8px',
-                            backgroundColor: '#f8fafc',
-                            border: '1px solid #e2e8f0',
-                            color: '#475569',
-                            cursor: isRefreshingThread ? 'not-allowed' : 'pointer'
-                          }}
-                          title={t.chats.refreshThread}
-                        >
-                          <RefreshCw size={13} className={isRefreshingThread ? 'animate-spin' : ''} />
-                          <span>{isRefreshingThread ? t.common.refreshing : t.chats.refreshThread}</span>
-                        </button>
-                        <span className="status-pill ready flex items-center gap-1.5" style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem' }}>
-                          <CheckCircle size={12} />
-                          <span>{t.common.connected}</span>
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Messages Area */}
-                    <div className="room-messages">
-                      {chatMessages.length === 0 ? (
-                        <div className="empty-table-state" style={{ margin: 'auto' }}>
-                          <MessageSquare size={36} />
-                          <h3>{t.chats.noMessages}</h3>
-                          <p>{t.chats.startConversation}</p>
-                        </div>
-                      ) : (
-                        chatMessages.map((m, idx) => {
-                          const isMe = m.from_me === 1;
-                          const prevMsg = idx > 0 ? chatMessages[idx - 1] : null;
-                          const showDateSeparator = !prevMsg || 
-                            new Date(m.timestamp).toDateString() !== new Date(prevMsg.timestamp).toDateString();
-                          const dateSeparatorText = showDateSeparator ? formatDateSeparator(m.timestamp) : undefined;
-                          
-                          let senderDisplayName = '';
-                          const isGroup = activeChatJid.endsWith('@g.us');
-                          if (!isMe && isGroup) {
-                            const senderPhone = m.sender_jid?.split('@')[0];
-                            const contactMatch = findContact(m.sender_jid) || findContact(senderPhone);
-                            senderDisplayName = contactMatch?.name || contactMatch?.push_name || formatPhoneForDisplay(senderPhone || '') || senderPhone || 'Member';
-                          }
-
-                          return (
-                            <ChatMessageBubble
-                              key={m.id}
-                              message={m}
-                              isMe={isMe}
-                              showDateSeparator={showDateSeparator}
-                              dateSeparatorText={dateSeparatorText}
-                              senderDisplayName={senderDisplayName}
-                              isGroupChat={isGroup}
-                            />
-                          );
-                        })
-                      )}
-                      <div ref={messagesEndRef} />
-                    </div>
-
-                    {/* Chat Input Footer */}
-                    <ChatInputBox
-                      onSend={handleSendChatMessage}
-                      onAttach={() => setIsSendMediaModal(true)}
-                      placeholder={t.chats.typeMessage}
-                      sendTitle={t.chats.send}
-                      attachTitle={t.chats.attachFile}
-                    />
-                  </div>
-                ) : (
-                  <div className="chats-room-placeholder">
-                    <div className="placeholder-icon">
-                      <MessageSquare size={54} />
-                    </div>
-                    <h2>{lang === 'id' ? 'Pilih Percakapan' : 'Select a conversation'}</h2>
-                    <p>{lang === 'id' ? 'Pilih obrolan dari bilah samping, pilih kontak, atau klik "Chat Baru" untuk mulai berkirim pesan.' : 'Choose a chat from the sidebar, select a contact, or click "New Chat" to start messaging.'}</p>
-                  </div>
-                )}
-              </main>
-            </div>
-          </div>
-        )}
-
-        {/* ==================== AMAN CHAT PRO: CRM & PIPELINE SEQUENCER ==================== */}
-        {activeTab === 'crm' && (
-          <div className="space-y-6">
-            <header className="page-header">
-              <div className="page-header__title-group">
-                <div className="flex items-center gap-2.5">
-                  <h1>{t.crm.title}</h1>
-                  <span className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 text-xs font-bold px-2.5 py-0.5 rounded-full">
-                    WhatsAman Pro Engine
-                  </span>
-                </div>
-                <span className="status-badge connected">{contacts.length} {t.crm.totalLeads}</span>
-              </div>
-              <div className="page-header__actions flex items-center gap-2 flex-wrap">
-                <button
-                  onClick={() => {
-                    setNewTaskPhone('');
-                    setNewTaskName('');
-                    setIsNewTaskModal(true);
-                  }}
-                  className="btn-primary"
-                >
-                  <Plus size={16} />
-                  <span>{t.crm.newTask}</span>
-                </button>
-                <a
-                  href={`/api/v1/crm/export-csv?sessionId=${selectedSessionId}`}
-                  download
-                  className="btn-secondary"
-                  title={lang === 'id' ? 'Unduh data CRM dan tugas follow-up ke CSV' : 'Export CRM data & follow-up tasks to CSV'}
-                >
-                  <Download size={15} />
-                  <span>{lang === 'id' ? 'Ekspor CSV' : 'Export CSV'}</span>
-                </a>
-                <button
-                  onClick={() => {
-                    fetchContacts(selectedSessionId);
-                    fetchCRMTasks(selectedSessionId);
-                    fetchSalesAnalytics(selectedSessionId, crmTimeRange);
-                  }}
-                  className="btn-secondary"
-                  title={t.common.refresh}
-                >
-                  <RefreshCw size={15} />
-                </button>
-              </div>
-              <p className="page-header__subtitle">
-                {t.crm.subtitle}
-              </p>
-            </header>
-
-            {/* Pipeline Stage Funnel Filter Tabs */}
-            <div className="flex items-center gap-2 overflow-x-auto py-1 px-0.5 scrollbar-none">
-              {[
-                {
-                  id: 'ALL',
-                  label: lang === 'id' ? 'Semua Prospek' : 'All Leads',
-                  count: contacts.length,
-                  icon: Users,
-                  activeClass: 'bg-slate-900 text-white border-slate-900 shadow-sm dark:bg-slate-100 dark:text-slate-900 dark:border-slate-100',
-                  activeBadge: 'bg-slate-800 text-slate-100 dark:bg-slate-200 dark:text-slate-900',
-                  iconClass: (isActive: boolean) => isActive ? 'text-white dark:text-slate-900' : 'text-slate-400 group-hover:text-slate-600 dark:text-slate-400',
-                  hoverClass: 'hover:bg-slate-50 hover:border-slate-300 dark:hover:bg-slate-700/50'
-                },
-                {
-                  id: 'lead',
-                  label: t.crm.lead,
-                  count: contacts.filter(c => !c.pipeline_stage || c.pipeline_stage === 'lead').length,
-                  icon: UserPlus,
-                  activeClass: 'bg-[#e0f2fe] text-[#0369a1] border-sky-300 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800 shadow-sm',
-                  activeBadge: 'bg-sky-200/90 text-[#0369a1] dark:bg-sky-900/80 dark:text-sky-200',
-                  iconClass: (isActive: boolean) => isActive ? 'text-[#0369a1] dark:text-sky-300' : 'text-sky-500 dark:text-sky-400',
-                  hoverClass: 'hover:bg-sky-50/50 hover:border-sky-300 dark:hover:bg-slate-700/50'
-                },
-                {
-                  id: 'prospect',
-                  label: t.crm.prospect,
-                  count: contacts.filter(c => c.pipeline_stage === 'prospect').length,
-                  icon: Target,
-                  activeClass: 'bg-[#fef9c3] text-[#854d0e] border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800 shadow-sm',
-                  activeBadge: 'bg-amber-200/90 text-[#854d0e] dark:bg-amber-900/80 dark:text-amber-200',
-                  iconClass: (isActive: boolean) => isActive ? 'text-[#854d0e] dark:text-amber-300' : 'text-amber-500 dark:text-amber-400',
-                  hoverClass: 'hover:bg-amber-50/50 hover:border-amber-300 dark:hover:bg-slate-700/50'
-                },
-                {
-                  id: 'customer',
-                  label: t.crm.customer,
-                  count: contacts.filter(c => c.pipeline_stage === 'customer').length,
-                  icon: CheckCircle2,
-                  activeClass: 'bg-[#dcfce7] text-[#15803d] border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800 shadow-sm',
-                  activeBadge: 'bg-emerald-200/90 text-[#15803d] dark:bg-emerald-900/80 dark:text-emerald-200',
-                  iconClass: (isActive: boolean) => isActive ? 'text-[#15803d] dark:text-emerald-300' : 'text-emerald-500 dark:text-emerald-400',
-                  hoverClass: 'hover:bg-emerald-50/50 hover:border-emerald-300 dark:hover:bg-slate-700/50'
-                },
-                {
-                  id: 'churned',
-                  label: t.crm.churned,
-                  count: contacts.filter(c => c.pipeline_stage === 'churned').length,
-                  icon: XCircle,
-                  activeClass: 'bg-[#fee2e2] text-[#b91c1c] border-rose-300 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800 shadow-sm',
-                  activeBadge: 'bg-rose-200/90 text-[#b91c1c] dark:bg-rose-900/80 dark:text-rose-200',
-                  iconClass: (isActive: boolean) => isActive ? 'text-[#b91c1c] dark:text-rose-300' : 'text-rose-500 dark:text-rose-400',
-                  hoverClass: 'hover:bg-rose-50/50 hover:border-rose-300 dark:hover:bg-slate-700/50'
-                }
-              ].map(s => {
-                const isActive = crmStageFilter === s.id;
-                const IconComponent = s.icon;
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() => setCrmStageFilter(s.id as any)}
-                    className={`group px-3.5 py-1.5 rounded-lg text-xs font-semibold border transition-all duration-150 flex items-center gap-2 flex-shrink-0 cursor-pointer select-none ${
-                      isActive
-                        ? `${s.activeClass} font-bold`
-                        : `bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 ${s.hoverClass}`
-                    }`}
-                  >
-                    <IconComponent size={14} className={`stroke-[2.2] transition-colors ${s.iconClass(isActive)}`} />
-                    <span>{s.label}</span>
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-[11px] font-bold min-w-[20px] text-center leading-none transition-colors ${
-                        isActive
-                          ? s.activeBadge
-                          : 'bg-slate-100 dark:bg-slate-700/70 text-slate-600 dark:text-slate-300 font-semibold'
-                      }`}
-                    >
-                      {s.count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* 2-Column Responsive Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-              {/* Left Column: Contacts CRM Pipeline Table (7 cols) */}
-              <div className="lg:col-span-7 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
-                        {lang === 'id' ? 'Pipeline Kontak Pelanggan' : 'Customer Pipeline Contacts'}
-                      </h3>
-                      <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 dark:bg-slate-700/60 px-2 py-0.5 rounded-full">
-                        {contacts.filter(c => {
-                          const stage = c.pipeline_stage || 'lead';
-                          if (crmStageFilter !== 'ALL' && stage !== crmStageFilter) return false;
-                          if (selectedTagFilter !== 'ALL' && !c.tags.includes(selectedTagFilter)) return false;
-                          if (crmSearchQuery.trim()) {
-                            const q = crmSearchQuery.trim().toLowerCase();
-                            const matchPhone = c.phone.toLowerCase().includes(q);
-                            const matchName = (c.name || c.push_name || '').toLowerCase().includes(q);
-                            const matchNotes = (c.notes || '').toLowerCase().includes(q);
-                            const matchTags = c.tags.some(t => t.toLowerCase().includes(q));
-                            if (!matchPhone && !matchName && !matchNotes && !matchTags) return false;
-                          }
-                          return true;
-                        }).length} / {contacts.length}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-500">
-                      {lang === 'id' ? 'Klik status stage atau tag untuk memperbarui klasifikasi prospek' : 'Click stage status or tags to update customer classification'}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2 w-full sm:w-auto">
-                    <div className="relative flex-1 sm:w-56">
-                      <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
-                      <input
-                        type="text"
-                        placeholder={lang === 'id' ? 'Cari nama, HP, tag, catatan...' : 'Search name, phone, tag, notes...'}
-                        value={crmSearchQuery}
-                        onChange={e => setCrmSearchQuery(e.target.value)}
-                        className="w-full text-xs pl-8 pr-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 focus:outline-none focus:border-emerald-500"
-                      />
-                    </div>
-
-                    <button
-                      onClick={() => setIsAddContactModal(true)}
-                      className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1.5 flex-shrink-0"
-                      title={lang === 'id' ? 'Tambah Kontak / Prospek Baru' : 'Add New Contact / Lead'}
-                    >
-                      <Plus size={14} />
-                      <span>{lang === 'id' ? 'Tambah Kontak' : 'Add Contact'}</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Preset Tag Badges Bar */}
-                <div className="flex items-center gap-1.5 flex-wrap pt-1 text-xs">
-                  <span className="text-[11px] font-semibold text-slate-400 mr-1">Quick Tag Filter:</span>
-                  {['ALL', '🔥 Hot Lead', '🟡 Warm Lead', '🔵 New Lead', '💰 Customer', '🔄 Follow Up', '❌ Lost', '⭐ VIP'].map(t => (
-                    <button
-                      key={t}
-                      onClick={() => setSelectedTagFilter(t)}
-                      className={`text-[11px] px-2 py-0.5 rounded-full border transition-all ${
-                        selectedTagFilter === t
-                          ? 'bg-slate-900 text-white border-slate-900 dark:bg-slate-100 dark:text-slate-900 font-bold'
-                          : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-400'
-                      }`}
-                    >
-                      {t}
-                    </button>
-                  ))}
-                  {(selectedTagFilter !== 'ALL' || crmStageFilter !== 'ALL' || crmSearchQuery) && (
-                    <button
-                      onClick={() => {
-                        setCrmStageFilter('ALL');
-                        setSelectedTagFilter('ALL');
-                        setCrmSearchQuery('');
-                      }}
-                      className="text-[10px] text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 underline ml-1 cursor-pointer"
-                    >
-                      {lang === 'id' ? 'Reset Semua Filter' : 'Reset All'}
-                    </button>
-                  )}
-                </div>
-
-                {/* Contacts List Table */}
-                <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-                  <table className="w-full text-left text-xs text-slate-600 dark:text-slate-300">
-                    <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 font-bold text-slate-500 uppercase sticky top-0 z-10">
-                      <tr>
-                        <th className="py-2.5 px-3">{lang === 'id' ? 'KONTAK' : 'CONTACT'}</th>
-                        <th className="py-2.5 px-3">{lang === 'id' ? 'PIPELINE STAGE' : 'PIPELINE STAGE'}</th>
-                        <th className="py-2.5 px-3">TAGS</th>
-                        <th className="py-2.5 px-3">{lang === 'id' ? 'CATATAN' : 'NOTES'}</th>
-                        <th className="py-2.5 px-3 text-right">{lang === 'id' ? 'AKSI' : 'ACTIONS'}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
-                      {contacts
-                        .filter(c => {
-                          const stage = c.pipeline_stage || 'lead';
-                          if (crmStageFilter !== 'ALL' && stage !== crmStageFilter) return false;
-                          if (selectedTagFilter !== 'ALL' && !c.tags.includes(selectedTagFilter)) return false;
-                          if (crmSearchQuery.trim()) {
-                            const q = crmSearchQuery.trim().toLowerCase();
-                            const matchPhone = c.phone.toLowerCase().includes(q);
-                            const matchName = (c.name || c.push_name || '').toLowerCase().includes(q);
-                            const matchNotes = (c.notes || '').toLowerCase().includes(q);
-                            const matchTags = c.tags.some(t => t.toLowerCase().includes(q));
-                            if (!matchPhone && !matchName && !matchNotes && !matchTags) return false;
-                          }
-                          return true;
-                        })
-                        .map(c => {
-                          const stage = c.pipeline_stage || 'lead';
-                          const displayName = c.name || c.push_name || formatPhoneForDisplay(c.phone) || `+${c.phone}`;
-                          return (
-                            <tr key={c.id || c.phone} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/30 transition-colors">
-                              <td className="py-2.5 px-3">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-7 h-7 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-[11px] flex-shrink-0">
-                                    {(c.name || c.push_name || 'U').slice(0, 1).toUpperCase()}
-                                  </div>
-                                  <div className="min-w-0">
-                                    <div className="font-semibold text-slate-900 dark:text-slate-100 truncate privacy-blur" title={displayName}>
-                                      {displayName}
-                                    </div>
-                                    <div className="text-[11px] text-slate-400 font-mono privacy-blur">
-                                      +{c.phone}
-                                    </div>
-                                  </div>
-                                </div>
-                              </td>
-
-                              <td className="py-2.5 px-3">
-                                <select
-                                  value={stage}
-                                  onChange={e => handleUpdateContactStage(c.phone, e.target.value as any)}
-                                  className={`text-[11px] font-bold rounded-lg px-2 py-1 border transition-all cursor-pointer ${
-                                    stage === 'customer'
-                                      ? 'bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950/50 dark:text-emerald-300'
-                                      : stage === 'prospect'
-                                      ? 'bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/50 dark:text-amber-300'
-                                      : stage === 'churned'
-                                      ? 'bg-rose-50 text-rose-800 border-rose-300 dark:bg-rose-950/50 dark:text-rose-300'
-                                      : 'bg-sky-50 text-sky-800 border-sky-300 dark:bg-sky-950/50 dark:text-sky-300'
-                                  }`}
-                                >
-                                  <option value="lead">🔵 {t.crm.lead}</option>
-                                  <option value="prospect">🟡 {t.crm.prospect}</option>
-                                  <option value="customer">💰 {t.crm.customer}</option>
-                                  <option value="churned">❌ {t.crm.churned}</option>
-                                </select>
-                              </td>
-
-                              <td className="py-2.5 px-3">
-                                <div className="flex items-center gap-1 flex-wrap max-w-xs">
-                                  {c.tags.slice(0, 2).map(tag => (
-                                    <span key={tag} className="text-[10px] bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded text-slate-700 dark:text-slate-200">
-                                      {tag}
-                                    </span>
-                                  ))}
-                                  {c.tags.length > 2 && (
-                                    <span className="text-[10px] text-slate-400">+{c.tags.length - 2}</span>
-                                  )}
-                                  <button
-                                    onClick={() => {
-                                      setEditingContactPhone(c.phone);
-                                      setEditingContactName(displayName);
-                                      setEditingContactTags(c.tags.join(', '));
-                                      setIsEditContactTagsModal(true);
-                                    }}
-                                    className="text-[10px] text-emerald-600 hover:underline"
-                                    title={lang === 'id' ? 'Edit Tag' : 'Edit Tags'}
-                                  >
-                                    <Tag size={12} />
-                                  </button>
-                                </div>
-                              </td>
-
-                              <td className="py-2.5 px-3">
-                                <button
-                                  onClick={() => {
-                                    setSelectedContactForNotes(c);
-                                    setContactNotesText(c.notes || '');
-                                    setIsNotesModal(true);
-                                  }}
-                                  className="text-left group flex items-center gap-1 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
-                                  title={lang === 'id' ? 'Lihat / Edit Catatan Pelanggan' : 'View / Edit Notes'}
-                                >
-                                  <Edit3 size={12} className="text-slate-400 group-hover:text-slate-700" />
-                                  <span className="text-[11px] truncate max-w-[120px] italic">
-                                    {c.notes || (lang === 'id' ? 'Tambah catatan...' : 'Add notes...')}
-                                  </span>
-                                </button>
-                              </td>
-
-                              <td className="py-2.5 px-3 text-right">
-                                <div className="flex items-center justify-end gap-1.5">
-                                  {/* Apply Sequence Button */}
-                                  <button
-                                    onClick={() => {
-                                      setApplySeqContact(c);
-                                      setIsApplySeqModal(true);
-                                    }}
-                                    className="btn-secondary py-1 px-2 text-[10px] flex items-center gap-1"
-                                    title={t.crm.applySequence}
-                                  >
-                                    <Zap size={11} className="text-amber-500" />
-                                    <span>Sequence</span>
-                                  </button>
-
-                                  {/* Quick Manual Task Button */}
-                                  <button
-                                    onClick={() => {
-                                      setNewTaskPhone(c.phone);
-                                      setNewTaskName(displayName);
-                                      setIsNewTaskModal(true);
-                                    }}
-                                    className="btn-secondary py-1 px-2 text-[10px] flex items-center gap-1"
-                                    title={lang === 'id' ? 'Jadwalkan Follow-up untuk kontak ini' : 'Schedule follow-up for this contact'}
-                                  >
-                                    <Clock size={11} />
-                                    <span>Follow-up</span>
-                                  </button>
-
-                                  {/* Chat Button */}
-                                  <button
-                                    onClick={() => {
-                                      setActiveChatJid(`${c.phone}@s.whatsapp.net`);
-                                      setActiveTab('chats');
-                                    }}
-                                    className="btn-icon p-1 text-emerald-600 hover:bg-emerald-50 rounded"
-                                    title={lang === 'id' ? 'Buka Chat Langsung' : 'Open Chat Directly'}
-                                  >
-                                    <MessageSquare size={14} />
-                                  </button>
-
-                                  {/* Delete Contact Button */}
-                                  <button
-                                    onClick={() => handleDeleteContact(c.phone)}
-                                    className="btn-icon p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded transition-colors"
-                                    title={lang === 'id' ? 'Hapus kontak dari database' : 'Delete contact from database'}
-                                  >
-                                    <Trash2 size={13} />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      {contacts.filter(c => {
-                        const stage = c.pipeline_stage || 'lead';
-                        if (crmStageFilter !== 'ALL' && stage !== crmStageFilter) return false;
-                        if (selectedTagFilter !== 'ALL' && !c.tags.includes(selectedTagFilter)) return false;
-                        if (crmSearchQuery.trim()) {
-                          const q = crmSearchQuery.trim().toLowerCase();
-                          const matchPhone = c.phone.toLowerCase().includes(q);
-                          const matchName = (c.name || c.push_name || '').toLowerCase().includes(q);
-                          const matchNotes = (c.notes || '').toLowerCase().includes(q);
-                          const matchTags = c.tags.some(t => t.toLowerCase().includes(q));
-                          if (!matchPhone && !matchName && !matchNotes && !matchTags) return false;
-                        }
-                        return true;
-                      }).length === 0 && (
-                        <tr>
-                          <td colSpan={5} className="py-12 text-center text-slate-400">
-                            {contacts.length === 0 ? (
-                              <div className="flex flex-col items-center gap-2">
-                                <Users size={32} className="text-slate-300 dark:text-slate-600" />
-                                <p className="text-xs font-medium">
-                                  {lang === 'id' ? 'Belum ada kontak di database sesi ini.' : 'No contacts in database for this session.'}
-                                </p>
-                                <button
-                                  onClick={() => setIsAddContactModal(true)}
-                                  className="btn-primary text-xs py-1 px-3 mt-1 flex items-center gap-1"
-                                >
-                                  <Plus size={13} />
-                                  <span>{lang === 'id' ? 'Tambah Kontak Pertama' : 'Add First Contact'}</span>
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="flex flex-col items-center gap-2">
-                                <Search size={28} className="text-slate-300 dark:text-slate-600" />
-                                <p className="text-xs font-medium">
-                                  {lang === 'id'
-                                    ? 'Tidak ada kontak yang cocok dengan filter aktif.'
-                                    : 'No contacts match the active filter criteria.'}
-                                </p>
-                                <button
-                                  onClick={() => {
-                                    setCrmStageFilter('ALL');
-                                    setSelectedTagFilter('ALL');
-                                    setCrmSearchQuery('');
-                                  }}
-                                  className="btn-secondary text-xs py-1 px-3 mt-1 flex items-center gap-1"
-                                >
-                                  <RefreshCw size={12} />
-                                  <span>{lang === 'id' ? 'Reset Semua Filter' : 'Reset All Filters'}</span>
-                                </button>
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Right Column: Follow-up Tasks & Sequencer Engine (5 cols) */}
-              <div className="lg:col-span-5 space-y-4">
-                {/* Auto-Stop Sequencer Info Banner */}
-                <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4 text-xs text-emerald-900 dark:text-emerald-200 space-y-1.5">
-                  <div className="flex items-center gap-2 font-bold text-emerald-800 dark:text-emerald-300">
-                    <ShieldCheck size={16} />
-                    <span>{lang === 'id' ? 'Smart Sequencer & Auto-Stop Aktif' : 'Smart Sequencer & Auto-Stop Active'}</span>
-                  </div>
-                  <p className="text-[11px] leading-relaxed text-emerald-700 dark:text-emerald-300">
-                    {lang === 'id'
-                      ? 'Saat pelanggan merespon atau membalas pesan, rantai sequence yang belum terkirim otomatis dihentikan (Auto-Stop) agar tidak spam.'
-                      : 'When a customer replies or messages back, any remaining scheduled follow-up steps are automatically cancelled (Auto-Stop) to prevent spam.'}
-                  </p>
-                </div>
-
-                {/* Follow-up Tasks List Card */}
-                <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                      <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
-                        <Clock size={16} className="text-amber-500" />
-                        <span>{lang === 'id' ? 'Tugas Follow-up' : 'Follow-up Tasks'}</span>
-                      </h3>
-                      <p className="text-xs text-slate-500">
-                        {crmTasks.filter(t => t.status === 'PENDING').length} {lang === 'id' ? 'tugas pending' : 'pending tasks'}
-                        {crmTasks.filter(t => t.status === 'PENDING' && t.due_at <= Date.now()).length > 0 && (
-                          <span className="text-rose-600 font-bold ml-1.5 animate-pulse">
-                            ({crmTasks.filter(t => t.status === 'PENDING' && t.due_at <= Date.now()).length} {lang === 'id' ? 'Jatuh Tempo' : 'Overdue'})
-                          </span>
-                        )}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {/* Auto-Dispatch Switch */}
-                      <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1">
-                        <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                          Auto-Dispatch:
-                        </span>
-                        <label className="toggle-switch">
-                          <input
-                            type="checkbox"
-                            checked={crmAutoDispatch}
-                            onChange={handleToggleCrmAutoDispatch}
-                          />
-                          <span className="toggle-slider" />
-                        </label>
-                        <span className={`text-[10px] font-extrabold ${crmAutoDispatch ? 'text-emerald-600' : 'text-slate-400'}`}>
-                          {crmAutoDispatch ? 'ON' : 'OFF'}
-                        </span>
-                      </div>
-
-                      {/* Task Filter */}
-                      <select
-                        value={crmTaskFilter}
-                        onChange={e => setCrmTaskFilter(e.target.value as any)}
-                        className="text-xs font-semibold py-1 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900"
-                      >
-                        <option value="ALL">{t.crm.taskFilterAll} ({crmTasks.length})</option>
-                        <option value="PENDING">{t.crm.taskFilterPending} ({crmTasks.filter(t => t.status === 'PENDING').length})</option>
-                        <option value="COMPLETED">{t.crm.taskFilterCompleted} ({crmTasks.filter(t => t.status === 'COMPLETED').length})</option>
-                        <option value="CANCELLED">{t.crm.taskFilterCancelled} ({crmTasks.filter(t => t.status === 'CANCELLED').length})</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Tasks Cards List */}
-                  <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
-                    {crmTasks
-                      .filter(task => crmTaskFilter === 'ALL' || task.status === crmTaskFilter)
-                      .map(task => {
-                        const isOverdue = task.status === 'PENDING' && task.due_at <= Date.now();
-                        const isToday = task.status === 'PENDING' && new Date(task.due_at).toDateString() === new Date().toDateString();
-                        return (
-                          <div
-                            key={task.id}
-                            className={`p-3.5 rounded-lg border transition-all space-y-2 ${
-                              task.status === 'COMPLETED'
-                                ? 'bg-slate-50/60 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700/60 opacity-80'
-                                : task.status === 'CANCELLED'
-                                ? 'bg-rose-50/40 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/40 opacity-70'
-                                : isOverdue
-                                ? 'bg-rose-50/80 dark:bg-rose-950/30 border-rose-300 dark:border-rose-800'
-                                : 'bg-white dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 hover:border-slate-300'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="font-bold text-xs text-slate-900 dark:text-slate-100 truncate" title={task.title}>
-                                {task.title}
-                              </span>
-                              <span
-                                className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full flex-shrink-0 ${
-                                  task.status === 'COMPLETED'
-                                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                                    : task.status === 'CANCELLED'
-                                    ? 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
-                                    : isOverdue
-                                    ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 animate-pulse'
-                                    : isToday
-                                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                                    : 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300'
-                                }`}
-                              >
-                                {task.status === 'COMPLETED'
-                                  ? (lang === 'id' ? '✓ SELESAI' : '✓ COMPLETED')
-                                  : task.status === 'CANCELLED'
-                                  ? (lang === 'id' ? 'AUTO-STOP / BATAL' : 'AUTO-STOPPED')
-                                  : isOverdue
-                                  ? (lang === 'id' ? '🔴 TERLEWAT' : '🔴 OVERDUE')
-                                  : isToday
-                                  ? (lang === 'id' ? '🟡 HARI INI' : '🟡 TODAY')
-                                  : (lang === 'id' ? '🟢 MENDATANG' : '🟢 UPCOMING')}
-                              </span>
-                            </div>
-
-                            <div className="text-[11px] text-slate-500 flex items-center justify-between">
-                              <span className="privacy-blur font-medium text-slate-700 dark:text-slate-300">
-                                👤 {task.contact_name || formatPhoneForDisplay(task.contact_phone) || `+${task.contact_phone}`}
-                              </span>
-                              <span className="font-mono text-[10px]">
-                                ⏰ {new Date(task.due_at).toLocaleDateString(lang === 'id' ? 'id-ID' : 'en-US')} {new Date(task.due_at).toLocaleTimeString(lang === 'id' ? 'id-ID' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
-                              </span>
-                            </div>
-
-                            {/* Message Template Preview */}
-                            <p className="text-[11px] bg-slate-50 dark:bg-slate-900/60 p-2 rounded border border-slate-200 dark:border-slate-700/60 text-slate-700 dark:text-slate-300 italic line-clamp-2">
-                              "{previewTemplate(task.message_template, task.contact_name || (lang === 'id' ? 'Sahabat' : 'Friend'))}"
-                            </p>
-
-                            {task.notes && (
-                              <div className="text-[10px] text-slate-400 italic">
-                                Info: {task.notes}
-                              </div>
-                            )}
-
-                            {/* Task Action Buttons */}
-                            <div className="flex items-center justify-between pt-1">
-                              <span className="text-[10px] text-slate-400 font-mono">
-                                Step {task.step_number || 1}
-                              </span>
-
-                              <div className="flex items-center gap-1.5">
-                                {task.status === 'PENDING' && (
-                                  <>
-                                    <button
-                                      onClick={() => handleExecuteFollowUp(task.id)}
-                                      className="btn-primary py-1 px-2.5 text-xs flex items-center gap-1 shadow-sm"
-                                      title={lang === 'id' ? 'Kirim pesan follow-up ini sekarang ke WhatsApp pelanggan' : 'Dispatch this follow-up message to customer now'}
-                                    >
-                                      <Send size={12} />
-                                      <span>{t.crm.executeTask}</span>
-                                    </button>
-                                    <button
-                                      onClick={() => handleCancelFollowUp(task.id)}
-                                      className="btn-secondary py-1 px-2 text-[10px]"
-                                      title={t.crm.cancelTask}
-                                    >
-                                      {t.common.cancel}
-                                    </button>
-                                  </>
-                                )}
-                                <button
-                                  onClick={() => handleDeleteFollowUp(task.id)}
-                                  className="text-slate-400 hover:text-rose-500 p-1"
-                                  title={t.common.delete}
-                                >
-                                  <Trash2 size={13} />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-
-                    {crmTasks.length === 0 && (
-                      <div className="p-8 text-center text-slate-400 text-xs">
-                        {lang === 'id'
-                          ? <>Belum ada tugas follow-up. Klik <b>"Jadwalkan Follow-up"</b> atau terapkan sequence ke salah satu kontak.</>
-                          : <>No follow-up tasks yet. Click <b>"New Follow-Up Task"</b> or apply a sequence to a contact.</>}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ==================== 4. MESSAGE TESTER ==================== */}
-        {activeTab === 'tester' && (
-          <div className="space-y-6">
-            <header className="page-header">
-              <div className="page-header__title-group">
-                <h1>{t.tester.title}</h1>
-                <span className="status-badge connected">Live API Client</span>
-              </div>
-              <p className="page-header__subtitle">
-                {t.tester.subtitle}
-              </p>
-            </header>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Left Column: Send Form */}
-              <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4">
-                <h3 className="font-bold text-slate-900 text-sm">
-                  {lang === 'id' ? 'Formulir Uji Kirim Pesan' : 'Message Request Builder'}
-                </h3>
-
-                {/* Session Selector */}
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1">{t.common.session}</label>
-                  <select
-                    value={selectedSessionId}
-                    onChange={e => setSelectedSessionId(e.target.value)}
-                    className="w-full text-xs font-semibold py-2 px-3 bg-white border border-slate-200 rounded-lg text-slate-800"
-                  >
-                    {sessions.map(s => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({s.status})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Message Type Tabs */}
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1">
-                    {lang === 'id' ? 'Tipe Pesan' : 'Message Type'}
-                  </label>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setTesterType('text')}
-                      className={`btn-sm flex-1 ${testerType === 'text' ? 'bg-emerald-500 text-slate-900 font-bold border-emerald-500' : 'btn-secondary'}`}
-                    >
-                      {t.tester.typeText}
-                    </button>
-                    <button
-                      onClick={() => setTesterType('media')}
-                      className={`btn-sm flex-1 ${testerType === 'media' ? 'bg-emerald-500 text-slate-900 font-bold border-emerald-500' : 'btn-secondary'}`}
-                    >
-                      {t.tester.typeMedia}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Recipient Phone */}
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1">
-                    {t.tester.recipientPhone}
-                  </label>
-                  <input
-                    type="text"
-                    placeholder={t.tester.recipientPlaceholder}
-                    value={testerRecipient}
-                    onChange={e => setTesterRecipient(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg p-2.5 text-xs font-mono focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-
-                {/* Text Message or Media Input */}
-                {testerType === 'text' ? (
-                  <div>
-                    <label className="text-xs font-semibold text-slate-600 block mb-1">{t.tester.messageText}</label>
-                    <textarea
-                      rows={4}
-                      value={testerMessage}
-                      onChange={e => setTesterMessage(e.target.value)}
-                      placeholder={lang === 'id' ? 'Ketik isi pesan uji coba...' : 'Type test message content...'}
-                      className="w-full border border-slate-200 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-xs font-semibold text-slate-600 block mb-1">{t.tester.mediaFile}</label>
-                      <input
-                        type="file"
-                        onChange={e => setTesterMediaFile(e.target.files?.[0] || null)}
-                        className="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-slate-600 block mb-1">{t.tester.mediaCaption}</label>
-                      <input
-                        type="text"
-                        value={testerMediaCaption}
-                        onChange={e => setTesterMediaCaption(e.target.value)}
-                        placeholder={lang === 'id' ? 'Keterangan media / caption...' : 'Image / document caption...'}
-                        className="w-full border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:border-emerald-500"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                <button
-                  onClick={handleRunTester}
-                  disabled={testerLoading || !testerRecipient.trim()}
-                  className="btn-primary w-full"
-                >
-                  <Send size={16} />
-                  <span>{testerLoading ? t.tester.sending : t.tester.sendTest}</span>
-                </button>
-              </div>
-
-              {/* Right Column: Live API Response Viewer */}
-              <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-bold text-slate-900 text-sm">{t.tester.responseLog}</h3>
-                  {testerResponse && (
-                    <span className={`status-pill ${testerResponse.status === 200 ? 'ready' : 'failed'}`}>
-                      HTTP {testerResponse.status}
-                    </span>
-                  )}
-                </div>
-
-                {testerResponse ? (
-                  <div className="space-y-3">
-                    <div className="text-[11px] text-slate-400 mono">Timestamp: {testerResponse.timestamp}</div>
-                    <pre className="bg-slate-900 text-emerald-400 p-4 rounded-xl text-xs font-mono overflow-x-auto max-h-96">
-                      {JSON.stringify(testerResponse, null, 2)}
-                    </pre>
-                  </div>
-                ) : (
-                  <div className="py-20 text-center text-slate-400 text-xs space-y-2">
-                    <Activity size={32} className="mx-auto text-slate-300" />
-                    <p>{t.tester.noResponse}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ==================== 5. CONTACTS (WHATSAMAN TABLE) ==================== */}
-        {activeTab === 'contacts' && (
-          <div className="contacts-page space-y-6">
-            <header className="page-header">
-              <div className="page-header__title-group">
-                <h1>{t.contacts.title}</h1>
-                <span className="status-badge connected">{contacts.length} Total</span>
-              </div>
-              <div className="page-header__actions">
-                <button
-                  onClick={async () => {
-                    if (!selectedSessionId) return;
-                    try {
-                      const res = await fetch('/api/v1/contacts/sync', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ sessionId: selectedSessionId })
-                      });
-                      const data = await res.json();
-                      if (data.success) {
-                        fetchContacts(selectedSessionId);
-                        fetchChats(selectedSessionId);
-                      }
-                    } catch {
-                      // ignore
-                    }
-                  }}
-                  className="btn-secondary btn-sm"
-                  title={lang === 'id' ? 'Sinkronkan kontak dari WhatsApp' : 'Sync contacts from WhatsApp'}
-                >
-                  <RefreshCw size={14} />
-                  <span>{t.contacts.syncFromWa}</span>
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('groups')}
-                  className="btn-secondary btn-sm"
-                  title={lang === 'id' ? 'Ekstrak anggota dari grup WhatsApp' : 'Extract members from WhatsApp Groups'}
-                >
-                  <Layers size={14} />
-                  <span>{lang === 'id' ? 'Ekstrak dari Grup' : 'Extract from Groups'}</span>
-                </button>
-
-                <label className="btn-secondary btn-sm cursor-pointer">
-                  <Upload size={14} />
-                  <span>{t.contacts.importExcel}</span>
-                  <input
-                    type="file"
-                    accept=".xlsx,.csv"
-                    className="hidden"
-                    onChange={async e => {
-                      const file = e.target.files?.[0];
-                      if (!file || !selectedSessionId) return;
-                      const fd = new FormData();
-                      fd.append('sessionId', selectedSessionId);
-                      fd.append('file', file);
-                      const res = await fetch('/api/v1/contacts/import', { method: 'POST', body: fd });
-                      const data = await res.json();
-                      if (data.success) {
-                        alert(data.message);
-                        fetchContacts(selectedSessionId);
-                      }
-                    }}
-                  />
-                </label>
-
-                <a
-                  href={`/api/v1/contacts/export?sessionId=${selectedSessionId}`}
-                  download
-                  className="btn-secondary btn-sm"
-                >
-                  <Download size={14} />
-                  <span>{t.contacts.exportExcel}</span>
-                </a>
-
-                <button onClick={() => setIsAddContactModal(true)} className="btn-primary">
-                  <Plus size={16} />
-                  <span>{lang === 'id' ? 'Tambah Kontak' : 'Add Contact'}</span>
-                </button>
-              </div>
-              <p className="page-header__subtitle">{t.contacts.subtitle}</p>
-            </header>
-
-            <div className="filters-bar">
-              <div className="search-input">
-                <Search size={16} />
-                <input
-                  type="text"
-                  placeholder={t.contacts.searchContacts}
-                  value={contactSearchQuery}
-                  onChange={e => setContactSearchQuery(e.target.value)}
-                />
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <Tag size={13} className="text-slate-400" />
-                  <span className="text-xs text-slate-500 font-medium">{lang === 'id' ? 'Group:' : 'Group:'}</span>
-                  <select
-                    value={selectedTagFilter}
-                    onChange={e => setSelectedTagFilter(e.target.value)}
-                    className="session-selector text-xs py-1.5 px-3 bg-white border border-slate-200 rounded-lg text-slate-800"
-                    style={{ width: 'auto' }}
-                  >
-                    <option value="ALL">{lang === 'id' ? 'Semua Group' : 'All Groups'} ({contacts.length})</option>
-                    {availableTags.map(t => (
-                      <option key={t.tag} value={t.tag}>
-                        {t.tag} ({t.count})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <span className="text-xs text-slate-500 font-medium">{t.common.session}:</span>
-                  <select
-                    value={selectedSessionId}
-                    onChange={e => setSelectedSessionId(e.target.value)}
-                    className="session-selector text-xs py-1.5 px-3 bg-white border border-slate-200 rounded-lg text-slate-800"
-                    style={{ width: 'auto' }}
-                  >
-                    {sessions.map(s => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({s.status})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div className="keys-table-container">
-              <table className="keys-table">
-                <thead>
-                  <tr className="table-row header">
-                    <th>{lang === 'id' ? 'KONTAK & AVATAR' : 'CONTACT & AVATAR'}</th>
-                    <th>{t.contacts.colName}</th>
-                    <th>{lang === 'id' ? 'PUSH NAME (WA)' : 'PUSH NAME (WA)'}</th>
-                    <th>{t.contacts.colStage}</th>
-                    <th>{lang === 'id' ? 'GROUP / TAGS' : 'GROUP / TAGS'}</th>
-                    <th>{lang === 'id' ? 'STATUS OPT-OUT' : 'OPT-OUT STATUS'}</th>
-                    <th style={{ textAlign: 'right' }}>{t.contacts.colActions}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {contacts.length === 0 ? (
-                    <tr>
-                      <td colSpan={7}>
-                        <div className="empty-table-state">
-                          <Users size={40} />
-                          <h3>{t.contacts.noContacts}</h3>
-                          <p>{lang === 'id' ? 'Klik "Tambah Kontak" atau "Import Excel" untuk membangun kontak sesi ini.' : 'Click "Add Contact" or "Import Excel" to build your directory.'}</p>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    contacts
-                      .filter(c => {
-                        if (selectedTagFilter !== 'ALL' && !c.tags.includes(selectedTagFilter)) {
-                          return false;
-                        }
-                        const target = `${c.phone} ${c.name || ''} ${c.push_name || ''} ${c.tags.join(' ')}`.toLowerCase();
-                        return target.includes(contactSearchQuery.toLowerCase());
-                      })
-                      .map(c => (
-                        <tr key={c.id} className="table-row">
-                          <td>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                              <ChatAvatar
-                                sessionId={selectedSessionId}
-                                jid={`${c.phone}@s.whatsapp.net`}
-                                name={c.name || c.push_name || c.phone}
-                                size={14}
-                                style={{ width: '34px', height: '34px', flexShrink: 0 }}
-                              />
-                              <div>
-                                <div className="name-cell font-mono font-semibold text-slate-900 privacy-blur" style={{ fontSize: '0.85rem' }}>
-                                  {formatPhoneForDisplay(c.phone) || `+${c.phone}`}
-                                </div>
-                                <div className="text-[11px] text-slate-400 privacy-blur">
-                                  {c.jid}
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                          <td>
-                            <div className="name-cell font-medium privacy-blur text-slate-800">
-                              {c.name || c.push_name || '—'}
-                            </div>
-                          </td>
-                          <td>
-                            <span className="privacy-blur text-xs text-slate-500">{c.push_name || '—'}</span>
-                          </td>
-                          <td>
-                            <select
-                              value={c.pipeline_stage || 'lead'}
-                              onChange={e => handleUpdateContactStage(c.phone, e.target.value as any)}
-                              className={`text-[10px] font-bold rounded-md px-1.5 py-0.5 border cursor-pointer transition-all ${
-                                c.pipeline_stage === 'customer'
-                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                                  : c.pipeline_stage === 'prospect'
-                                  ? 'bg-amber-50 text-amber-800 border-amber-300'
-                                  : c.pipeline_stage === 'churned'
-                                  ? 'bg-rose-50 text-rose-800 border-rose-300'
-                                  : 'bg-sky-50 text-sky-800 border-sky-300'
-                              }`}
-                            >
-                              <option value="lead">🔵 {t.crm.lead}</option>
-                              <option value="prospect">🟡 {t.crm.prospect}</option>
-                              <option value="customer">💰 {t.crm.customer}</option>
-                              <option value="churned">❌ {t.crm.churned}</option>
-                            </select>
-                          </td>
-                          <td>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' }}>
-                              {c.tags.length === 0 ? (
-                                <span className="text-[11px] text-slate-400 italic">{lang === 'id' ? 'Tanpa Group' : 'No Group'}</span>
-                              ) : (
-                                c.tags.map(t => (
-                                  <span
-                                    key={t}
-                                    className="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full text-[10px] inline-flex items-center gap-1 font-medium"
-                                  >
-                                    <Tag size={9} />
-                                    {t}
-                                  </span>
-                                ))
-                              )}
-                              <button
-                                onClick={() => openEditTagsModal(c)}
-                                className="text-slate-400 hover:text-blue-600 p-1 rounded hover:bg-slate-100 transition-colors"
-                                title={lang === 'id' ? 'Edit / Atur Group Kontak Ini' : 'Edit tags for this contact'}
-                                style={{ display: 'inline-flex', alignItems: 'center', marginLeft: '2px' }}
-                              >
-                                <Edit3 size={12} />
-                              </button>
-                            </div>
-                          </td>
-                          <td>
-                            <button
-                              onClick={() => handleToggleOptOut(c.phone, c.opt_out)}
-                              className={`status-pill cursor-pointer ${c.opt_out ? 'error' : 'ready'}`}
-                              title={lang === 'id' ? 'Klik untuk ubah status opt-out' : 'Click to toggle opt-out status'}
-                            >
-                              {c.opt_out ? (lang === 'id' ? 'Opt-Out (Blokir)' : 'Opted-Out') : (lang === 'id' ? 'Opt-In Aktif' : 'Opt-In Active')}
-                            </button>
-                          </td>
-                          <td style={{ textAlign: 'right' }}>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '6px' }}>
-                              <button
-                                onClick={() => handleOpenChatWithContact(c.phone, c.name)}
-                                className="btn-secondary btn-sm"
-                                title={lang === 'id' ? 'Chat kontak ini' : 'Chat with this contact'}
-                                style={{ padding: '0.35rem 0.65rem', gap: '4px', fontSize: '0.75rem' }}
-                              >
-                                <MessageSquare size={13} />
-                                <span>Chat</span>
-                              </button>
-                              <button
-                                onClick={() => handleDeleteContact(c.phone)}
-                                className="btn-icon"
-                                title={t.common.delete}
-                                style={{ color: 'var(--text-muted)' }}
-                              >
-                                <Trash2 size={15} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* ==================== 6. GROUPS ==================== */}
-        {activeTab === 'groups' && (
-          <div className="space-y-6">
-            <header className="page-header">
-              <div className="page-header__title-group">
-                <h1>{t.groups.title}</h1>
-                <span className="status-badge connected">{groups.length} {t.groups.totalGroups}</span>
-              </div>
-              <div className="page-header__actions">
-                <button onClick={() => fetchGroups(selectedSessionId)} className="btn-secondary">
-                  <RefreshCw size={15} />
-                  <span>{t.common.refresh}</span>
-                </button>
-              </div>
-              <p className="page-header__subtitle">{t.groups.subtitle}</p>
-            </header>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {groups.length === 0 ? (
-                <div className="col-span-full bg-white rounded-xl border border-slate-200 p-12 text-center text-slate-400 space-y-2">
-                  <Layers size={36} className="mx-auto text-slate-300" />
-                  <p>{t.groups.noGroups}</p>
-                </div>
-              ) : (
-                groups.map(g => (
-                  <div key={g.jid} className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col justify-between space-y-4">
-                    <div>
-                      <h4 className="font-bold text-slate-900 text-sm truncate">{g.name}</h4>
-                      <p className="text-xs text-slate-500 mt-1">
-                        {t.groups.participants}: <span className="font-bold text-slate-800">{g.memberCount}</span>
-                      </p>
-                      <p className="text-[11px] text-slate-400 mono truncate mt-0.5">{g.jid}</p>
-                    </div>
-
-                    <div className="space-y-2 pt-2 border-t border-slate-100">
-                      <button
-                        onClick={() => handleImportGroupToContacts(g.jid)}
-                        className="btn-primary w-full text-xs"
-                        style={{ padding: '0.5rem' }}
-                      >
-                        <Users size={14} />
-                        <span>{t.groups.importMembers}</span>
-                      </button>
-
-                      <a
-                        href={`/api/v1/groups/${g.jid}/export?sessionId=${selectedSessionId}`}
-                        download
-                        className="btn-secondary w-full text-xs"
-                        style={{ padding: '0.5rem' }}
-                      >
-                        <Download size={14} />
-                        <span>{t.groups.exportExcel}</span>
-                      </a>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ==================== 7. CAMPAIGNS (BROADCAST) ==================== */}
-        {activeTab === 'campaigns' && (
-          <div className="space-y-6">
-            <header className="page-header">
-              <div className="page-header__title-group">
-                <h1>{t.campaigns.title}</h1>
-                <span className="status-badge connected">{campaigns.length} Total</span>
-              </div>
-              <div className="page-header__actions">
-                <button onClick={() => setIsNewCampaignModal(true)} className="btn-primary">
-                  <Plus size={16} />
-                  <span>{t.campaigns.newBroadcast}</span>
-                </button>
-              </div>
-              <p className="page-header__subtitle">
-                {t.campaigns.subtitle}
-              </p>
-            </header>
-
-            <div className="grid grid-cols-1 gap-4">
-              {campaigns.length === 0 ? (
-                <div className="bg-white rounded-xl border border-slate-200 p-12 text-center text-slate-400 space-y-2">
-                  <Radio size={36} className="mx-auto text-slate-300" />
-                  <p>{t.campaigns.noCampaigns}</p>
-                </div>
-              ) : (
-                campaigns.map(c => (
-                  <div key={c.id} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="font-bold text-slate-900 text-sm">{c.name}</h4>
-                        <span className="text-xs text-slate-400 mono">ID: {c.id}</span>
-                      </div>
-                      <span className={`status-pill ${c.status.toLowerCase()}`}>{c.status}</span>
-                    </div>
-
-                    {/* Progress Bar */}
-                    <div>
-                      <div className="flex justify-between text-xs text-slate-500 mb-1 font-medium">
-                        <span>
-                          {t.campaigns.progress}: {c.sent_count} / {c.total_recipients} {t.campaigns.sent}
-                        </span>
-                        <span>{t.campaigns.failed}: {c.failed_count}</span>
-                      </div>
-                      {(c as any).last_message && (
-                        <p
-                          className={`text-[11px] mb-1.5 px-2.5 py-1 rounded-md border ${
-                            c.status === 'PAUSED'
-                              ? 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'
-                              : 'bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-900/40 dark:text-slate-300 dark:border-slate-700'
-                          }`}
-                        >
-                          {c.status === 'PAUSED' ? '⏸ ' : 'ℹ️ '}{c.last_message}
-                        </p>
-                      )}
-                      <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                        <div
-                          className="bg-emerald-500 h-full rounded-full transition-all duration-300"
-                          style={{
-                            width: `${c.total_recipients > 0 ? (c.sent_count / c.total_recipients) * 100 : 0}%`
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                      <p className="text-xs text-slate-400 truncate max-w-md italic">"{c.template_text}"</p>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleViewRecipients(c.id, c.name)}
-                          className="btn-secondary btn-sm"
-                          title={lang === 'id' ? 'Lihat Log Penerima' : 'View Recipient Log'}
-                        >
-                          <Eye size={14} />
-                          <span>{lang === 'id' ? 'Penerima' : 'Recipients'}</span>
-                        </button>
-
-                        {c.status === 'RUNNING' ? (
-                          <button onClick={() => handlePauseCampaign(c.id)} className="btn-sm" style={{ color: 'var(--warning-text)' }}>
-                            <Pause size={14} />
-                            <span>{t.campaigns.pauseCampaign}</span>
-                          </button>
-                        ) : (
-                          <button onClick={() => handleStartCampaign(c.id)} className="btn-primary btn-sm">
-                            <Play size={14} />
-                            <span>{t.campaigns.startCampaign}</span>
-                          </button>
-                        )}
-
-                        <button
-                          onClick={() => handleDeleteCampaign(c.id)}
-                          className="btn-sm danger"
-                          title={t.common.delete}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ==================== 8. TEMPLATES & RULES (AUTOMATION) ==================== */}
-        {activeTab === 'automation' && (
-          <div className="space-y-6">
-            <header className="page-header">
-              <div className="page-header__title-group">
-                <h1>{t.automation.title}</h1>
-                <span className="status-badge connected">{rules.length} {lang === 'id' ? 'Aturan' : 'Rules'}</span>
-              </div>
-              <div className="page-header__actions">
-                <button onClick={() => setIsNewRuleModal(true)} className="btn-primary">
-                  <Plus size={16} />
-                  <span>{t.automation.newRule}</span>
-                </button>
-              </div>
-              <p className="page-header__subtitle">
-                {t.automation.subtitle}
-              </p>
-            </header>
-
-            {/* AMAN CHAT Pro: Smart Bot & Business Hours Config Panel */}
-            <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm space-y-5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-700">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 flex items-center justify-center flex-shrink-0">
-                    <Clock size={20} />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
-                        {t.automation.workingHours}
-                      </h3>
-                      <span className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                        WhatsAman Pro Engine
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      {t.automation.workingHoursDesc}
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={handleSaveBotConfig}
-                  className="btn-primary flex items-center gap-2 flex-shrink-0 text-xs py-2 px-4 shadow-sm"
-                >
-                  <Check size={14} />
-                  <span>{lang === 'id' ? 'Simpan Pengaturan Bot' : 'Save Bot Settings'}</span>
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Column 1: Jam Operasional Layanan & Offline Reply */}
-                <div className="bg-slate-50/70 dark:bg-slate-900/50 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                        {lang === 'id' ? 'Jam Operasional Bisnis (Business Hours)' : 'Business Operating Hours'}
-                      </label>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                        {lang === 'id' ? 'Batasi operasional bot pada hari & jam tertentu' : 'Restrict automated bot responses to specific days & hours'}
-                      </p>
-                    </div>
-                    <label className="toggle-switch">
-                      <input
-                        type="checkbox"
-                        checked={botConfig.businessHoursEnabled}
-                        onChange={e => setBotConfig(prev => ({ ...prev, businessHoursEnabled: e.target.checked }))}
-                      />
-                      <span className="toggle-slider" />
-                    </label>
-                  </div>
-
-                  {botConfig.businessHoursEnabled && (
-                    <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-700/60">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 block mb-1">
-                            {lang === 'id' ? 'Jam Buka (WIB)' : 'Opening Time'}
-                          </label>
-                          <input
-                            type="time"
-                            value={botConfig.businessHoursStart}
-                            onChange={e => setBotConfig(prev => ({ ...prev, businessHoursStart: e.target.value }))}
-                            className="w-full text-xs p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 font-mono"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 block mb-1">
-                            {lang === 'id' ? 'Jam Tutup (WIB)' : 'Closing Time'}
-                          </label>
-                          <input
-                            type="time"
-                            value={botConfig.businessHoursEnd}
-                            onChange={e => setBotConfig(prev => ({ ...prev, businessHoursEnd: e.target.value }))}
-                            className="w-full text-xs p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 font-mono"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 block mb-1.5">
-                          {lang === 'id' ? 'Hari Kerja Aktif:' : 'Active Working Days:'}
-                        </label>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {[
-                            { day: 1, label: lang === 'id' ? 'Senin' : 'Mon' },
-                            { day: 2, label: lang === 'id' ? 'Selasa' : 'Tue' },
-                            { day: 3, label: lang === 'id' ? 'Rabu' : 'Wed' },
-                            { day: 4, label: lang === 'id' ? 'Kamis' : 'Thu' },
-                            { day: 5, label: lang === 'id' ? 'Jumat' : 'Fri' },
-                            { day: 6, label: lang === 'id' ? 'Sabtu' : 'Sat' },
-                            { day: 0, label: lang === 'id' ? 'Minggu' : 'Sun' }
-                          ].map(d => {
-                            const isChecked = botConfig.businessDays.includes(d.day);
-                            return (
-                              <button
-                                key={d.day}
-                                type="button"
-                                onClick={() => {
-                                  setBotConfig(prev => {
-                                    const nextDays = isChecked
-                                      ? prev.businessDays.filter(x => x !== d.day)
-                                      : [...prev.businessDays, d.day];
-                                    return { ...prev, businessDays: nextDays };
-                                  });
-                                }}
-                                className={`text-[11px] px-2.5 py-1 rounded-md border font-medium transition-all ${
-                                  isChecked
-                                    ? 'bg-emerald-600 text-white border-emerald-600 font-bold'
-                                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
-                                }`}
-                              >
-                                {d.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Offline Auto-Reply */}
-                  <div className="pt-3 border-t border-slate-200 dark:border-slate-700/60 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                          {lang === 'id' ? 'Balasan Otomatis Luar Jam Kerja (Offline Reply)' : 'After-Hours / Away Auto-Reply'}
-                        </label>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                          {lang === 'id' ? 'Kirim pesan ramah otomatis saat pelanggan chat di luar jam operasional' : 'Send friendly automated notice when customers chat outside business hours'}
-                        </p>
-                      </div>
-                      <label className="toggle-switch">
-                        <input
-                          type="checkbox"
-                          checked={botConfig.offlineReplyEnabled}
-                          onChange={e => setBotConfig(prev => ({ ...prev, offlineReplyEnabled: e.target.checked }))}
-                        />
-                        <span className="toggle-slider" />
-                      </label>
-                    </div>
-
-                    {botConfig.offlineReplyEnabled && (
-                      <div className="space-y-1 pt-1">
-                        <textarea
-                          rows={3}
-                          value={botConfig.offlineReplyText}
-                          onChange={e => setBotConfig(prev => ({ ...prev, offlineReplyText: e.target.value }))}
-                          placeholder={lang === 'id' ? 'Pesan di luar jam kerja...' : 'Away message outside operating hours...'}
-                          className="w-full border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-xs bg-white dark:bg-slate-800 focus:outline-none focus:border-emerald-500"
-                        />
-                        <p className="text-[10px] text-slate-400">
-                          {t.automation.supportsSpintax}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Column 2: Anti-Spam Cooldown, Typing Simulation & Fallback */}
-                <div className="bg-slate-50/70 dark:bg-slate-900/50 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 space-y-4">
-                  {/* Human Typing Simulation */}
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                        {lang === 'id' ? 'Simulasi Mengetik (Human Composing Presence)' : 'Human Typing Simulation'}
-                      </label>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                        {lang === 'id' ? "Kirim status 'sedang mengetik...' 1.2 detik sebelum membalas agar alami & aman dari banned" : "Send 'typing...' status 1.2s before replying to emulate human response"}
-                      </p>
-                    </div>
-                    <label className="toggle-switch">
-                      <input
-                        type="checkbox"
-                        checked={botConfig.simulateTyping}
-                        onChange={e => setBotConfig(prev => ({ ...prev, simulateTyping: e.target.checked }))}
-                      />
-                      <span className="toggle-slider" />
-                    </label>
-                  </div>
-
-                  {/* Cooldown */}
-                  <div className="pt-3 border-t border-slate-200 dark:border-slate-700/60 space-y-1">
-                    <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                      {lang === 'id' ? 'Jeda Anti-Spam / Cooldown per Kontak' : 'Anti-Spam Cooldown per Contact'}
-                    </label>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-1">
-                      {lang === 'id' ? 'Mencegah bot mengirim pesan otomatis berulang kali ke kontak yang sama (isi 0 untuk membalas setiap pesan):' : 'Prevent repeated automated replies to the same contact within (set 0 to reply every message):'}
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        min={0}
-                        max={120}
-                        value={botConfig.cooldownMinutes}
-                        onChange={e => {
-                          const val = e.target.value === '' ? 0 : Number(e.target.value);
-                          setBotConfig(prev => ({ ...prev, cooldownMinutes: isNaN(val) ? 0 : val }));
-                        }}
-                        className="w-24 text-xs p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 font-mono text-center font-bold"
-                      />
-                      <span className="text-xs text-slate-600 dark:text-slate-300 font-medium">{lang === 'id' ? 'Menit jeda (0 = Tanpa Jeda)' : 'Minutes (0 = No Cooldown)'}</span>
-                    </div>
-                  </div>
-
-                  {/* Fallback Default Reply */}
-                  <div className="pt-3 border-t border-slate-200 dark:border-slate-700/60 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                          {lang === 'id' ? 'Balasan Standar (Fallback Default Reply)' : 'Default Fallback Auto-Reply'}
-                        </label>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                          {lang === 'id' ? 'Kirim balasan jika chat pelanggan tidak cocok dengan satupun kata kunci aturan bot' : 'Send reply when no defined keywords match incoming message'}
-                        </p>
-                      </div>
-                      <label className="toggle-switch">
-                        <input
-                          type="checkbox"
-                          checked={botConfig.fallbackEnabled}
-                          onChange={e => setBotConfig(prev => ({ ...prev, fallbackEnabled: e.target.checked }))}
-                        />
-                        <span className="toggle-slider" />
-                      </label>
-                    </div>
-
-                    {botConfig.fallbackEnabled && (
-                      <div className="space-y-1 pt-1">
-                        <textarea
-                          rows={3}
-                          value={botConfig.fallbackReplyText}
-                          onChange={e => setBotConfig(prev => ({ ...prev, fallbackReplyText: e.target.value }))}
-                          placeholder={lang === 'id' ? 'Balasan standar jika tidak ada kata kunci cocok...' : 'Default message when no keyword matches...'}
-                          className="w-full border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-xs bg-white dark:bg-slate-800 focus:outline-none focus:border-emerald-500"
-                        />
-                        <p className="text-[10px] text-slate-400">
-                          {t.automation.supportsSpintax}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Live Spintax & Bot Simulator Widget */}
-            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                  <Bot size={16} className="text-emerald-600" />
-                  <span>{t.automation.botSimulator}</span>
-                </h3>
-                <span className="text-[11px] text-slate-400">{t.automation.botSimulatorDesc}</span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1">
-                    {lang === 'id' ? 'Teks Pesan Masuk (Simulasi)' : 'Simulated Customer Message'}
-                  </label>
-                  <input
-                    type="text"
-                    placeholder={t.automation.testInputPlaceholder}
-                    value={simTestInput}
-                    onChange={e => setSimTestInput(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-
-                <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-slate-700">{t.automation.matchedRule}</span>
-                    <span className={`status-pill ${simMatchedRule ? 'ready' : 'disconnected'}`}>
-                      {simMatchedRule ? simMatchedRule.name : t.automation.noMatch}
-                    </span>
-                  </div>
-                  {simEvaluatedReply && (
-                    <div className="mt-2 pt-2 border-t border-slate-200 text-slate-800">
-                      <span className="font-semibold text-[11px] text-slate-500 block mb-0.5">{t.automation.replyPreview}</span>
-                      <p className="italic text-emerald-800 bg-emerald-50 p-2 rounded border border-emerald-100">
-                        "{simEvaluatedReply}"
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Rules Table */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
-              <h3 className="font-bold text-slate-900 text-sm">{t.automation.configuredRules}</h3>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-slate-600">
-                  <thead className="table-header" style={{ display: 'table-header-group' }}>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase">
-                      <th className="py-2.5 px-4">{t.automation.ruleName}</th>
-                      <th className="py-2.5 px-4">{t.automation.triggerCondition}</th>
-                      <th className="py-2.5 px-4">{t.automation.replyAction}</th>
-                      <th className="py-2.5 px-4">{t.automation.hitCount}</th>
-                      <th className="py-2.5 px-4">{t.automation.status}</th>
-                      <th className="py-2.5 px-4 text-right">{t.automation.actions}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {rules.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="py-8 text-center text-slate-400">
-                          {t.automation.noRules}
-                        </td>
-                      </tr>
-                    ) : (
-                      rules.map(r => {
-                        const cond = r.conditions[0];
-                        const textAction = r.actions.find((a: any) => a.type === 'reply_text' || a.type === 'send_text');
-                        const tagActions = r.actions.filter((a: any) => a.type === 'add_tag');
-                        const stageActions = r.actions.filter((a: any) => a.type === 'set_stage');
-                        return (
-                          <tr key={r.id} className="hover:bg-slate-50 transition">
-                            <td className="py-2.5 px-4 font-bold text-slate-900">{r.name}</td>
-                            <td className="py-2.5 px-4">
-                              <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-mono text-[11px]">
-                                {cond?.operator} "{cond?.value}"
-                              </span>
-                            </td>
-                            <td className="py-2.5 px-4 max-w-xs">
-                              <div className="space-y-1">
-                                {textAction?.text && (
-                                  <div className="truncate text-slate-800 font-medium">"{textAction.text}"</div>
-                                )}
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  {tagActions.map((a: any, idx: number) => (
-                                    <span key={idx} className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] px-1.5 py-0.5 rounded font-medium">
-                                      {a.tag}
-                                    </span>
-                                  ))}
-                                  {stageActions.map((a: any, idx: number) => (
-                                    <span key={idx} className="bg-amber-50 text-amber-700 border border-amber-200 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase">
-                                      Stage: {a.stage}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            </td>
-                            <td className="py-2.5 px-4 mono font-semibold text-slate-800">{r.hit_count}x</td>
-                            <td className="py-2.5 px-4">
-                              {/* WhatsAman Toggle Switch */}
-                              <label className="toggle-switch">
-                                <input
-                                  type="checkbox"
-                                  checked={r.is_active}
-                                  onChange={() => handleToggleRule(r.id, r.is_active)}
-                                />
-                                <span className="toggle-slider" />
-                              </label>
-                            </td>
-                            <td className="py-2.5 px-4 text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                <button
-                                  onClick={() => {
-                                    const tAction = r.actions.find((a: any) => a.type === 'reply_text' || a.type === 'send_text');
-                                    const tgAction = r.actions.find((a: any) => a.type === 'add_tag');
-                                    const stgAction = r.actions.find((a: any) => a.type === 'set_stage');
-                                    setEditRuleId(r.id);
-                                    setEditRuleName(r.name);
-                                    setEditRuleTriggerText(cond?.value || '');
-                                    setEditRuleOperator((cond?.operator as any) || 'contains');
-                                    setEditRuleReplyText(tAction?.text || '');
-                                    setEditRuleAddTagEnabled(Boolean(tgAction));
-                                    setEditRuleActionTag(tgAction?.tag || '🔥 Hot Lead');
-                                    setEditRuleSetStageEnabled(Boolean(stgAction));
-                                    setEditRuleActionStage((stgAction?.stage as any) || 'prospect');
-                                    setIsEditRuleModal(true);
-                                  }}
-                                  className="text-slate-400 hover:text-slate-700 p-1"
-                                  title={lang === 'id' ? 'Edit Aturan' : 'Edit Rule'}
-                                >
-                                  <Edit3 size={15} />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteRule(r.id)}
-                                  className="text-slate-400 hover:text-rose-600 p-1"
-                                  title={t.common.delete}
-                                >
-                                  <Trash2 size={15} />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ==================== 8.5. WEBHOOKS & 3RD-PARTY INTEGRATIONS ==================== */}
-        {activeTab === 'integrations' && (
-          <div className="space-y-6">
-            <header className="page-header">
-              <div className="page-header__title-group">
-                <div className="flex items-center gap-2">
-                  <Webhook className="text-blue-600" size={24} />
-                  <h1>{t.integrations.title}</h1>
-                </div>
-                <span className="status-badge connected">{lang === 'id' ? 'API Ingestion Siap' : 'API Ingestion Ready'}</span>
-              </div>
-              <div className="page-header__actions" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    fetchIntegrationConfigs();
-                    fetchOutgoingWebhooks();
-                    fetchIntegrationLogs();
-                  }}
-                  className="btn-secondary"
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                  title={t.common.refresh}
-                >
-                  <RefreshCw size={15} />
-                  <span>{t.common.refresh}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsTestIntegrationModal(true)}
-                  className="btn-secondary"
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', borderColor: '#93c5fd', color: '#1d4ed8' }}
-                >
-                  <Send size={15} />
-                  <span>{t.integrations.testTrigger}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsAddOutgoingWebhookModal(true)}
-                  className="btn-primary"
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                >
-                  <Plus size={15} />
-                  <span>{t.integrations.addOutgoing}</span>
-                </button>
-              </div>
-              <p className="page-header__subtitle">
-                {t.integrations.subtitle}
-              </p>
-            </header>
-
-            {/* Integration Stats Cards */}
-            <div className="stats-grid">
-              <div className="stat-card">
-                <Code2 className="stat-watermark" />
-                <div className="stat-header">
-                  <span className="stat-label">Google Apps Script</span>
-                  <Code2 size={18} className="stat-icon text-blue-600" />
-                </div>
-                <div className="stat-value text-lg text-emerald-600 font-bold">{lang === 'id' ? 'Siap Digunakan' : 'Ready to Ingest'}</div>
-                <div className="stat-detail">{lang === 'id' ? 'Trigger Google Forms & Sheets' : 'Trigger Google Forms & Sheets'}</div>
-              </div>
-
-              <div className="stat-card">
-                <Webhook className="stat-watermark" />
-                <div className="stat-header">
-                  <span className="stat-label">{lang === 'id' ? 'Integrasi Masuk' : 'Provider Ingestions'}</span>
-                  <Webhook size={18} className="stat-icon text-indigo-600" />
-                </div>
-                <div className="stat-value">{integrationConfigs.filter(c => c.isActive).length} {t.common.active}</div>
-                <div className="stat-detail">{lang === 'id' ? `Dari ${integrationConfigs.length || 6} template` : `From ${integrationConfigs.length || 6} templates`}</div>
-              </div>
-
-              <div className="stat-card">
-                <Share2 className="stat-watermark" />
-                <div className="stat-header">
-                  <span className="stat-label">Outgoing Webhooks</span>
-                  <Share2 size={18} className="stat-icon text-amber-600" />
-                </div>
-                <div className="stat-value">{outgoingWebhooks.filter(w => w.isActive).length} {lang === 'id' ? 'Aktif' : 'Active'}</div>
-                <div className="stat-detail">{lang === 'id' ? 'Event push ke server Anda' : 'Real-time event push'}</div>
-              </div>
-
-              <div className="stat-card">
-                <Activity className="stat-watermark" />
-                <div className="stat-header">
-                  <span className="stat-label">{lang === 'id' ? 'Riwayat Ingestion' : 'Ingestion History'}</span>
-                  <Activity size={18} className="stat-icon text-slate-600" />
-                </div>
-                <div className="stat-value">{integrationLogs.length} {lang === 'id' ? 'Log' : 'Logs'}</div>
-                <div className="stat-detail">{lang === 'id' ? 'Tercatat di sistem database' : 'Recorded in database'}</div>
-              </div>
-            </div>
-
-            {/* Provider Selector Tabs */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="flex border-b border-slate-200 bg-slate-50 overflow-x-auto text-xs font-semibold">
-                <button
-                  type="button"
-                  onClick={() => setSelectedIntegrationTab('google_form')}
-                  className={`py-3 px-5 border-b-2 flex items-center gap-2 transition ${
-                    selectedIntegrationTab === 'google_form'
-                      ? 'border-blue-600 text-blue-600 bg-white font-bold'
-                      : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                  }`}
-                >
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  <span>{t.integrations.tabGoogleForm}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedIntegrationTab('woocommerce')}
-                  className={`py-3 px-5 border-b-2 flex items-center gap-2 transition ${
-                    selectedIntegrationTab === 'woocommerce'
-                      ? 'border-blue-600 text-blue-600 bg-white font-bold'
-                      : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                  }`}
-                >
-                  <span>{t.integrations.tabWooCommerce}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedIntegrationTab('cf7')}
-                  className={`py-3 px-5 border-b-2 flex items-center gap-2 transition ${
-                    selectedIntegrationTab === 'cf7'
-                      ? 'border-blue-600 text-blue-600 bg-white font-bold'
-                      : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                  }`}
-                >
-                  <span>{t.integrations.tabCf7}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedIntegrationTab('elementor')}
-                  className={`py-3 px-5 border-b-2 flex items-center gap-2 transition ${
-                    selectedIntegrationTab === 'elementor'
-                      ? 'border-blue-600 text-blue-600 bg-white font-bold'
-                      : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                  }`}
-                >
-                  <span>{t.integrations.tabElementor}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedIntegrationTab('outgoing')}
-                  className={`py-3 px-5 border-b-2 flex items-center gap-2 transition ${
-                    selectedIntegrationTab === 'outgoing'
-                      ? 'border-blue-600 text-blue-600 bg-white font-bold'
-                      : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                  }`}
-                >
-                  <Share2 size={14} />
-                  <span>{t.integrations.tabOutgoing}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedIntegrationTab('logs')}
-                  className={`py-3 px-5 border-b-2 flex items-center gap-2 transition ${
-                    selectedIntegrationTab === 'logs'
-                      ? 'border-blue-600 text-blue-600 bg-white font-bold'
-                      : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                  }`}
-                >
-                  <FileText size={14} />
-                  <span>{t.integrations.tabLogs}</span>
-                </button>
-              </div>
-
-              {/* TAB 1: GOOGLE FORMS & APPS SCRIPT */}
-              {selectedIntegrationTab === 'google_form' && (
-                <div className="p-6 space-y-6">
-                  {/* Webhook Endpoint Box */}
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-3">
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="bg-emerald-600 text-white text-[11px] font-bold px-2 py-0.5 rounded font-mono">POST</span>
-                        <h3 className="font-bold text-slate-900 text-sm">{t.integrations.webhookUrlTitle}</h3>
-                      </div>
-                      <span className="text-xs text-slate-500 font-medium">{t.sessions.title}: <strong>{selectedSessionId || 'default'}</strong></span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        readOnly
-                        value={`http://localhost:3000/api/v1/integrations/webhook/google_form/${selectedSessionId || 'default'}`}
-                        className="font-mono text-xs text-slate-800 bg-white border border-slate-300 rounded-lg p-2.5 flex-1 select-all"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const url = `http://localhost:3000/api/v1/integrations/webhook/google_form/${selectedSessionId || 'default'}`;
-                          navigator.clipboard.writeText(url);
-                          setCopiedWebhookUrl(true);
-                          setTimeout(() => setCopiedWebhookUrl(false), 2000);
-                        }}
-                        className="btn-primary"
-                        style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0.6rem 1rem' }}
-                      >
-                        {copiedWebhookUrl ? <Check size={16} /> : <Copy size={16} />}
-                        <span>{copiedWebhookUrl ? t.integrations.copiedUrl : t.integrations.copyUrl}</span>
-                      </button>
-                    </div>
-
-                    <p className="text-xs text-slate-500 leading-relaxed">
-                      💡 <strong>{lang === 'id' ? 'Petunjuk URL:' : 'URL Hint:'}</strong> {t.integrations.urlHint}
-                    </p>
-                  </div>
-
-                  {/* Template & Form Configuration */}
-                  {(() => {
-                    const gfConfig = integrationConfigs.find(c => c.provider === 'google_form') || {
-                      id: 'default_google_form',
-                      provider: 'google_form' as const,
-                      name: 'Google Forms Auto-Notification',
-                      templateText: 'Halo *{name}*, terima kasih telah mengisi formulir *{form_name}*! ✨\n\nData respon Anda telah berhasil kami terima. Tim kami akan segera meninjau dan menghubungi Anda kembali.',
-                      adminPhone: '',
-                      adminTemplateText: '🔔 *Notifikasi Respon Formulir Baru*\n\n• Form: {form_name}\n• Pengirim: {name} ({phone})\n\nRespon baru berhasil tercatat di sistem.',
-                      isActive: true,
-                      createdAt: Date.now(),
-                      updatedAt: Date.now()
-                    };
-
-                    return (
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* Template Editor Card */}
-                        <div className="border border-slate-200 rounded-xl p-5 bg-white space-y-4">
-                          <div className="flex items-center justify-between">
-                            <h4 className="font-bold text-slate-900 text-sm">{t.integrations.templateConfigTitle}</h4>
-                            <span className="status-pill ready">{lang === 'id' ? 'Penerima: Pengisi Form' : 'Recipient: Form Submitter'}</span>
-                          </div>
-
-                          <div className="space-y-2">
-                            <label className="text-xs font-semibold text-slate-700 block">{t.integrations.templateTextLabel}</label>
-                            <textarea
-                              rows={5}
-                              className="w-full text-xs border border-slate-300 rounded-lg p-3 font-sans leading-relaxed focus:border-blue-500 outline-none"
-                              defaultValue={gfConfig.templateText}
-                              id="gf-template-textarea"
-                            />
-                            <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-slate-500">
-                              <span>{t.integrations.supportedVars}</span>
-                              <code className="bg-slate-100 text-blue-700 px-1.5 py-0.5 rounded font-mono">{'{name}'}</code>
-                              <code className="bg-slate-100 text-blue-700 px-1.5 py-0.5 rounded font-mono">{'{form_name}'}</code>
-                              <code className="bg-slate-100 text-blue-700 px-1.5 py-0.5 rounded font-mono">{'{phone}'}</code>
-                              <code className="bg-slate-100 text-blue-700 px-1.5 py-0.5 rounded font-mono">{'{data.Pertanyaan}'}</code>
-                            </div>
-                          </div>
-
-                          <div className="pt-2 border-t border-slate-100 space-y-2">
-                            <label className="text-xs font-semibold text-slate-700 block">{t.integrations.adminPhoneLabel}</label>
-                            <input
-                              type="text"
-                              placeholder={lang === 'id' ? 'Contoh: 08123456789 (Kosongkan jika tidak perlu salinan)' : 'e.g. 628123456789 (Optional admin copy)'}
-                              defaultValue={gfConfig.adminPhone || ''}
-                              id="gf-admin-phone-input"
-                              className="w-full text-xs border border-slate-300 rounded-lg p-2.5 focus:border-blue-500 outline-none"
-                            />
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const templateText = (document.getElementById('gf-template-textarea') as HTMLTextAreaElement)?.value || gfConfig.templateText;
-                              const adminPhone = (document.getElementById('gf-admin-phone-input') as HTMLInputElement)?.value;
-                              handleSaveIntegrationConfig({
-                                id: gfConfig.id,
-                                sessionId: selectedSessionId || undefined,
-                                provider: 'google_form',
-                                name: gfConfig.name,
-                                templateText,
-                                adminPhone: adminPhone || undefined,
-                                isActive: true
-                              });
-                            }}
-                            className="btn-primary w-full text-xs"
-                            style={{ padding: '0.65rem' }}
-                          >
-                            <Check size={15} />
-                            <span>{t.integrations.saveConfig}</span>
-                          </button>
-                        </div>
-
-                        {/* Apps Script Guide & Code Card */}
-                        <div className="border border-slate-200 rounded-xl p-5 bg-white space-y-4">
-                          <div className="flex items-center justify-between">
-                            <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                              <Code2 size={17} className="text-emerald-600" />
-                              <span>{t.integrations.appsScriptCodeTitle}</span>
-                            </h4>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const code = `/**
- * WhatsAman — Google Apps Script WhatsApp Auto-Notification
- * Pasang di Google Sheet (Ekstensi > Apps Script)
- */
-function onFormSubmit(e) {
-  var webhookUrl = "http://localhost:3000/api/v1/integrations/webhook/google_form/${selectedSessionId || 'default'}";
-  
-  // Baca respon formulir dari Google Sheet
-  var itemResponses = e.response ? e.response.getItemResponses() : [];
-  var namedValues = e.namedValues || {};
-  var nama = "";
-  var noWhatsapp = "";
-  
-  if (itemResponses.length > 0) {
-    for (var i = 0; i < itemResponses.length; i++) {
-      var title = itemResponses[i].getItem().getTitle().toLowerCase();
-      var resp = itemResponses[i].getResponse();
-      if (title.indexOf("nama") !== -1 && !nama) nama = resp;
-      if ((title.indexOf("wa") !== -1 || title.indexOf("whatsapp") !== -1 || title.indexOf("hp") !== -1 || title.indexOf("telepon") !== -1) && !noWhatsapp) noWhatsapp = resp;
-    }
-    if (!nama) nama = itemResponses[0].getResponse();
-    if (!noWhatsapp && itemResponses.length > 1) noWhatsapp = itemResponses[1].getResponse();
-  } else {
-    // Jika trigger dipasang di Google Sheets Spreadsheet
-    nama = (namedValues["Nama"] && namedValues["Nama"][0]) || (namedValues["Name"] && namedValues["Name"][0]) || (e.values && e.values[1]) || "Pelanggan";
-    noWhatsapp = (namedValues["No WhatsApp"] && namedValues["No WhatsApp"][0]) || (namedValues["WhatsApp"] && namedValues["WhatsApp"][0]) || (namedValues["No HP"] && namedValues["No HP"][0]) || (e.values && e.values[2]) || "";
-  }
-
-  var payload = {
-    form_name: e.source ? e.source.getTitle() : "Formulir Pendaftaran",
-    name: nama,
-    phone: noWhatsapp,
-    data: namedValues
-  };
-
-  var options = {
-    method: "post",
-    contentType: "application/json",
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true
-  };
-
-  try {
-    var res = UrlFetchApp.fetch(webhookUrl, options);
-    Logger.log("WhatsAman Response: " + res.getContentText());
-  } catch (err) {
-    Logger.log("Error sending webhook: " + err.toString());
-  }
-}`;
-                                navigator.clipboard.writeText(code);
-                                setCopiedScriptCode(true);
-                                setTimeout(() => setCopiedScriptCode(false), 2000);
-                              }}
-                              className="btn-secondary text-xs"
-                              style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '0.35rem 0.75rem' }}
-                            >
-                              {copiedScriptCode ? <Check size={14} /> : <Copy size={14} />}
-                              <span>{copiedScriptCode ? t.integrations.copiedScriptCode : t.integrations.copyScriptCode}</span>
-                            </button>
-                          </div>
-
-                          <div className="bg-slate-900 text-slate-100 rounded-lg p-3 font-mono text-[11px] overflow-x-auto max-h-64 leading-relaxed">
-                            <pre>{`function onFormSubmit(e) {
-  var webhookUrl = "http://localhost:3000/api/v1/integrations/webhook/google_form/${selectedSessionId || 'default'}";
-  
-  var nama = (e.namedValues && e.namedValues["Nama"] && e.namedValues["Nama"][0]) || e.values[1];
-  var phone = (e.namedValues && e.namedValues["No WhatsApp"] && e.namedValues["No WhatsApp"][0]) || e.values[2];
-
-  var payload = {
-    form_name: "Formulir Pendaftaran",
-    name: nama,
-    phone: phone,
-    data: e.namedValues
-  };
-
-  UrlFetchApp.fetch(webhookUrl, {
-    method: "post",
-    contentType: "application/json",
-    payload: JSON.stringify(payload)
-  });
-}`}</pre>
-                          </div>
-
-                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-900 space-y-1.5">
-                            <span className="font-bold block">{t.integrations.appsScriptGuideTitle}:</span>
-                            <ol className="list-decimal pl-4 space-y-1 text-slate-700">
-                              <li>{t.integrations.step1}</li>
-                              <li>{t.integrations.step2}</li>
-                              <li>{t.integrations.step3}</li>
-                              <li>{t.integrations.step4}</li>
-                            </ol>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
-
-              {/* TAB 2: WOOCOMMERCE */}
-              {selectedIntegrationTab === 'woocommerce' && (
-                <div className="p-6 space-y-6">
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-3">
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="bg-purple-600 text-white text-[11px] font-bold px-2 py-0.5 rounded font-mono">POST</span>
-                        <h3 className="font-bold text-slate-900 text-sm">{lang === 'id' ? 'URL Webhook WooCommerce Order' : 'WooCommerce Order Webhook URL'}</h3>
-                      </div>
-                      <span className="text-xs text-slate-500 font-medium">{t.sessions.title}: <strong>{selectedSessionId || 'default'}</strong></span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        readOnly
-                        value={`http://localhost:3000/api/v1/integrations/webhook/woocommerce/${selectedSessionId || 'default'}`}
-                        className="font-mono text-xs text-slate-800 bg-white border border-slate-300 rounded-lg p-2.5 flex-1 select-all"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const url = `http://localhost:3000/api/v1/integrations/webhook/woocommerce/${selectedSessionId || 'default'}`;
-                          navigator.clipboard.writeText(url);
-                          setCopiedWebhookUrl(true);
-                          setTimeout(() => setCopiedWebhookUrl(false), 2000);
-                        }}
-                        className="btn-primary"
-                        style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0.6rem 1rem' }}
-                      >
-                        {copiedWebhookUrl ? <Check size={16} /> : <Copy size={16} />}
-                        <span>{copiedWebhookUrl ? t.integrations.copiedUrl : t.integrations.copyUrl}</span>
-                      </button>
-                    </div>
-
-                    <p className="text-xs text-slate-500">
-                      {lang === 'id'
-                        ? 'Cara Pasang di WordPress: WooCommerce > Settings > Advanced > Webhooks > Add Webhook ➔ Topic: Order created / Order updated ➔ Delivery URL: masukkan URL di atas.'
-                        : 'Setup in WordPress: WooCommerce > Settings > Advanced > Webhooks > Add Webhook ➔ Topic: Order created / Order updated ➔ Delivery URL: paste the URL above.'}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 3: CONTACT FORM 7 */}
-              {selectedIntegrationTab === 'cf7' && (
-                <div className="p-6 space-y-6">
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-3">
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="bg-blue-600 text-white text-[11px] font-bold px-2 py-0.5 rounded font-mono">POST</span>
-                        <h3 className="font-bold text-slate-900 text-sm">{lang === 'id' ? 'URL Webhook Contact Form 7 (WordPress)' : 'Contact Form 7 Webhook URL (WordPress)'}</h3>
-                      </div>
-                      <span className="text-xs text-slate-500 font-medium">{t.sessions.title}: <strong>{selectedSessionId || 'default'}</strong></span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        readOnly
-                        value={`http://localhost:3000/api/v1/integrations/webhook/cf7/${selectedSessionId || 'default'}`}
-                        className="font-mono text-xs text-slate-800 bg-white border border-slate-300 rounded-lg p-2.5 flex-1 select-all"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const url = `http://localhost:3000/api/v1/integrations/webhook/cf7/${selectedSessionId || 'default'}`;
-                          navigator.clipboard.writeText(url);
-                          setCopiedWebhookUrl(true);
-                          setTimeout(() => setCopiedWebhookUrl(false), 2000);
-                        }}
-                        className="btn-primary"
-                        style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0.6rem 1rem' }}
-                      >
-                        {copiedWebhookUrl ? <Check size={16} /> : <Copy size={16} />}
-                        <span>{copiedWebhookUrl ? t.integrations.copiedUrl : t.integrations.copyUrl}</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 4: ELEMENTOR */}
-              {selectedIntegrationTab === 'elementor' && (
-                <div className="p-6 space-y-6">
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-3">
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="bg-rose-600 text-white text-[11px] font-bold px-2 py-0.5 rounded font-mono">POST</span>
-                        <h3 className="font-bold text-slate-900 text-sm">{lang === 'id' ? 'URL Webhook Elementor Pro Form' : 'Elementor Pro Form Webhook URL'}</h3>
-                      </div>
-                      <span className="text-xs text-slate-500 font-medium">{t.sessions.title}: <strong>{selectedSessionId || 'default'}</strong></span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        readOnly
-                        value={`http://localhost:3000/api/v1/integrations/webhook/elementor/${selectedSessionId || 'default'}`}
-                        className="font-mono text-xs text-slate-800 bg-white border border-slate-300 rounded-lg p-2.5 flex-1 select-all"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const url = `http://localhost:3000/api/v1/integrations/webhook/elementor/${selectedSessionId || 'default'}`;
-                          navigator.clipboard.writeText(url);
-                          setCopiedWebhookUrl(true);
-                          setTimeout(() => setCopiedWebhookUrl(false), 2000);
-                        }}
-                        className="btn-primary"
-                        style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0.6rem 1rem' }}
-                      >
-                        {copiedWebhookUrl ? <Check size={16} /> : <Copy size={16} />}
-                        <span>{copiedWebhookUrl ? t.integrations.copiedUrl : t.integrations.copyUrl}</span>
-                      </button>
-                    </div>
-                    <p className="text-xs text-slate-500">
-                      {lang === 'id'
-                        ? 'Cara Pasang di Elementor: Buka widget Form ➔ Actions After Submit ➔ Pilih Webhook ➔ Masukkan Webhook URL di atas.'
-                        : 'Setup in Elementor: Open Form widget ➔ Actions After Submit ➔ Choose Webhook ➔ Paste the Webhook URL above.'}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 5: OUTGOING WEBHOOKS */}
-              {selectedIntegrationTab === 'outgoing' && (
-                <div className="p-6 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-bold text-slate-900 text-sm">{t.integrations.outgoingTableTitle}</h4>
-                      <p className="text-xs text-slate-500">{t.integrations.outgoingSubtitle}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setIsAddOutgoingWebhookModal(true)}
-                      className="btn-primary text-xs"
-                      style={{ padding: '0.5rem 0.85rem' }}
-                    >
-                      <Plus size={14} />
-                      <span>{t.integrations.addOutgoing}</span>
-                    </button>
-                  </div>
-
-                  <div className="overflow-x-auto border border-slate-200 rounded-lg">
-                    <table className="w-full text-left text-xs text-slate-600">
-                      <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase">
-                        <tr>
-                          <th className="py-2.5 px-4">{t.integrations.colName}</th>
-                          <th className="py-2.5 px-4">{t.integrations.colTargetUrl}</th>
-                          <th className="py-2.5 px-4">{t.integrations.colEvents}</th>
-                          <th className="py-2.5 px-4">{t.integrations.colStatus}</th>
-                          <th className="py-2.5 px-4 text-right">{t.integrations.colActions}</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {outgoingWebhooks.length === 0 ? (
-                          <tr>
-                            <td colSpan={5} className="py-8 text-center text-slate-400">
-                              {t.integrations.noOutgoing}
-                            </td>
-                          </tr>
-                        ) : (
-                          outgoingWebhooks.map(w => (
-                            <tr key={w.id} className="hover:bg-slate-50 transition">
-                              <td className="py-2.5 px-4 font-bold text-slate-900">{w.name}</td>
-                              <td className="py-2.5 px-4 font-mono text-[11px] text-blue-700 max-w-xs truncate">{w.targetUrl}</td>
-                              <td className="py-2.5 px-4">
-                                <div className="flex items-center gap-1 flex-wrap">
-                                  {(w.events || ['all']).map((ev, i) => (
-                                    <span key={i} className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px] font-mono">
-                                      {ev}
-                                    </span>
-                                  ))}
-                                </div>
-                              </td>
-                              <td className="py-2.5 px-4">
-                                <span className={`status-pill ${w.isActive ? 'ready' : 'disconnected'}`}>
-                                  {w.isActive ? t.common.active : t.common.inactive}
-                                </span>
-                              </td>
-                              <td className="py-2.5 px-4 text-right">
-                                <div className="flex items-center justify-end gap-1.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleTestOutgoingWebhook(w.id)}
-                                    className="btn-secondary btn-sm"
-                                    title={t.integrations.testPing}
-                                  >
-                                    <Send size={12} />
-                                    <span>{t.integrations.testPing}</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteOutgoingWebhook(w.id)}
-                                    className="btn-icon text-rose-500 hover:bg-rose-50"
-                                    title={t.common.delete}
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 6: LOGS */}
-              {selectedIntegrationTab === 'logs' && (
-                <div className="p-6 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-bold text-slate-900 text-sm">{t.integrations.logsTitle}</h4>
-                    <span className="text-xs text-slate-500">{lang === 'id' ? '50 catatan terakhir' : 'Last 50 records'}</span>
-                  </div>
-
-                  <div className="overflow-x-auto border border-slate-200 rounded-lg">
-                    <table className="w-full text-left text-xs text-slate-600">
-                      <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase">
-                        <tr>
-                          <th className="py-2.5 px-4">{t.integrations.colTime}</th>
-                          <th className="py-2.5 px-4">{t.integrations.colProvider}</th>
-                          <th className="py-2.5 px-4">{t.integrations.colTargetWa}</th>
-                          <th className="py-2.5 px-4">{t.integrations.colStatus}</th>
-                          <th className="py-2.5 px-4">{t.integrations.colPayload}</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {integrationLogs.length === 0 ? (
-                          <tr>
-                            <td colSpan={5} className="py-8 text-center text-slate-400">
-                              {t.integrations.noLogs}
-                            </td>
-                          </tr>
-                        ) : (
-                          integrationLogs.map(log => (
-                            <tr key={log.id} className="hover:bg-slate-50 transition">
-                              <td className="py-2.5 px-4 mono text-[11px] text-slate-500 whitespace-nowrap">
-                                {new Date(log.createdAt).toLocaleString(lang === 'id' ? 'id-ID' : 'en-US')}
-                              </td>
-                              <td className="py-2.5 px-4">
-                                <span className="bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase">
-                                  {log.provider}
-                                </span>
-                              </td>
-                              <td className="py-2.5 px-4 font-mono font-medium text-slate-800">
-                                {formatPhoneForDisplay(log.targetPhone) || log.targetPhone}
-                              </td>
-                              <td className="py-2.5 px-4">
-                                <span className={`status-pill ${log.status === 'SUCCESS' ? 'ready' : 'disconnected'}`}>
-                                  {log.status}
-                                </span>
-                              </td>
-                              <td className="py-2.5 px-4 max-w-xs truncate font-mono text-[11px] text-slate-700">
-                                {log.errorMessage ? (
-                                  <span className="text-rose-600 font-sans">{log.errorMessage}</span>
-                                ) : (
-                                  JSON.stringify(log.payload)
-                                )}
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Test Trigger Modal */}
-            {isTestIntegrationModal && (
-              <div className="modal-backdrop">
-                <div className="modal-card max-w-md w-full p-6 space-y-4">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                    <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
-                      <Send size={18} className="text-blue-600" />
-                      <span>{t.integrations.testModalTitle}</span>
-                    </h3>
-                    <button type="button" onClick={() => setIsTestIntegrationModal(false)} className="btn-icon">
-                      <X size={18} />
-                    </button>
-                  </div>
-
-                  <p className="text-xs text-slate-500">
-                    {t.integrations.testModalDesc}
-                  </p>
-
-                  <div className="space-y-3 text-xs">
-                    <div>
-                      <label className="font-semibold text-slate-700 block mb-1">{t.integrations.testSenderName}:</label>
-                      <input
-                        type="text"
-                        value={testIntegrationName}
-                        onChange={e => setTestIntegrationName(e.target.value)}
-                        className="w-full border border-slate-300 rounded-lg p-2.5 focus:border-blue-500 outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="font-semibold text-slate-700 block mb-1">{t.integrations.testTargetPhone}:</label>
-                      <input
-                        type="text"
-                        placeholder="Contoh: 08123456789 atau 628123456789"
-                        value={testIntegrationPhone}
-                        onChange={e => setTestIntegrationPhone(e.target.value)}
-                        className="w-full border border-slate-300 rounded-lg p-2.5 focus:border-blue-500 outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="font-semibold text-slate-700 block mb-1">{t.integrations.testFormName}:</label>
-                      <input
-                        type="text"
-                        value={testIntegrationFormName}
-                        onChange={e => setTestIntegrationFormName(e.target.value)}
-                        className="w-full border border-slate-300 rounded-lg p-2.5 focus:border-blue-500 outline-none"
-                      />
-                    </div>
-
-                    {testIntegrationResult && (
-                      <div className={`p-3 rounded-lg text-xs ${testIntegrationResult.success ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'}`}>
-                        <div className="font-bold">{testIntegrationResult.success ? '✅ Webhook Berhasil Diproses!' : '❌ Gagal Memproses Webhook'}</div>
-                        <div className="text-[11px] mt-1">{testIntegrationResult.message}</div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                    <button type="button" onClick={() => setIsTestIntegrationModal(false)} className="btn-secondary text-xs">
-                      {t.common.close}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleTestIncomingWebhook}
-                      disabled={testIntegrationLoading}
-                      className="btn-primary text-xs"
-                      style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                    >
-                      {testIntegrationLoading && <RefreshCw size={13} className="animate-spin" />}
-                      <span>{testIntegrationLoading ? `${t.integrations.testSendButton}...` : t.integrations.testSendButton}</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Add Outgoing Webhook Modal */}
-            {isAddOutgoingWebhookModal && (
-              <div className="modal-backdrop">
-                <div className="modal-card max-w-md w-full p-6 space-y-4">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                    <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
-                      <Share2 size={18} className="text-blue-600" />
-                      <span>{t.integrations.addOutgoing}</span>
-                    </h3>
-                    <button type="button" onClick={() => setIsAddOutgoingWebhookModal(false)} className="btn-icon">
-                      <X size={18} />
-                    </button>
-                  </div>
-
-                  <div className="space-y-3 text-xs">
-                    <div>
-                      <label className="font-semibold text-slate-700 block mb-1">{t.integrations.colName}:</label>
-                      <input
-                        type="text"
-                        placeholder="Contoh: CRM Server Notifier"
-                        value={newWebhookName}
-                        onChange={e => setNewWebhookName(e.target.value)}
-                        className="w-full border border-slate-300 rounded-lg p-2.5 focus:border-blue-500 outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="font-semibold text-slate-700 block mb-1">{t.integrations.colTargetUrl} (HTTPS):</label>
-                      <input
-                        type="text"
-                        placeholder="https://api.yourdomain.com/whatsapp-event"
-                        value={newWebhookUrl}
-                        onChange={e => setNewWebhookUrl(e.target.value)}
-                        className="w-full border border-slate-300 rounded-lg p-2.5 focus:border-blue-500 outline-none font-mono text-[11px]"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="font-semibold text-slate-700 block mb-1">Secret Key / Token ({lang === 'id' ? 'Opsional' : 'Optional'}):</label>
-                      <input
-                        type="password"
-                        placeholder="Untuk verifikasi signature X-Hub-Signature"
-                        value={newWebhookSecret}
-                        onChange={e => setNewWebhookSecret(e.target.value)}
-                        className="w-full border border-slate-300 rounded-lg p-2.5 focus:border-blue-500 outline-none font-mono text-[11px]"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                    <button type="button" onClick={() => setIsAddOutgoingWebhookModal(false)} className="btn-secondary text-xs">
-                      {t.common.cancel}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleCreateOutgoingWebhook}
-                      className="btn-primary text-xs"
-                    >
-                      {t.integrations.addOutgoing}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ==================== 9. INFRASTRUCTURE & SYSTEM ==================== */}
-        {activeTab === 'infrastructure' && (
-          <div className="space-y-6">
-            <header className="page-header">
-              <div className="page-header__title-group">
-                <h1>{t.infrastructure.title}</h1>
-                <span className="status-badge connected">{lang === 'id' ? 'Telemetri Aktif' : 'Telemetry Active'}</span>
-              </div>
-              <div className="page-header__actions">
-                <button onClick={handleCreateBackup} className="btn-primary">
-                  <Download size={15} />
-                  <span>{t.infrastructure.createBackup}</span>
-                </button>
-              </div>
-              <p className="page-header__subtitle">
-                {t.infrastructure.subtitle}
-              </p>
-            </header>
-
-            {/* Metrics cards */}
-            <div className="stats-grid">
-              <div className="stat-card">
-                <Server className="stat-watermark" />
-                <div className="stat-header">
-                  <span className="stat-label">{t.infrastructure.ramHeapUsed}</span>
-                  <Server size={18} className="stat-icon" />
-                </div>
-                <div className="stat-value">{systemStatus ? `${systemStatus.memory.heapUsedMb} MB` : '—'}</div>
-                <div className="stat-detail">RSS: {systemStatus ? `${systemStatus.memory.rssMb} MB` : '—'}</div>
-              </div>
-
-              <div className="stat-card">
-                <ShieldCheck className="stat-watermark" />
-                <div className="stat-header">
-                  <span className="stat-label">{t.infrastructure.portableStorage}</span>
-                  <ShieldCheck size={18} className="stat-icon" />
-                </div>
-                <div className="stat-value text-xl font-bold truncate">
-                  {systemStatus?.isPortable ? (lang === 'id' ? 'Mode Portable' : 'Portable Mode') : 'Standard'}
-                </div>
-                <div className="stat-detail truncate mono">{systemStatus?.storageDir}</div>
-              </div>
-
-              <div className="stat-card">
-                <Activity className="stat-watermark" />
-                <div className="stat-header">
-                  <span className="stat-label">{t.infrastructure.uptime}</span>
-                  <Clock size={18} className="stat-icon" />
-                </div>
-                <div className="stat-value">
-                  {systemStatus ? `${Math.floor(systemStatus.uptimeSeconds / 60)} ${lang === 'id' ? 'menit' : 'min'}` : '—'}
-                </div>
-                <div className="stat-detail">Seconds: {systemStatus?.uptimeSeconds || 0}s</div>
-              </div>
-
-              <div className="stat-card">
-                <Layers className="stat-watermark" />
-                <div className="stat-header">
-                  <span className="stat-label">{t.infrastructure.totalBackups}</span>
-                  <HardDrive size={18} className="stat-icon" />
-                </div>
-                <div className="stat-value">{backups.length}</div>
-                <div className="stat-detail">{lang === 'id' ? 'Arsip cadangan lokal' : 'Local snapshot archives'}</div>
-              </div>
-            </div>
-
-            {/* Backups List */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
-              <h3 className="font-bold text-slate-900 text-sm">{t.infrastructure.backupsListTitle}</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-slate-600">
-                  <thead className="table-header" style={{ display: 'table-header-group' }}>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase">
-                      <th className="py-2.5 px-4">{t.infrastructure.colFileName}</th>
-                      <th className="py-2.5 px-4">{t.infrastructure.colSize}</th>
-                      <th className="py-2.5 px-4">{t.infrastructure.colCreatedAt}</th>
-                      <th className="py-2.5 px-4 text-right">{t.infrastructure.colAction}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {backups.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="py-8 text-center text-slate-400">
-                          {t.infrastructure.noBackups}
-                        </td>
-                      </tr>
-                    ) : (
-                      backups.map((b, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50 transition">
-                          <td className="py-2.5 px-4 font-mono font-medium text-slate-900">{b.fileName}</td>
-                          <td className="py-2.5 px-4 mono">{b.sizeKb} KB</td>
-                          <td className="py-2.5 px-4">{new Date(b.createdAt).toLocaleString(lang === 'id' ? 'id-ID' : 'en-US')}</td>
-                          <td className="py-2.5 px-4 text-right">
-                            <a href={b.downloadUrl} download className="btn-secondary btn-sm">
-                              <Download size={13} />
-                              <span>{t.infrastructure.downloadBackup}</span>
-                            </a>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ==================== 10. AUDIT LOGS ==================== */}
-        {activeTab === 'logs' && (
-          <div className="space-y-6">
-            <header className="page-header">
-              <div className="page-header__title-group">
-                <h1>{t.logs.title}</h1>
-                <span className="status-badge connected">{auditLogs.length} Events</span>
-              </div>
-              <div className="page-header__actions">
-                <button onClick={fetchAuditLogs} className="btn-secondary">
-                  <RefreshCw size={15} />
-                  <span>{lang === 'id' ? 'Segarkan Log' : 'Refresh Trace'}</span>
-                </button>
-              </div>
-              <p className="page-header__subtitle">{t.logs.subtitle}</p>
-            </header>
-
-            {/* Filter buttons */}
-            <div className="flex gap-2">
-              {['ALL', 'session.', 'message.', 'campaign.', 'contact.'].map(f => (
-                <button
-                  key={f}
-                  onClick={() => setLogFilter(f)}
-                  className={`btn-sm ${logFilter === f ? 'bg-emerald-500 text-slate-900 font-bold border-emerald-500' : 'btn-secondary'}`}
-                >
-                  {f === 'ALL' ? (lang === 'id' ? 'Semua Event' : 'All Events') : `${f}*`}
-                </button>
-              ))}
-            </div>
-
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-slate-600">
-                  <thead className="table-header" style={{ display: 'table-header-group' }}>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase">
-                      <th className="py-2.5 px-4">{t.logs.colTime}</th>
-                      <th className="py-2.5 px-4">{t.logs.colType}</th>
-                      <th className="py-2.5 px-4">{t.logs.colMessage}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {auditLogs.length === 0 ? (
-                      <tr>
-                        <td colSpan={3} className="py-8 text-center text-slate-400">
-                          {t.logs.noLogs}
-                        </td>
-                      </tr>
-                    ) : (
-                      auditLogs
-                        .filter(l => logFilter === 'ALL' || l.event_type.startsWith(logFilter))
-                        .map(l => (
-                          <tr key={l.id} className="hover:bg-slate-50 transition">
-                            <td className="py-2.5 px-4 font-mono text-slate-400 whitespace-nowrap">
-                              {new Date(l.created_at).toLocaleString(lang === 'id' ? 'id-ID' : 'en-US')}
-                            </td>
-                            <td className="py-2.5 px-4">
-                              <span className="status-pill ready font-mono text-[10px]">{l.event_type}</span>
-                            </td>
-                            <td className="py-2.5 px-4 font-mono text-xs text-slate-800 truncate max-w-xl">
-                              {JSON.stringify(l.payload)}
-                            </td>
-                          </tr>
-                        ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
       </main>
 
       {/* ==================== MODALS ==================== */}
@@ -7341,6 +3328,21 @@ function onFormSubmit(e) {
 
               <div>
                 <label className="text-xs font-semibold text-slate-700 block mb-1">{lang === 'id' ? 'Isi Pesan Broadcast' : 'Broadcast Message Content'}</label>
+                {messageTemplates.length > 0 && (
+                  <select
+                    value=""
+                    onChange={e => {
+                      const tpl = messageTemplates.find(t => t.id === e.target.value);
+                      if (tpl) setChatBroadcastMessage(tpl.content);
+                    }}
+                    className="w-full text-xs border border-slate-200 rounded-lg p-2 mb-2 bg-slate-50"
+                  >
+                    <option value="">{lang === 'id' ? '📂 Gunakan Template Tersimpan...' : '📂 Use Saved Template...'}</option>
+                    {messageTemplates.map(tpl => (
+                      <option key={tpl.id} value={tpl.id}>{tpl.name} ({tpl.category})</option>
+                    ))}
+                  </select>
+                )}
                 <textarea
                   rows={4}
                   placeholder={lang === 'id' ? 'Ketik pesan broadcast... Gunakan {{name}} untuk nama & {Halo|Hi} untuk acak spintax.' : 'Type broadcast message... Use {{name}} for name & {Hello|Hi} for spintax.'}
@@ -7768,6 +3770,21 @@ function onFormSubmit(e) {
                 <label className="text-xs font-semibold text-slate-700 block mb-1">
                   {lang === 'id' ? 'Template Pesan (Spintax & Variabel)' : 'Message Template (Spintax & Variables)'}
                 </label>
+                {messageTemplates.length > 0 && (
+                  <select
+                    value=""
+                    onChange={e => {
+                      const tpl = messageTemplates.find(t => t.id === e.target.value);
+                      if (tpl) setCampTemplate(tpl.content);
+                    }}
+                    className="w-full text-xs border border-slate-200 rounded-lg p-2 mb-2 bg-slate-50"
+                  >
+                    <option value="">{lang === 'id' ? '📂 Gunakan Template Tersimpan...' : '📂 Use Saved Template...'}</option>
+                    {messageTemplates.map(tpl => (
+                      <option key={tpl.id} value={tpl.id}>{tpl.name} ({tpl.category})</option>
+                    ))}
+                  </select>
+                )}
                 <textarea
                   rows={4}
                   value={campTemplate}
@@ -8423,5 +4440,16 @@ function onFormSubmit(e) {
         </div>
       )}
     </div>
+  );
+}
+
+// Toast + confirm-dialog hosts wrap the whole app so any handler can raise
+// in-app notifications instead of blocking native alert()/confirm() dialogs.
+export default function App() {
+  return (
+    <ToastProvider>
+      <AppShell />
+      <ConfirmDialogHost />
+    </ToastProvider>
   );
 }

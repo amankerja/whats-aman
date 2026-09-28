@@ -1821,11 +1821,91 @@ table td,
   color: var(--text-secondary);
 }
 
-/* ==================== AMAN CHAT PRO: PRIVACY BLUR MODE ==================== */
+/* ==================== AMAN CHAT PRO: GRANULAR PRIVACY BLUR MODE ==================== */
+.privacy-blur,
+.privacy-blur-pic,
+.privacy-blur-recent,
+.privacy-blur-name,
+.privacy-blur-message,
+.chat-avatar,
+.room-avatar,
+.chat-item-name,
+.chat-item-snippet,
+.message-bubble .message-text,
+.message-bubble .chat-image-media,
+.message-bubble .chat-sticker-media,
+.message-bubble .chat-audio-media,
+.message-bubble .chat-video-media,
+.message-bubble .chat-document-media {
+  transition: filter 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* 1. Blur Contact Pics (Avatars & Profile Images) */
+.privacy-blur-pics-active .privacy-blur-pic,
+.privacy-blur-pics-active .chat-avatar,
+.privacy-blur-pics-active .room-avatar {
+  filter: blur(8px) !important;
+  user-select: none !important;
+}
+.privacy-blur-pics-active .privacy-blur-pic:hover,
+.privacy-blur-pics-active .chat-avatar:hover,
+.privacy-blur-pics-active .room-avatar:hover {
+  filter: blur(0px) !important;
+}
+
+/* 2. Blur Recent Chats (Sidebar snippets & previews) */
+.privacy-blur-recents-active .privacy-blur-recent,
+.privacy-blur-recents-active .chat-item-snippet {
+  filter: blur(5.5px) !important;
+  user-select: none !important;
+}
+.privacy-blur-recents-active .privacy-blur-recent:hover,
+.privacy-blur-recents-active .chat-item-snippet:hover {
+  filter: blur(0px) !important;
+}
+
+/* 3. Blur Chat Names (Contact names, group titles, phone numbers) */
+.privacy-blur-names-active .privacy-blur-name,
+.privacy-blur-names-active .chat-item-name,
+.privacy-blur-names-active .room-contact-info h3,
+.privacy-blur-names-active .room-contact-phone,
+.privacy-blur-names-active .message-sender {
+  filter: blur(5.5px) !important;
+  user-select: none !important;
+}
+.privacy-blur-names-active .privacy-blur-name:hover,
+.privacy-blur-names-active .chat-item-name:hover,
+.privacy-blur-names-active .room-contact-info h3:hover,
+.privacy-blur-names-active .room-contact-phone:hover,
+.privacy-blur-names-active .message-sender:hover {
+  filter: blur(0px) !important;
+}
+
+/* 4. Blur Chat Messages (Message bubbles, text, media, captions) */
+.privacy-blur-messages-active .privacy-blur-message,
+.privacy-blur-messages-active .message-bubble .message-text,
+.privacy-blur-messages-active .message-bubble .chat-image-media,
+.privacy-blur-messages-active .message-bubble .chat-sticker-media,
+.privacy-blur-messages-active .message-bubble .chat-audio-media,
+.privacy-blur-messages-active .message-bubble .chat-video-media,
+.privacy-blur-messages-active .message-bubble .chat-document-media {
+  filter: blur(6.5px) !important;
+  user-select: none !important;
+}
+.privacy-blur-messages-active .privacy-blur-message:hover,
+.privacy-blur-messages-active .message-bubble:hover .message-text,
+.privacy-blur-messages-active .message-bubble:hover .chat-image-media,
+.privacy-blur-messages-active .message-bubble:hover .chat-sticker-media,
+.privacy-blur-messages-active .message-bubble:hover .chat-audio-media,
+.privacy-blur-messages-active .message-bubble:hover .chat-video-media,
+.privacy-blur-messages-active .message-bubble:hover .chat-document-media {
+  filter: blur(0px) !important;
+}
+
+/* Legacy / General fallback */
 .privacy-active .privacy-blur {
   filter: blur(5.5px) !important;
   user-select: none !important;
-  transition: filter 0.2s ease !important;
 }
 .privacy-active .privacy-blur:hover {
   filter: blur(0px) !important;
@@ -1900,3 +1980,78 @@ table td,
 }
 
 
+
+/* ==================== Toast Notification System ==================== */
+.toast-viewport {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 3000;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  max-width: min(380px, calc(100vw - 2rem));
+  pointer-events: none;
+}
+
+.toast-item {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-left: 4px solid transparent;
+  border-radius: 10px;
+  padding: 0.75rem 0.9rem;
+  box-shadow: var(--shadow-md);
+  animation: toastIn 0.25s cubic-bezier(0.21, 1.02, 0.73, 1);
+  cursor: pointer;
+}
+
+.toast-item.toast-leaving {
+  animation: toastOut 0.25s ease forwards;
+}
+
+.toast-icon {
+  display: flex;
+  align-items: center;
+  margin-top: 1px;
+  flex-shrink: 0;
+}
+
+.toast-message {
+  flex: 1;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.toast-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.toast-close:hover {
+  background: var(--bg-light);
+  color: var(--text-primary);
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(24px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes toastOut {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(24px); }
+}

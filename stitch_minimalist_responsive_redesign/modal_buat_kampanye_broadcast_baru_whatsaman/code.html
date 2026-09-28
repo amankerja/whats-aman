@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{colors:{"secondary-container":"#82f5c1","surface-variant":"#d3e4fe","on-secondary":"#ffffff","on-surface-variant":"#3c4a42","error-container":"#ffdad6","on-tertiary-fixed":"#001d31","on-background":"#0b1c30","on-secondary-fixed-variant":"#005137","on-primary-fixed-variant":"#005236","outline-variant":"#bbcabf","primary":"#006c49","primary-fixed-dim":"#4edea3","surface-tint":"#006c49","on-tertiary-container":"#003c5e","surface-container-high":"#dce9ff","inverse-primary":"#4edea3","surface-container-low":"#eff4ff","primary-container":"#10b981","surface-dim":"#cbdbf5","surface-bright":"#f8f9ff","on-tertiary":"#ffffff","inverse-surface":"#213145","secondary":"#006c4a","on-secondary-container":"#00714e","tertiary-fixed-dim":"#93ccff","tertiary-fixed":"#cce5ff","surface-container-highest":"#d3e4fe","outline":"#6c7a71","on-tertiary-fixed-variant":"#004b73","secondary-fixed-dim":"#68dba9","on-primary-fixed":"#002113","on-error":"#ffffff","on-primary":"#ffffff","on-error-container":"#93000a","primary-fixed":"#6ffbbe","tertiary":"#006398","on-primary-container":"#00422b","inverse-on-surface":"#eaf1ff","on-secondary-fixed":"#002114","on-surface":"#0b1c30","background":"#f8f9ff","surface":"#f8f9ff","secondary-fixed":"#85f8c4","error":"#ba1a1a","surface-container":"#e5eeff","tertiary-container":"#4aaaef","surface-container-lowest":"#ffffff"},borderRadius:{"DEFAULT":"0.25rem","lg":"0.5rem","xl":"0.75rem","full":"9999px"},spacing:{"space-md":"0.875rem","margin":"1rem","space-2xl":"2.5rem","gutter":"1rem","space-xl":"1.75rem","space-xs":"0.25rem","margin-desktop":"1.75rem","gutter-desktop":"1.25rem","space-lg":"1.25rem","space-sm":"0.5rem"},fontFamily:{"body-sm":["Plus Jakarta Sans"],"body-lg":["Plus Jakarta Sans"],"headline-lg":["Plus Jakarta Sans"],"label-xs":["Plus Jakarta Sans"],"label-md":["Plus Jakarta Sans"],"headline-xl":["Plus Jakarta Sans"],"headline-xl-mobile":["Plus Jakarta Sans"],"headline-sm":["Plus Jakarta Sans"],"label-lg":["Plus Jakarta Sans"],"body-md":["Plus Jakarta Sans"]},fontSize:{"body-sm":["13px",{lineHeight:"18px",fontWeight:"400"}],"body-lg":["15px",{lineHeight:"22px",fontWeight:"400"}],"headline-lg":["22px",{lineHeight:"28px",letterSpacing:"-0.015em",fontWeight:"700"}],"label-xs":["11px",{lineHeight:"14px",letterSpacing:"0.04em",fontWeight:"700"}],"label-md":["12px",{lineHeight:"16px",letterSpacing:"0.02em",fontWeight:"600"}],"headline-xl":["30px",{lineHeight:"38px",letterSpacing:"-0.02em",fontWeight:"700"}],"headline-xl-mobile":["24px",{lineHeight:"32px",letterSpacing:"-0.015em",fontWeight:"700"}],"headline-sm":["18px",{lineHeight:"24px",letterSpacing:"-0.01em",fontWeight:"600"}],"label-lg":["13px",{lineHeight:"18px",fontWeight:"600"}],"body-md":["14px",{lineHeight:"20px",fontWeight:"400"}]}}}};</script></head><body class="bg-surface font-body-md text-on-surface antialiased"><aside class="fixed left-0 top-0 h-screen w-64 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-50 flex flex-col justify-between overflow-y-auto"><div class="flex flex-col"><div class="h-16 px-space-md flex items-center justify-between bg-surface-container-lowest"><div class="flex items-center gap-space-sm"><img alt="WhatsAman Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1WlOfUmew9CQf59fuHcyGEEmPJ3L9zycaF2-92sv0FxwVoOfAg3ylPAdZzoNS3mqQ3bbVa_lb_Gdm8CKLEUa24crHQm0uVxsy1Dn8JuEeKSZBjuEtJgtuWfU8N_VokXnwVVlN3jbItj1wGvavMSomek3aHtZhN4MBiQF8g4FC71AlFph8A4cmS21uK-KdTSv2b67fP4FUpRRIPGjdjWt-aRKV7cNnkR9xOKHyUrbXHDRta06ABxeJxc7qE"/><div class="flex flex-col"><span class="font-headline-sm text-headline-sm tracking-tight text-on-surface font-bold leading-none">WhatsAman</span><span class="font-label-xs text-label-xs text-on-surface-variant flex items-center gap-1.5 mt-1"><span class="w-1.5 h-1.5 rounded-full bg-primary-container animate-pulse"></span>v1.0.0 • Ready</span></div></div><button class="p-1 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low rounded-lg transition-colors" type="button"><span class="material-symbols-outlined text-[20px]">dock_to_left</span></button></div><div class="px-space-md my-space-xs"><div class="p-space-xs px-space-sm bg-surface-container-low rounded-xl flex items-center justify-between"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-primary-container ring-2 ring-secondary-container"></span><div class="flex flex-col"><span class="font-label-md text-label-md text-on-surface font-bold leading-tight">SAMSUNG S23</span><span class="font-label-xs text-label-xs text-primary font-semibold">Connected (Session 1)</span></div></div><span class="material-symbols-outlined text-on-surface-variant text-[18px]">unfold_more</span></div></div><nav class="flex flex-col gap-0.5 px-space-sm mt-space-xs" data-active-classes="bg-surface-container-low text-primary font-bold shadow-none"><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all" data-path="dashboard" href="#"><div class="flex items-center gap- space-sm"><span class="material-symbols-outlined mr-2.5 text-[20px]">dashboard</span><span class="font-label-lg text-label-lg">Dashboard</span></div></a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all" data-path="sesi-whatsapp" href="#"><div class="flex items-center gap-space-sm"><span class="material-symbols-outlined mr-2.5 text-[20px]">qr_code_scanner</span><span class="font-label-lg text-label-lg">Sesi WhatsApp</span></div><span class="px-1.5 py-0.5 rounded-full font-label-xs text-label-xs bg-secondary-container text-on-secondary-fixed-variant">4 Online</span></a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all" data-path="obrolan-inbox" href="#"><div class="flex items-center gap-space-sm"><span class="material-symbols-outlined mr-2.5 text-[20px]">chat</span><span class="font-label-lg text-label-lg">Obrolan (Inbox)</span></div><span class="px-2 py-0.5 rounded-full font-label-xs text-label-xs bg-primary-container text-on-primary-container font-bold">12</span></a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all" data-path="crm-pipeline" href="#"><div class="flex items-center gap-space-sm"><span class="material-symbols-outlined mr-2.5 text-[20px]">view_kanban</span><span class="font-label-lg text-label-lg">CRM &amp; Pipeline</span></div></a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all" data-path="kontak" href="#"><div class="flex items-center gap-space-sm"><span class="material-symbols-outlined mr-2.5 text-[20px]">contact_page</span><span class="font-label-lg text-label-lg">Kontak</span></div></a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all" data-path="grup-whatsapp" href="#"><div class="flex items-center gap-space-sm"><span class="material-symbols-outlined mr-2.5 text-[20px]">groups</span><span class="font-label-lg text-label-lg">Grup WhatsApp</span></div></a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all" data-path="broadcast-massal" href="#"><div class="flex items-center gap-space-sm"><span class="material-symbols-outlined mr-2.5 text-[20px]">campaign</span><span class="font-label-lg text-label-lg">Broadcast Massal</span></div></a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all" data-path="message-tester" href="#"><div class="flex items-center gap-space-sm"><span class="material-symbols-outlined mr-2.5 text-[20px]">terminal</span><span class="font-label-lg text-label-lg">Message Tester</span></div></a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all" data-path="template-auto-reply" href="#"><div class="flex items-center gap-space-sm"><span class="material-symbols-outlined mr-2.5 text-[20px]">smart_toy</span><span class="font-label-lg text-label-lg">Template &amp; Auto-Reply</span></div></a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all" data-path="webhooks-integrasi" href="#"><div class="flex items-center gap-space-sm"><span class="material-symbols-outlined mr-2.5 text-[20px]">webhook</span><span class="font-label-lg text-label-lg">Webhooks &amp; Integrasi</span></div></a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all" data-path="infrastruktur" href="#"><div class="flex items-center gap-space-sm"><span class="material-symbols-outlined mr-2.5 text-[20px]">dns</span><span class="font-label-lg text-label-lg">Infrastruktur</span></div></a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all" data-path="audit-logs" href="#"><div class="flex items-center gap-space-sm"><span class="material-symbols-outlined mr-2.5 text-[20px]">receipt_long</span><span class="font-label-lg text-label-lg">Audit Logs</span></div></a></nav></div><div class="p-space-sm flex flex-col gap-2 bg-surface-container-low/50 m-space-sm rounded-xl"><div class="flex items-center justify-between px-space-xs"><span class="font-label-xs text-label-xs text-on-surface-variant">Mode Privasi</span><button class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-container-highest text-on-surface font-label-xs text-label-xs" type="button"><span class="material-symbols-outlined text-[14px]">visibility_off</span><span>Alt+P</span></button></div><div class="flex items-center justify-between px-space-xs pt-1"><div class="flex items-center gap-1.5"><button class="font-label-xs text-label-xs text-on-surface-variant hover:text-on-surface font-bold bg-surface-container-high px-1.5 py-0.5 rounded" type="button">ID</button><button class="font-label-xs text-label-xs text-on-surface-variant hover:text-on-surface px-1.5 py-0.5 rounded" type="button">EN</button></div><button class="p-1 text-on-surface-variant hover:text-on-surface rounded-lg hover:bg-surface-container-high transition-colors" type="button"><span class="material-symbols-outlined text-[18px]">light_mode</span></button></div><div class="pt-1 px-space-xs flex items-center justify-between"><span class="font-label-xs text-label-xs text-on-surface-variant flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-primary-container animate-ping"></span>Core Gateway</span><span class="font-label-xs text-label-xs text-primary font-bold">Online 99.98%</span></div></div></aside><div class="pl-64"><header class="fixed top-0 left-64 right-0 h-16 bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex items-center justify-between px-space-lg"><div class="relative w-96 flex items-center"><span class="material-symbols-outlined absolute left-3 text-on-surface-variant text-[20px]">search</span><input class="w-full pl-10 pr-16 py-2 bg-surface-container-lowest rounded-full font-body-sm text-body-sm text-on-surface placeholder:text-on-surface-variant/70 shadow-[0_1px_4px_rgba(0,0,0,0.03)] focus:outline-none focus:ring-2 focus:ring-primary-container" placeholder="Cari obrolan, kontak, broadcast, pesan..." type="text"/><span class="absolute right-3 px-1.5 py-0.5 bg-surface-container-low font-label-xs text-label-xs text-on-surface-variant rounded border border-outline-variant/30">Ctrl+K</span></div><div class="flex items-center gap-space-sm"><div class="flex items-center gap-2"><button class="flex items-center gap-1.5 px-3 py-1.5 bg-primary-container text-on-primary-container hover:bg-primary hover:text-on-primary rounded-full font-label-md text-label-md font-bold transition-all" type="button"><span class="material-symbols-outlined text-[18px]">send</span><span>Kirim Broadcast</span></button><button class="flex items-center gap-1.5 px-3 py-1.5 bg-surface-container-lowest text-on-surface hover:bg-surface-container-low hover:text-on-surface rounded-full font-label-md text-label-md font-semibold transition-all shadow-[0_1px_3px_rgba(0,0,0,0.04)]" type="button"><span class="material-symbols-outlined text-[18px]">edit_square</span><span>Chat Baru</span></button><button class="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low rounded-full transition-colors" type="button"><span class="material-symbols-outlined text-[20px]">refresh</span></button></div><div class="h-6 w-px bg-outline-variant/40 mx-1"></div><div class="relative"><button class="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low rounded-full transition-colors relative" type="button"><span class="material-symbols-outlined text-[22px]">notifications</span><span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-error ring-2 ring-surface"></span></button></div><div class="flex items-center gap-2.5 pl-1"><div class="relative"><img alt="Profile" class="w-8 h-8 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBrPT2zLitf3BAk6tsmu57PNBTgUJRSjP8YLQsi8OBmdJXhp80lg92GA1M_5qEp_rXbYSbDKXnJH8G1Z9qSIbupocWerzPa8oqWoGyIAsuZJ7MITAquYZIkHoheFdYOVr8C5mYhhihy_FoXRrgtAaeg2cjM05oqMc2A_4Ukj4H9Kfpe9nd4XQIkQw3aCowq2lGLd8RIu2JYmd_whZ9GSIZpEdDa1I67v1gdbvcNo5sX61hstQPJ8cGv"/><span class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-primary-container ring-2 ring-surface"></span></div><div class="hidden xl:flex flex-col text-left"><span class="font-label-md text-label-md text-on-surface font-bold leading-tight">Admin Operasional</span><span class="font-label-xs text-label-xs text-on-surface-variant">Superadmin • Aktif</span></div><span class="material-symbols-outlined text-on-surface-variant text-[18px]">expand_more</span></div></div></header><main class="w-full pt-16 bg-surface px-space-lg py-space-md min-h-screen"><div class="flex flex-col w-full relative">
+<!-- BACKGROUND UNDERLAY: WhatsAman Broadcast Massal Screen -->
+<div class="w-full flex flex-col gap-6 select-none opacity-40 filter blur-[1px] pointer-events-none transition-all">
+<!-- Header Page Actions -->
+<div class="flex flex-wrap items-center justify-between gap-4">
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<span class="font-headline-lg text-headline-lg text-on-surface">Broadcast Massal</span>
+<span class="px-2.5 py-0.5 rounded-full bg-secondary-container text-on-secondary-fixed-variant font-label-xs text-label-xs font-bold">Campaigns Engine</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant">Kelola pengiriman siaran pesan masif dengan protokol anti-banned cerdas dan simulasi personalisasi otomatis.</p>
+</div>
+<div class="flex items-center gap-3">
+<button class="px-4 py-2 rounded-full bg-surface-container-lowest text-on-surface font-label-md text-label-md shadow-sm flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">download</span> Ekspor Riwayat
+        </button>
+<button class="px-4 py-2 rounded-full bg-primary-container text-on-primary-container font-label-md text-label-md font-bold shadow-sm flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">add_circle</span> + Kampanye Baru
+        </button>
+</div>
+</div>
+<!-- 4-Tier KPI Analytics Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+<div class="bg-surface-container-lowest p-5 rounded-2xl shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-label-xs text-label-xs text-on-surface-variant tracking-wider uppercase">Total Broadcast Terkirim</span>
+<div class="w-8 h-8 rounded-lg bg-surface-container-low flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]">outbox</span>
+</div>
+</div>
+<div class="mt-3">
+<span class="font-headline-xl text-headline-xl text-on-surface font-bold">4.820</span>
+<span class="ml-2 font-label-xs text-label-xs text-primary font-semibold">↑ +14.2% minggu ini</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-5 rounded-2xl shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-label-xs text-label-xs text-on-surface-variant tracking-wider uppercase">Tingkat Keberhasilan</span>
+<div class="w-8 h-8 rounded-lg bg-surface-container-low flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]">verified</span>
+</div>
+</div>
+<div class="mt-3">
+<span class="font-headline-xl text-headline-xl text-on-surface font-bold">99.8%</span>
+<span class="ml-2 font-label-xs text-label-xs text-on-surface-variant">0.2% Bounce / Invalid</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-5 rounded-2xl shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-label-xs text-label-xs text-on-surface-variant tracking-wider uppercase">Penerima Unik</span>
+<div class="w-8 h-8 rounded-lg bg-surface-container-low flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined text-[20px]">groups</span>
+</div>
+</div>
+<div class="mt-3">
+<span class="font-headline-xl text-headline-xl text-on-surface font-bold">3.410</span>
+<span class="ml-2 font-label-xs text-label-xs text-on-surface-variant">Tercakup di 4 grup CRM</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-5 rounded-2xl shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-label-xs text-label-xs text-on-surface-variant tracking-wider uppercase">Sesi Pengirim Utama</span>
+<div class="w-8 h-8 rounded-lg bg-secondary-container flex items-center justify-center text-on-secondary-fixed-variant">
+<span class="material-symbols-outlined text-[20px]">smartphone</span>
+</div>
+</div>
+<div class="mt-3 flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-primary-container"></span>
+<span class="font-headline-sm text-headline-sm text-on-surface font-bold">Samsung S23</span>
+<span class="font-label-xs text-label-xs px-2 py-0.5 rounded bg-surface-container-low text-primary font-bold">Aktif</span>
+</div>
+</div>
+</div>
+<!-- Background Table Placeholder for Context -->
+<div class="bg-surface-container-lowest rounded-2xl shadow-sm p-6 flex flex-col gap-4">
+<div class="flex items-center justify-between border-b pb-4">
+<div class="flex items-center gap-4">
+<span class="font-label-lg text-label-lg text-on-surface font-bold">Daftar Kampanye Siaran</span>
+<div class="flex items-center gap-2">
+<span class="px-2.5 py-1 rounded-full bg-surface-container text-on-surface font-label-xs text-label-xs">Semua (24)</span>
+<span class="px-2.5 py-1 rounded-full bg-surface-container-low text-on-surface-variant font-label-xs text-label-xs">Berjalan (1)</span>
+<span class="px-2.5 py-1 rounded-full bg-surface-container-low text-on-surface-variant font-label-xs text-label-xs">Selesai (21)</span>
+</div>
+</div>
+</div>
+<div class="h-44 w-full flex items-center justify-center text-on-surface-variant font-body-sm text-body-sm">
+        Memuat tabel riwayat broadcast...
+      </div>
+</div>
+</div>
+<!-- MODAL BACKDROP OVERLAY -->
+<div class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+<!-- CENTER MODAL CONTAINER -->
+<div class="relative w-full max-w-[940px] max-h-[92vh] bg-surface-container-lowest rounded-2xl shadow-2xl flex flex-col overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-200">
+<!-- MODAL HEADER -->
+<div class="px-6 py-4.5 bg-surface-container-lowest flex items-start justify-between border-b border-surface-container-high/60 shrink-0">
+<div class="flex items-center gap-3.5">
+<div class="w-10 h-10 rounded-xl bg-secondary-container/70 text-on-secondary-fixed-variant flex items-center justify-center shadow-sm">
+<span class="material-symbols-outlined text-[24px]">campaign</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-bold leading-tight">Buat Kampanye Broadcast Baru</h2>
+<span class="px-2 py-0.5 rounded-full bg-primary-container/20 text-on-primary-fixed-variant font-label-xs text-label-xs font-bold">Pro Anti-Banned</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">Kirim pesan siaran massal terjadwal dengan perlindungan spintax humanis &amp; simulator real-time.</p>
+</div>
+</div>
+<button class="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low transition-colors" title="Tutup Modal" type="button">
+<span class="material-symbols-outlined text-[22px]">close</span>
+</button>
+</div>
+<!-- STEPPER WIZARD INDICATOR -->
+<div class="px-6 py-2.5 bg-surface-container-low/60 flex items-center justify-between border-b border-surface-container-high/40 shrink-0">
+<div class="flex items-center gap-2">
+<span class="w-5 h-5 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-label-xs text-label-xs font-bold">
+<span class="material-symbols-outlined text-[13px]">check</span>
+</span>
+<span class="font-label-md text-label-md font-bold text-on-surface">1. Info &amp; Pengirim</span>
+</div>
+<div class="w-8 h-px bg-outline-variant/40"></div>
+<div class="flex items-center gap-2">
+<span class="w-5 h-5 rounded-full bg-primary text-on-primary flex items-center justify-center font-label-xs text-label-xs font-bold">
+<span class="material-symbols-outlined text-[13px]">check</span>
+</span>
+<span class="font-label-md text-label-md font-bold text-on-surface">2. Target Penerima</span>
+</div>
+<div class="w-8 h-px bg-outline-variant/40"></div>
+<div class="flex items-center gap-2">
+<span class="w-5 h-5 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-label-xs text-label-xs font-bold ring-2 ring-primary-container/30">3</span>
+<span class="font-label-md text-label-md font-bold text-primary">3. Konten &amp; Template</span>
+</div>
+<div class="w-8 h-px bg-outline-variant/40"></div>
+<div class="flex items-center gap-2 opacity-60">
+<span class="w-5 h-5 rounded-full bg-surface-container-highest text-on-surface-variant flex items-center justify-center font-label-xs text-label-xs font-bold">4</span>
+<span class="font-label-md text-label-md text-on-surface-variant font-medium">4. Jadwal &amp; Proteksi</span>
+</div>
+</div>
+<!-- MODAL BODY: 2-COLUMN LAYOUT -->
+<div class="flex-1 overflow-y-auto px-6 py-5">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+<!-- LEFT COLUMN: Campaign Setup Form (approx 58%) -->
+<div class="lg:col-span-7 flex flex-col gap-5">
+<!-- 1. Nama Kampanye -->
+<div class="flex flex-col gap-1.5">
+<label class="font-label-md text-label-md text-on-surface font-bold flex items-center justify-between">
+<span>Nama Kampanye Siaran</span>
+<span class="font-label-xs text-label-xs text-on-surface-variant font-normal">Identifikasi internal</span>
+</label>
+<div class="relative">
+<input class="w-full px-3.5 py-2.5 rounded-xl bg-surface-container-low font-body-sm text-body-sm text-on-surface focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary-container shadow-inner transition-all" type="text" value="Promo Akhir Bulan Mei - Flash Sale VIP 2025"/>
+<span class="absolute right-3 top-2.5 px-2 py-0.5 rounded bg-surface-container font-label-xs text-label-xs text-on-surface-variant font-bold">FLASH-SALE</span>
+</div>
+</div>
+<!-- 2. Sesi WhatsApp Pengirim & Load Balancing -->
+<div class="p-3.5 rounded-xl bg-surface-container-low/70 flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<label class="font-label-md text-label-md text-on-surface font-bold flex items-center gap-1.5">
+<span class="material-symbols-outlined text-primary text-[18px]">phonelink_ring</span>
+<span>Sesi WhatsApp Pengirim</span>
+</label>
+<span class="px-2 py-0.5 rounded-full bg-secondary-container font-label-xs text-label-xs text-on-secondary-fixed-variant font-semibold flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container animate-pulse"></span>
+                  Risiko Banned 0/100 (Aman)
+                </span>
+</div>
+<div class="p-2.5 rounded-lg bg-surface-container-lowest shadow-sm flex items-center justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-full bg-secondary-container text-on-secondary-fixed-variant flex items-center justify-center font-bold font-label-xs text-label-xs">
+                    S23
+                  </div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-bold">SAMSUNG S23 (+62 822-2308-9790)</span>
+<span class="font-label-xs text-label-xs text-primary font-medium">Batas Harian: 420 / 2.500 pesan terpakai</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant text-[20px]">unfold_more</span>
+</div>
+<!-- Multi-Device Load Balance Switch -->
+<div class="flex items-center justify-between pt-1">
+<div class="flex flex-col">
+<span class="font-label-xs text-label-xs text-on-surface font-bold">Multi-Device Load Balancing</span>
+<span class="font-label-xs text-label-xs text-on-surface-variant">Bagi beban kuota secara rotasi ke 2 sesi aktif</span>
+</div>
+<button class="w-9 h-5 rounded-full bg-primary-container relative p-0.5 flex items-center transition-colors" type="button">
+<span class="w-4 h-4 rounded-full bg-surface-container-lowest shadow-sm translate-x-4 transition-transform"></span>
+</button>
+</div>
+</div>
+<!-- 3. Target Penerima -->
+<div class="flex flex-col gap-2">
+<label class="font-label-md text-label-md text-on-surface font-bold flex items-center justify-between">
+<span>Target Penerima Pesan</span>
+<span class="font-label-xs text-label-xs text-primary font-bold">1.240 Kontak Dipilih</span>
+</label>
+<!-- Source Tabs -->
+<div class="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-surface-container-low text-center">
+<button class="py-1.5 px-2 rounded-lg bg-surface-container-lowest shadow-sm font-label-xs text-label-xs text-primary font-bold" type="button">
+                  Grup CRM (1.890)
+                </button>
+<button class="py-1.5 px-2 rounded-lg font-label-xs text-label-xs text-on-surface-variant hover:text-on-surface" type="button">
+                  Impor CSV/Excel
+                </button>
+<button class="py-1.5 px-2 rounded-lg font-label-xs text-label-xs text-on-surface-variant hover:text-on-surface" type="button">
+                  Ekstrak Grup WA (16)
+                </button>
+</div>
+<!-- Selected Tag Capsule -->
+<div class="p-2.5 rounded-xl bg-surface-container-lowest shadow-sm flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary text-[20px]">folder_shared</span>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Pelanggan VIP &amp; Warm Leads</span>
+<span class="font-label-xs text-label-xs text-on-surface-variant">Filter: Transaksi Terakhir &lt; 60 Hari</span>
+</div>
+</div>
+<button class="px-2.5 py-1 rounded bg-surface-container-low text-primary font-label-xs text-label-xs font-bold" type="button">Ubah</button>
+</div>
+<!-- Smart Hygiene Toggles -->
+<div class="grid grid-cols-2 gap-2 mt-1">
+<div class="p-2 rounded-lg bg-surface-container-low/50 flex items-center justify-between">
+<span class="font-label-xs text-label-xs text-on-surface-variant">Abaikan Opt-out/Unsub</span>
+<span class="material-symbols-outlined text-primary text-[18px]">check_circle</span>
+</div>
+<div class="p-2 rounded-lg bg-surface-container-low/50 flex items-center justify-between">
+<span class="font-label-xs text-label-xs text-on-surface-variant">Hapus Duplikasi Nomor</span>
+<span class="material-symbols-outlined text-primary text-[18px]">check_circle</span>
+</div>
+</div>
+</div>
+<!-- 4. Penyusun Pesan (Message Composer) -->
+<div class="flex flex-col gap-2">
+<div class="flex items-center justify-between">
+<label class="font-label-md text-label-md text-on-surface font-bold flex items-center gap-1.5">
+<span class="material-symbols-outlined text-primary text-[18px]">edit_note</span>
+<span>Konten Pesan Siaran</span>
+</label>
+<span class="font-label-xs text-label-xs text-on-surface-variant">Spintax &amp; Format WA Didukung</span>
+</div>
+<!-- Variable Pills Insertion Bar -->
+<div class="flex flex-wrap items-center gap-1.5 p-2 rounded-lg bg-surface-container-low">
+<span class="font-label-xs text-label-xs text-on-surface-variant mr-1">Variabel:</span>
+<button class="px-2 py-0.5 rounded bg-surface-container-lowest text-primary font-label-xs text-label-xs font-semibold shadow-xs hover:bg-primary hover:text-on-primary transition-colors" type="button">
+                  {{nama}}
+                </button>
+<button class="px-2 py-0.5 rounded bg-surface-container-lowest text-primary font-label-xs text-label-xs font-semibold shadow-xs hover:bg-primary hover:text-on-primary transition-colors" type="button">
+                  {{nomor_hp}}
+                </button>
+<button class="px-2 py-0.5 rounded bg-surface-container-lowest text-primary font-label-xs text-label-xs font-semibold shadow-xs hover:bg-primary hover:text-on-primary transition-colors" type="button">
+                  {{sapaan_waktu}}
+                </button>
+<button class="px-2 py-0.5 rounded bg-surface-container-lowest text-primary font-label-xs text-label-xs font-semibold shadow-xs hover:bg-primary hover:text-on-primary transition-colors" type="button">
+                  {{kode_kupon}}
+                </button>
+<div class="ml-auto flex items-center gap-1 text-on-surface-variant font-label-xs text-label-xs">
+<span class="material-symbols-outlined text-[15px]">shuffle</span> Spintax: {A|B|C}
+                </div>
+</div>
+<!-- Text Area Pre-filled -->
+<div class="relative">
+<textarea class="w-full p-3.5 rounded-xl bg-surface-container-lowest font-body-sm text-body-sm text-on-surface shadow-xs focus:outline-none focus:ring-2 focus:ring-primary-container leading-relaxed resize-none" id="composer-textarea" rows="6">{Halo|Hai|Selamat siang} kak {{nama}}! 👋
+
+Kabar gembira khusus untuk pelanggan setia WhatsAman! Dapatkan diskon 35% untuk perpanjangan paket WhatsApp Gateway menggunakan kode kupon: *{{kode_kupon}}*.
+
+Promo berlaku s/d 31 Mei 2025. Klik tautan berikut untuk klaim kupon instan:
+https://whatsaman.id/promo-vip
+
+_Balas STOP untuk berhenti berlangganan info promo._</textarea>
+<span class="absolute right-3 bottom-2.5 font-label-xs text-label-xs text-on-surface-variant bg-surface-container-lowest/90 px-1.5 py-0.5 rounded">342 Karakter</span>
+</div>
+<!-- Media Attachment Capsule -->
+<div class="p-2.5 rounded-xl bg-surface-container-low/70 flex items-center justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]">image</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">promo_banner_mei.png</span>
+<span class="font-label-xs text-label-xs text-on-surface-variant">420 KB • Gambar Lampiran Utama</span>
+</div>
+</div>
+<div class="flex items-center gap-1">
+<button class="p-1 text-on-surface-variant hover:text-error transition-colors" title="Hapus Gambar" type="button">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+<button class="px-2 py-1 rounded bg-surface-container-lowest text-on-surface font-label-xs text-label-xs font-semibold shadow-xs" type="button">
+                    Ganti Media
+                  </button>
+</div>
+</div>
+</div>
+<!-- 5. Anti-Banned & Jadwal -->
+<div class="p-4 rounded-xl bg-surface-container-low/80 flex flex-col gap-3.5">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface font-bold flex items-center gap-1.5">
+<span class="material-symbols-outlined text-primary text-[18px]">security</span>
+<span>Proteksi Anti-Banned &amp; Jadwal Kirim</span>
+</span>
+<span class="font-label-xs text-label-xs text-primary font-bold">Smart Jitter Aktif</span>
+</div>
+<!-- Jitter Range Slider UI -->
+<div class="flex flex-col gap-1.5">
+<div class="flex items-center justify-between font-label-xs text-label-xs">
+<span class="text-on-surface-variant font-medium">Jeda Humanis per Pesan (Jitter)</span>
+<span class="text-primary font-bold">6 - 15 Detik (Acak)</span>
+</div>
+<div class="relative w-full h-2 rounded-full bg-surface-container-high overflow-hidden">
+<div class="absolute left-[20%] right-[40%] top-0 bottom-0 bg-primary-container rounded-full"></div>
+</div>
+<span class="font-label-xs text-label-xs text-on-surface-variant">Meniru pola ketikan jari manusia untuk menjaga trust-score nomor pengirim.</span>
+</div>
+<!-- Jadwal Pengiriman Radio Options -->
+<div class="grid grid-cols-2 gap-2 pt-1">
+<div class="p-2.5 rounded-lg bg-surface-container-lowest shadow-xs flex items-center justify-between cursor-pointer">
+<div class="flex items-center gap-2">
+<span class="w-3.5 h-3.5 rounded-full border-2 border-outline-variant flex items-center justify-center"></span>
+<span class="font-label-sm text-label-md text-on-surface">Kirim Sekarang</span>
+</div>
+</div>
+<div class="p-2.5 rounded-lg bg-secondary-container/40 ring-1 ring-primary flex items-center justify-between cursor-pointer">
+<div class="flex items-center gap-2">
+<span class="w-3.5 h-3.5 rounded-full bg-primary flex items-center justify-center">
+<span class="w-1.5 h-1.5 rounded-full bg-surface-container-lowest"></span>
+</span>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-bold">Jadwalkan</span>
+<span class="font-label-xs text-label-xs text-primary font-semibold">Hari Ini, 14:00 WIB</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-primary text-[18px]">schedule</span>
+</div>
+</div>
+<!-- Auto-Stop Safety Switch -->
+<div class="flex items-center justify-between pt-1">
+<span class="font-label-xs text-label-xs text-on-surface-variant">Hentikan otomatis jika terjadi kegagalan &gt; 5 kali berturut-turut</span>
+<span class="px-2 py-0.5 rounded bg-surface-container text-primary font-label-xs text-label-xs font-bold">Auto-Stop ON</span>
+</div>
+</div>
+</div>
+<!-- RIGHT COLUMN: Realtime WhatsApp Mobile Phone Simulator (approx 42%) -->
+<div class="lg:col-span-5 flex flex-col gap-3.5">
+<!-- Recipient Simulator Selector -->
+<div class="p-3 rounded-xl bg-surface-container-low flex items-center justify-between shadow-xs">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[20px]">person_pin</span>
+<div class="flex flex-col">
+<span class="font-label-xs text-label-xs text-on-surface-variant">Pratinjau Variabel Untuk:</span>
+<span class="font-label-md text-label-md text-on-surface font-bold">Budi Santoso (+62 812-3456-7890)</span>
+</div>
+</div>
+<button class="px-2 py-1 rounded-lg bg-surface-container-lowest text-primary hover:bg-primary-container hover:text-on-primary-container font-label-xs text-label-xs font-bold shadow-xs transition-colors flex items-center gap-1" id="btn-shuffle-spintax" type="button">
+<span class="material-symbols-outlined text-[14px]">autorenew</span> Acak
+              </button>
+</div>
+<!-- SMARTPHONE MOCKUP FRAME -->
+<div class="w-full rounded-[32px] bg-slate-900 p-2.5 shadow-2xl flex flex-col">
+<!-- Smartphone Inner Bezel Screen -->
+<div class="w-full rounded-[24px] bg-[#0b141b] overflow-hidden flex flex-col relative aspect-[9/17] max-h-[580px]">
+<!-- Phone Status Bar -->
+<div class="h-6 px-4 bg-[#1f2c34] text-slate-300 flex items-center justify-between font-label-xs text-label-xs">
+<span class="font-bold">13:45</span>
+<div class="w-12 h-3.5 bg-black rounded-full mx-auto"></div>
+<div class="flex items-center gap-1 text-[11px]">
+<span class="material-symbols-outlined text-[13px]">signal_cellular_alt</span>
+<span class="material-symbols-outlined text-[13px]">wifi</span>
+<span class="material-symbols-outlined text-[14px]">battery_full</span>
+</div>
+</div>
+<!-- WhatsApp Top Header -->
+<div class="px-3 py-2 bg-[#1f2c34] text-white flex items-center justify-between shadow-sm">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px] text-slate-300">arrow_back</span>
+<div class="relative">
+<div class="w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-xs">
+                        WA
+                      </div>
+<span class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-primary-container ring-1 ring-[#1f2c34]"></span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-1">
+<span class="font-label-md text-label-md font-bold text-white leading-tight">WhatsAman Official</span>
+<span class="material-symbols-outlined text-primary-container text-[14px]" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+<span class="text-[10px] text-slate-300">online (+62 822-2308-9790)</span>
+</div>
+</div>
+<div class="flex items-center gap-2 text-slate-300">
+<span class="material-symbols-outlined text-[18px]">videocam</span>
+<span class="material-symbols-outlined text-[18px]">call</span>
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</div>
+</div>
+<!-- Chat Canvas Area with WhatsApp Pattern Style Background -->
+<div class="flex-1 p-3 overflow-y-auto flex flex-col justify-end bg-[#0b141b] bg-opacity-95 relative" style="background-image: radial-gradient(#1f2c34 1px, transparent 1px); background-size: 16px 16px;">
+<!-- Date Badge Stamp -->
+<div class="flex justify-center mb-3">
+<span class="px-2.5 py-0.5 rounded-md bg-[#182229] text-slate-400 font-label-xs text-[10px] uppercase tracking-wider shadow-xs">
+                      Hari Ini
+                    </span>
+</div>
+<!-- Incoming WA Message Bubble -->
+<div class="max-w-[88%] bg-[#005c4b] text-white rounded-2xl rounded-tl-sm p-1.5 shadow-md flex flex-col gap-1.5 self-start">
+<!-- Attached Promotional Banner Image Preview -->
+<div class="w-full rounded-xl overflow-hidden bg-gradient-to-tr from-emerald-800 via-teal-700 to-emerald-600 relative p-3 text-white flex flex-col justify-between aspect-[16/9] shadow-inner">
+<div class="flex items-center justify-between">
+<span class="px-2 py-0.5 rounded bg-black/30 font-label-xs text-[9px] uppercase tracking-wider font-bold backdrop-blur-xs">PROMO SPESIAL MEI</span>
+<span class="font-headline-sm text-headline-sm font-bold text-secondary-container">35% OFF</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md font-bold leading-tight">WhatsAman Gateway Pro</span>
+<span class="text-[10px] text-emerald-100">Solusi broadcast massal anti-blokir tanpa batas.</span>
+</div>
+</div>
+<!-- Rendered Simulated Message Body -->
+<div class="px-1.5 pt-1 flex flex-col gap-1.5 text-[12px] leading-relaxed text-slate-100 font-normal">
+<p id="preview-text-body">
+<span class="font-bold text-secondary-container" id="preview-greeting">Halo</span> kak <span class="font-semibold text-white">Budi Santoso</span>! 👋<br/><br/>
+                        Kabar gembira khusus untuk pelanggan setia WhatsAman! Dapatkan diskon 35% untuk perpanjangan paket WhatsApp Gateway menggunakan kode kupon: <strong class="text-white bg-black/20 px-1 rounded">VIPMEI2025</strong>.<br/><br/>
+                        Promo berlaku s/d 31 Mei 2025. Klik tautan berikut untuk klaim kupon instan:<br/>
+<span class="text-sky-300 underline">https://whatsaman.id/promo-vip</span><br/><br/>
+<em class="text-slate-300 text-[10px]">Balas STOP untuk berhenti berlangganan info promo.</em>
+</p>
+<!-- Timestamp & Double Blue Tick -->
+<div class="flex items-center justify-end gap-1 text-[10px] text-emerald-200/80 -mt-1">
+<span>13:45</span>
+<span class="material-symbols-outlined text-[13px] text-sky-400 font-bold">done_all</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Fake Phone Bottom Chat Input -->
+<div class="p-2 bg-[#1f2c34] flex items-center gap-1.5 shrink-0">
+<div class="flex-1 bg-[#2a3942] rounded-full px-3 py-1.5 flex items-center justify-between text-slate-400 text-xs">
+<span class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px]">sentiment_satisfied</span>
+<span class="text-[11px]">Ketik pesan</span>
+</span>
+<span class="material-symbols-outlined text-[16px]">attach_file</span>
+</div>
+<div class="w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center shadow-sm">
+<span class="material-symbols-outlined text-[16px]">mic</span>
+</div>
+</div>
+<!-- Phone Bottom Home Bar -->
+<div class="h-4 bg-[#1f2c34] flex items-center justify-center">
+<div class="w-20 h-1 bg-slate-500 rounded-full"></div>
+</div>
+</div>
+</div>
+<!-- Spintax Tester Banner -->
+<div class="p-2.5 rounded-xl bg-surface-container-low flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[18px]">psychology</span>
+<span class="font-label-xs text-label-xs text-on-surface font-semibold">Simulasi variasi teks Spintax aktif</span>
+</div>
+<span class="font-label-xs text-label-xs text-primary font-bold">3 Opsi Greeting</span>
+</div>
+</div>
+</div>
+</div>
+<!-- MODAL STICKY FOOTER -->
+<div class="px-6 py-4 bg-surface-container-lowest border-t border-surface-container-high/60 flex flex-wrap items-center justify-between gap-4 shrink-0 shadow-lg">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[18px]">timer</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-bold">Estimasi Selesai: ~2 Jam 15 Menit</span>
+<span class="font-label-xs text-label-xs text-on-surface-variant">1.240 Pesan • Rata-rata jeda 9.8 detik per pesan</span>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<button class="px-4 py-2.5 rounded-full bg-surface-container-low hover:bg-surface-container text-on-surface font-label-md text-label-md font-semibold transition-all" type="button">
+            Simpan sebagai Draf
+          </button>
+<button class="px-6 py-2.5 rounded-full bg-primary-container hover:bg-primary text-on-primary-container hover:text-on-primary font-label-md text-label-md font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2" type="button">
+<span class="material-symbols-outlined text-[18px]">send</span>
+<span>+ Jadwalkan &amp; Mulai Kampanye</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- INTERACTIVE MICRO-LOGIC FOR SPINTAX TESTING -->
+<script>
+    (function() {
+      const spintaxWords = ['Halo', 'Hai', 'Selamat siang'];
+      let currentIndex = 0;
+      const btn = document.getElementById('btn-shuffle-spintax');
+      const previewGreeting = document.getElementById('preview-greeting');
+
+      if (btn && previewGreeting) {
+        btn.addEventListener('click', function() {
+          currentIndex = (currentIndex + 1) % spintaxWords.length;
+          previewGreeting.textContent = spintaxWords[currentIndex];
+          
+          // Micro animation effect
+          previewGreeting.classList.add('opacity-40');
+          setTimeout(() => {
+            previewGreeting.classList.remove('opacity-40');
+          }, 150);
+        });
+      }
+    })();
+  </script>
+</div></main></div></body></html>

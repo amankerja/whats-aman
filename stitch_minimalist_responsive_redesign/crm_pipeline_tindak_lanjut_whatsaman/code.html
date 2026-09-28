@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{colors:{"secondary-container":"#82f5c1","surface-variant":"#d3e4fe","on-secondary":"#ffffff","on-surface-variant":"#3c4a42","error-container":"#ffdad6","on-tertiary-fixed":"#001d31","on-background":"#0b1c30","on-secondary-fixed-variant":"#005137","on-primary-fixed-variant":"#005236","outline-variant":"#bbcabf","primary":"#006c49","primary-fixed-dim":"#4edea3","surface-tint":"#006c49","on-tertiary-container":"#003c5e","surface-container-high":"#dce9ff","inverse-primary":"#4edea3","surface-container-low":"#eff4ff","primary-container":"#10b981","surface-dim":"#cbdbf5","surface-bright":"#f8f9ff","on-tertiary":"#ffffff","inverse-surface":"#213145","secondary":"#006c4a","on-secondary-container":"#00714e","tertiary-fixed-dim":"#93ccff","tertiary-fixed":"#cce5ff","surface-container-highest":"#d3e4fe","outline":"#6c7a71","on-tertiary-fixed-variant":"#004b73","secondary-fixed-dim":"#68dba9","on-primary-fixed":"#002113","on-error":"#ffffff","on-primary":"#ffffff","on-error-container":"#93000a","primary-fixed":"#6ffbbe","tertiary":"#006398","on-primary-container":"#00422b","inverse-on-surface":"#eaf1ff","on-secondary-fixed":"#002114","on-surface":"#0b1c30","background":"#f8f9ff","surface":"#f8f9ff","secondary-fixed":"#85f8c4","error":"#ba1a1a","surface-container":"#e5eeff","tertiary-container":"#4aaaef","surface-container-lowest":"#ffffff"},borderRadius:{"DEFAULT":"0.25rem","lg":"0.5rem","xl":"0.75rem","full":"9999px"},spacing:{"space-md":"0.875rem","margin":"1rem","space-2xl":"2.5rem","gutter":"1rem","space-xl":"1.75rem","space-xs":"0.25rem","margin-desktop":"1.75rem","gutter-desktop":"1.25rem","space-lg":"1.25rem","space-sm":"0.5rem"},fontFamily:{"body-sm":["Plus Jakarta Sans"],"body-lg":["Plus Jakarta Sans"],"headline-lg":["Plus Jakarta Sans"],"label-xs":["Plus Jakarta Sans"],"label-md":["Plus Jakarta Sans"],"headline-xl":["Plus Jakarta Sans"],"headline-xl-mobile":["Plus Jakarta Sans"],"headline-sm":["Plus Jakarta Sans"],"label-lg":["Plus Jakarta Sans"],"body-md":["Plus Jakarta Sans"]},fontSize:{"body-sm":["13px",{lineHeight:"18px",fontWeight:"400"}],"body-lg":["15px",{lineHeight:"22px",fontWeight:"400"}],"headline-lg":["22px",{lineHeight:"28px",letterSpacing:"-0.015em",fontWeight:"700"}],"label-xs":["11px",{lineHeight:"14px",letterSpacing:"0.04em",fontWeight:"700"}],"label-md":["12px",{lineHeight:"16px",letterSpacing:"0.02em",fontWeight:"600"}],"headline-xl":["30px",{lineHeight:"38px",letterSpacing:"-0.02em",fontWeight:"700"}],"headline-xl-mobile":["24px",{lineHeight:"32px",letterSpacing:"-0.015em",fontWeight:"700"}],"headline-sm":["18px",{lineHeight:"24px",letterSpacing:"-0.01em",fontWeight:"600"}],"label-lg":["13px",{lineHeight:"18px",fontWeight:"600"}],"body-md":["14px",{lineHeight:"20px",fontWeight:"400"}]}}}};</script></head><body class="bg-surface font-body-md text-on-surface antialiased"><aside class="fixed left-0 top-0 h-screen w-64 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-50 flex flex-col justify-between overflow-y-auto"><div class="flex flex-col"><div class="h-16 px-space-md flex items-center justify-between bg-surface-container-lowest"><div class="flex items-center gap-space-sm"><img alt="WhatsAman Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1WlOfUmew9CQf59fuHcyGEEmPJ3L9zycaF2-92sv0FxwVoOfAg3ylPAdZzoNS3mqQ3bbVa_lb_Gdm8CKLEUa24crHQm0uVxsy1Dn8JuEeKSZBjuEtJgtuWfU8N_VokXnwVVlN3jbItj1wGvavMSomek3aHtZhN4MBiQF8g4FC71AlFph8A4cmS21uK-KdTSv2b67fP4FUpRRIPGjdjWt-aRKV7cNnkR9xOKHyUrbXHDRta06ABxeJxc7qE"/><div class="flex flex-col"><span class="font-headline-sm text-headline-sm tracking-tight text-on-surface font-bold leading-none">WhatsAman</span><span class="font-label-xs text-label-xs text-on-surface-variant flex items-center gap-1.5 mt-1"><span class="w-1.5 h-1.5 rounded-full bg-primary-container animate-pulse"></span>v1.0.0 • Ready</span></div></div><button class="p-1 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low rounded-lg transition-colors" type="button"><span class="material-symbols-outlined text-[20px]">dock_to_left</span></button></div><div class="px-space-md my-space-xs"><div class="p-space-xs px-space-sm bg-surface-container-low rounded-xl flex items-center justify-between"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-primary-container ring-2 ring-secondary-container"></span><div class="flex flex-col"><span class="font-label-md text-label-md text-on-surface font-bold leading-tight">SAMSUNG S23</span><span class="font-label-xs text-label-xs text-primary font-semibold">Connected (Session 1)</span></div></div><span class="material-symbols-outlined text-on-surface-variant text-[18px]">unfold_more</span></div></div><nav class="flex flex-col gap-0.5 px-space-sm mt-space-xs" data-active-classes="bg-surface-container-low text-primary font-bold shadow-none"><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all" data-path="dashboard" href="#"><div class="flex items-center gap- space-sm"><span class="material-symbols-outlined mr-2.5 text-[20px]">dashboard</span><span class="font-label-lg text-label-lg">Dashboard</span></div></a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all" data-path="sesi-whatsapp" href="#"><div class="flex items-center gap-space-sm"><span class="material-symbols-outlined mr-2.5 text-[20px]">qr_code_scanner</span><span class="font-label-lg text-label-lg">Sesi WhatsApp</span></div><span class="px-1.5 py-0.5 rounded-full font-label-xs text-label-xs bg-secondary-container text-on-secondary-fixed-variant">4 Online</span></a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all" data-path="obrolan-inbox" href="#"><div class="flex items-center gap-space-sm"><span class="material-symbols-outlined mr-2.5 text-[20px]">chat</span><span class="font-label-lg text-label-lg">Obrolan (Inbox)</span></div><span class="px-2 py-0.5 rounded-full font-label-xs text-label-xs bg-primary-container text-on-primary-container font-bold">12</span></a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all" data-path="crm-pipeline" href="#"><div class="flex items-center gap-space-sm"><span class="material-symbols-outlined mr-2.5 text-[20px]">view_kanban</span><span class="font-label-lg text-label-lg">CRM &amp; Pipeline</span></div></a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all" data-path="kontak" href="#"><div class="flex items-center gap-space-sm"><span class="material-symbols-outlined mr-2.5 text-[20px]">contact_page</span><span class="font-label-lg text-label-lg">Kontak</span></div></a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all" data-path="grup-whatsapp" href="#"><div class="flex items-center gap-space-sm"><span class="material-symbols-outlined mr-2.5 text-[20px]">groups</span><span class="font-label-lg text-label-lg">Grup WhatsApp</span></div></a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all" data-path="broadcast-massal" href="#"><div class="flex items-center gap-space-sm"><span class="material-symbols-outlined mr-2.5 text-[20px]">campaign</span><span class="font-label-lg text-label-lg">Broadcast Massal</span></div></a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all" data-path="message-tester" href="#"><div class="flex items-center gap-space-sm"><span class="material-symbols-outlined mr-2.5 text-[20px]">terminal</span><span class="font-label-lg text-label-lg">Message Tester</span></div></a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all" data-path="template-auto-reply" href="#"><div class="flex items-center gap-space-sm"><span class="material-symbols-outlined mr-2.5 text-[20px]">smart_toy</span><span class="font-label-lg text-label-lg">Template &amp; Auto-Reply</span></div></a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all" data-path="webhooks-integrasi" href="#"><div class="flex items-center gap-space-sm"><span class="material-symbols-outlined mr-2.5 text-[20px]">webhook</span><span class="font-label-lg text-label-lg">Webhooks &amp; Integrasi</span></div></a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all" data-path="infrastruktur" href="#"><div class="flex items-center gap-space-sm"><span class="material-symbols-outlined mr-2.5 text-[20px]">dns</span><span class="font-label-lg text-label-lg">Infrastruktur</span></div></a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all" data-path="audit-logs" href="#"><div class="flex items-center gap-space-sm"><span class="material-symbols-outlined mr-2.5 text-[20px]">receipt_long</span><span class="font-label-lg text-label-lg">Audit Logs</span></div></a></nav></div><div class="p-space-sm flex flex-col gap-2 bg-surface-container-low/50 m-space-sm rounded-xl"><div class="flex items-center justify-between px-space-xs"><span class="font-label-xs text-label-xs text-on-surface-variant">Mode Privasi</span><button class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-container-highest text-on-surface font-label-xs text-label-xs" type="button"><span class="material-symbols-outlined text-[14px]">visibility_off</span><span>Alt+P</span></button></div><div class="flex items-center justify-between px-space-xs pt-1"><div class="flex items-center gap-1.5"><button class="font-label-xs text-label-xs text-on-surface-variant hover:text-on-surface font-bold bg-surface-container-high px-1.5 py-0.5 rounded" type="button">ID</button><button class="font-label-xs text-label-xs text-on-surface-variant hover:text-on-surface px-1.5 py-0.5 rounded" type="button">EN</button></div><button class="p-1 text-on-surface-variant hover:text-on-surface rounded-lg hover:bg-surface-container-high transition-colors" type="button"><span class="material-symbols-outlined text-[18px]">light_mode</span></button></div><div class="pt-1 px-space-xs flex items-center justify-between"><span class="font-label-xs text-label-xs text-on-surface-variant flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-primary-container animate-ping"></span>Core Gateway</span><span class="font-label-xs text-label-xs text-primary font-bold">Online 99.98%</span></div></div></aside><div class="pl-64"><header class="fixed top-0 left-64 right-0 h-16 bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex items-center justify-between px-space-lg"><div class="relative w-96 flex items-center"><span class="material-symbols-outlined absolute left-3 text-on-surface-variant text-[20px]">search</span><input class="w-full pl-10 pr-16 py-2 bg-surface-container-lowest rounded-full font-body-sm text-body-sm text-on-surface placeholder:text-on-surface-variant/70 shadow-[0_1px_4px_rgba(0,0,0,0.03)] focus:outline-none focus:ring-2 focus:ring-primary-container" placeholder="Cari obrolan, kontak, broadcast, pesan..." type="text"/><span class="absolute right-3 px-1.5 py-0.5 bg-surface-container-low font-label-xs text-label-xs text-on-surface-variant rounded border border-outline-variant/30">Ctrl+K</span></div><div class="flex items-center gap-space-sm"><div class="flex items-center gap-2"><button class="flex items-center gap-1.5 px-3 py-1.5 bg-primary-container text-on-primary-container hover:bg-primary hover:text-on-primary rounded-full font-label-md text-label-md font-bold transition-all" type="button"><span class="material-symbols-outlined text-[18px]">send</span><span>Kirim Broadcast</span></button><button class="flex items-center gap-1.5 px-3 py-1.5 bg-surface-container-lowest text-on-surface hover:bg-surface-container-low hover:text-on-surface rounded-full font-label-md text-label-md font-semibold transition-all shadow-[0_1px_3px_rgba(0,0,0,0.04)]" type="button"><span class="material-symbols-outlined text-[18px]">edit_square</span><span>Chat Baru</span></button><button class="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low rounded-full transition-colors" type="button"><span class="material-symbols-outlined text-[20px]">refresh</span></button></div><div class="h-6 w-px bg-outline-variant/40 mx-1"></div><div class="relative"><button class="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low rounded-full transition-colors relative" type="button"><span class="material-symbols-outlined text-[22px]">notifications</span><span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-error ring-2 ring-surface"></span></button></div><div class="flex items-center gap-2.5 pl-1"><div class="relative"><img alt="Profile" class="w-8 h-8 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBrPT2zLitf3BAk6tsmu57PNBTgUJRSjP8YLQsi8OBmdJXhp80lg92GA1M_5qEp_rXbYSbDKXnJH8G1Z9qSIbupocWerzPa8oqWoGyIAsuZJ7MITAquYZIkHoheFdYOVr8C5mYhhihy_FoXRrgtAaeg2cjM05oqMc2A_4Ukj4H9Kfpe9nd4XQIkQw3aCowq2lGLd8RIu2JYmd_whZ9GSIZpEdDa1I67v1gdbvcNo5sX61hstQPJ8cGv"/><span class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-primary-container ring-2 ring-surface"></span></div><div class="hidden xl:flex flex-col text-left"><span class="font-label-md text-label-md text-on-surface font-bold leading-tight">Admin Operasional</span><span class="font-label-xs text-label-xs text-on-surface-variant">Superadmin • Aktif</span></div><span class="material-symbols-outlined text-on-surface-variant text-[18px]">expand_more</span></div></div></header><main class="w-full pt-16 bg-surface px-space-lg py-space-md min-h-screen"><div class="flex flex-col w-full gap-space-lg pb-12">
+<!-- Top Bar / Page Header Section -->
+<div class="flex flex-col xl:flex-row xl:items-center justify-between gap-space-md">
+<div class="flex flex-col gap-1">
+<div class="flex flex-wrap items-center gap-2">
+<h1 class="font-headline-lg text-headline-lg text-on-surface font-bold tracking-tight">CRM Pipeline &amp; Tindak Lanjut Penjualan</h1>
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-secondary-container text-on-secondary-fixed-variant font-label-xs text-label-xs font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+          WhatsAman Pro Engine
+        </span>
+<span class="px-2.5 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-xs text-label-xs font-bold">
+          100 TOTAL PROSPEK
+        </span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+        Kelola prospek pelanggan, tugas follow-up berjadwal, otomatisasi sequence, dan pipeline konversi penjualan.
+      </p>
+</div>
+<!-- Header Quick Actions -->
+<div class="flex items-center flex-wrap gap-2">
+<button class="group flex items-center gap-1.5 px-4 py-2 bg-primary-container text-on-primary-container hover:bg-primary hover:text-on-primary rounded-full font-label-md text-label-md font-bold transition-all shadow-sm hover:shadow-md transform active:scale-95" type="button">
+<span class="material-symbols-outlined text-[18px] group-hover:rotate-90 transition-transform">add_task</span>
+<span>+ Tugas Follow-Up Baru</span>
+</button>
+<button class="flex items-center gap-1.5 px-3.5 py-2 bg-surface-container-lowest text-on-surface hover:bg-surface-container-low rounded-full font-label-md text-label-md font-semibold transition-all shadow-sm" type="button">
+<span class="material-symbols-outlined text-[18px] text-on-surface-variant">file_download</span>
+<span>Ekspor CSV</span>
+</button>
+<button class="p-2 bg-surface-container-lowest text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low rounded-full shadow-sm transition-colors" title="Muat ulang data pipeline" type="button">
+<span class="material-symbols-outlined text-[20px]">refresh</span>
+</button>
+</div>
+</div>
+<!-- KPI / Funnel Summary Cards Grid -->
+<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-space-md">
+<!-- Card 1: Total Prospek -->
+<div class="p-4 bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-md transition-shadow relative overflow-hidden flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-label-xs text-label-xs uppercase tracking-wider text-on-surface-variant font-bold">Total Prospek</span>
+<div class="w-8 h-8 rounded-lg bg-surface-container-low flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[18px]">group</span>
+</div>
+</div>
+<div class="mt-3 flex items-baseline justify-between">
+<span class="font-headline-xl text-headline-xl font-bold text-on-surface">2,633</span>
+<span class="inline-flex items-center text-primary font-label-xs text-label-xs font-bold gap-0.5">
+<span class="material-symbols-outlined text-[14px]">trending_up</span>
+          +120 mgg ini
+        </span>
+</div>
+<div class="mt-2 text-on-surface-variant font-body-sm text-body-sm flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span>
+        Semua database tersinkronisasi
+      </div>
+</div>
+<!-- Card 2: Leads Baru -->
+<div class="p-4 bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-md transition-shadow relative overflow-hidden flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-label-xs text-label-xs uppercase tracking-wider text-on-surface-variant font-bold">Leads Baru (Inbound)</span>
+<div class="w-8 h-8 rounded-lg bg-surface-container-low flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined text-[18px]">mark_chat_unread</span>
+</div>
+</div>
+<div class="mt-3 flex items-baseline justify-between">
+<span class="font-headline-xl text-headline-xl font-bold text-on-surface">1,842</span>
+<span class="px-2 py-0.5 rounded-full bg-tertiary-fixed text-on-tertiary-fixed font-label-xs text-label-xs font-bold">
+          Inbound Chat
+        </span>
+</div>
+<div class="mt-2 text-on-surface-variant font-body-sm text-body-sm flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary-container"></span>
+        68 butuh balasan awal &lt; 5m
+      </div>
+</div>
+<!-- Card 3: Hot Leads -->
+<div class="p-4 bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-md transition-shadow relative overflow-hidden flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-label-xs text-label-xs uppercase tracking-wider text-on-surface-variant font-bold">Hot Leads 🔥</span>
+<div class="w-8 h-8 rounded-lg bg-error-container/60 flex items-center justify-center text-error">
+<span class="material-symbols-outlined text-[18px]">local_fire_department</span>
+</div>
+</div>
+<div class="mt-3 flex items-baseline justify-between">
+<span class="font-headline-xl text-headline-xl font-bold text-on-surface">14</span>
+<span class="px-2 py-0.5 rounded-full bg-error-container text-on-error-container font-label-xs text-label-xs font-bold">
+          Prioritas Tinggi
+        </span>
+</div>
+<div class="mt-2 text-on-surface-variant font-body-sm text-body-sm flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-error"></span>
+        Butuh penawaran / invoice hari ini
+      </div>
+</div>
+<!-- Card 4: Pelanggan / Closing -->
+<div class="p-4 bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-md transition-shadow relative overflow-hidden flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-label-xs text-label-xs uppercase tracking-wider text-on-surface-variant font-bold">Closing / Pelanggan</span>
+<div class="w-8 h-8 rounded-lg bg-secondary-container/60 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[18px]">verified</span>
+</div>
+</div>
+<div class="mt-3 flex items-baseline justify-between">
+<span class="font-headline-xl text-headline-xl font-bold text-on-surface">88</span>
+<span class="px-2 py-0.5 rounded-full bg-primary-container text-on-primary-container font-label-xs text-label-xs font-bold">
+          3.34% Konversi
+        </span>
+</div>
+<div class="mt-2 text-on-surface-variant font-body-sm text-body-sm flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span>
+        Target bulanan tercapai 82%
+      </div>
+</div>
+</div>
+<!-- Segmented Stages Filter & Quick Tags Bar -->
+<div class="flex flex-col gap-space-sm p-4 bg-surface-container-lowest rounded-xl shadow-sm">
+<!-- Top Stage Tabs -->
+<div class="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+<button class="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-on-surface text-surface font-label-md text-label-md font-bold whitespace-nowrap shadow-sm" type="button">
+<span class="material-symbols-outlined text-[16px]">groups</span>
+<span>Semua Prospek</span>
+<span class="px-1.5 py-0.2 rounded-full bg-surface/20 text-surface font-label-xs text-label-xs">100</span>
+</button>
+<button class="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-surface-container-low text-on-surface-variant hover:text-on-surface font-label-md text-label-md whitespace-nowrap transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px] text-tertiary">person_add</span>
+<span>Lead (Baru)</span>
+<span class="px-1.5 py-0.2 rounded-full bg-surface-container-highest text-on-surface font-label-xs text-label-xs font-bold">65</span>
+</button>
+<button class="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-surface-container-low text-on-surface-variant hover:text-on-surface font-label-md text-label-md whitespace-nowrap transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px] text-primary">speed</span>
+<span>Prospek Hangat</span>
+<span class="px-1.5 py-0.2 rounded-full bg-surface-container-highest text-on-surface font-label-xs text-label-xs font-bold">20</span>
+</button>
+<button class="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-surface-container-low text-on-surface-variant hover:text-on-surface font-label-md text-label-md whitespace-nowrap transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px] text-primary-container">check_circle</span>
+<span>Pelanggan Aktif</span>
+<span class="px-1.5 py-0.2 rounded-full bg-surface-container-highest text-on-surface font-label-xs text-label-xs font-bold">12</span>
+</button>
+<button class="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-surface-container-low text-on-surface-variant hover:text-on-surface font-label-md text-label-md whitespace-nowrap transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px] text-error">cancel</span>
+<span>Batal / Churned</span>
+<span class="px-1.5 py-0.2 rounded-full bg-surface-container-highest text-on-surface font-label-xs text-label-xs font-bold">3</span>
+</button>
+</div>
+<!-- Quick Tag Filters -->
+<div class="flex items-center gap-2 flex-wrap pt-2">
+<span class="font-label-xs text-label-xs font-bold uppercase tracking-wider text-on-surface-variant pr-1">Filter Label:</span>
+<button class="px-2.5 py-1 rounded-full bg-on-surface text-surface font-label-xs text-label-xs font-bold" type="button">ALL</button>
+<button class="px-2.5 py-1 rounded-full bg-surface-container-low text-on-surface hover:bg-surface-container font-label-xs text-label-xs font-semibold flex items-center gap-1 transition-colors" type="button">
+<span>🔥 Hot Lead</span>
+</button>
+<button class="px-2.5 py-1 rounded-full bg-surface-container-low text-on-surface hover:bg-surface-container font-label-xs text-label-xs font-semibold flex items-center gap-1 transition-colors" type="button">
+<span>🟡 Warm Lead</span>
+</button>
+<button class="px-2.5 py-1 rounded-full bg-surface-container-low text-on-surface hover:bg-surface-container font-label-xs text-label-xs font-semibold flex items-center gap-1 transition-colors" type="button">
+<span>🔵 New Lead</span>
+</button>
+<button class="px-2.5 py-1 rounded-full bg-surface-container-low text-on-surface hover:bg-surface-container font-label-xs text-label-xs font-semibold flex items-center gap-1 transition-colors" type="button">
+<span>⭐ VIP</span>
+</button>
+<button class="px-2.5 py-1 rounded-full bg-surface-container-low text-on-surface hover:bg-surface-container font-label-xs text-label-xs font-semibold flex items-center gap-1 transition-colors" type="button">
+<span>💼 Customer</span>
+</button>
+<button class="px-2.5 py-1 rounded-full bg-surface-container-low text-on-surface hover:bg-surface-container font-label-xs text-label-xs font-semibold flex items-center gap-1 transition-colors" type="button">
+<span>⏳ Follow Up</span>
+</button>
+<button class="px-2.5 py-1 rounded-full bg-surface-container-low text-on-surface hover:bg-surface-container font-label-xs text-label-xs font-semibold flex items-center gap-1 transition-colors" type="button">
+<span>❌ Lost</span>
+</button>
+</div>
+</div>
+<!-- Main Asymmetric 2-Column Section -->
+<div class="grid grid-cols-1 xl:grid-cols-12 gap-space-lg items-start">
+<!-- LEFT COLUMN: Pipeline Prospek Table (Wider, col-span-8) -->
+<div class="xl:col-span-8 flex flex-col gap-space-md">
+<div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden flex flex-col">
+<!-- Table Toolbar & Search -->
+<div class="p-4 flex flex-col md:flex-row md:items-center justify-between gap-space-md bg-surface-container-lowest">
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-headline-sm font-bold text-on-surface">Pipeline Kontak Prospek</span>
+<span class="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-fixed-variant font-label-xs text-label-xs font-bold">
+              100 / 100
+            </span>
+</div>
+<div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+<div class="relative w-full sm:w-64">
+<span class="material-symbols-outlined absolute left-2.5 top-2.5 text-[18px] text-on-surface-variant">search</span>
+<input class="w-full pl-9 pr-3 py-1.5 bg-surface-container-low rounded-lg font-body-sm text-body-sm text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:bg-surface-container-lowest shadow-sm" placeholder="Cari nama, HP, tag, catatan..." type="text"/>
+</div>
+<button class="flex items-center gap-1.5 px-3 py-1.5 bg-primary-container text-on-primary-container hover:bg-primary hover:text-on-primary rounded-lg font-label-md text-label-md font-bold transition-all shadow-sm whitespace-nowrap" type="button">
+<span class="material-symbols-outlined text-[18px]">person_add</span>
+<span>+ Tambah Kontak</span>
+</button>
+</div>
+</div>
+<!-- Interactive Data Table -->
+<div class="overflow-x-auto w-full">
+<table class="w-full text-left font-body-sm text-body-sm">
+<thead class="bg-surface-container-low/70 text-on-surface-variant font-label-xs text-label-xs uppercase tracking-wider">
+<tr>
+<th class="py-3 px-4" scope="col">Kontak &amp; Profil</th>
+<th class="py-3 px-4" scope="col">Pipeline Stage</th>
+<th class="py-3 px-4" scope="col">Tags &amp; Label</th>
+<th class="py-3 px-4" scope="col">Catatan Agen</th>
+<th class="py-3 px-4 text-right" scope="col">Sequence &amp; Aksi</th>
+</tr>
+</thead>
+<tbody class="divide-y-0">
+<!-- ROW 1: dr. Aryo Adi Wibowo -->
+<tr class="hover:bg-surface-container-low/40 transition-colors group">
+<td class="py-3.5 px-4">
+<div class="flex items-center gap-3">
+<div class="w-9 h-9 rounded-full bg-secondary-container text-on-secondary-fixed-variant flex items-center justify-center font-label-lg text-label-lg font-bold">
+                      AW
+                    </div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-lg text-label-lg font-bold text-on-surface truncate">dr. Aryo Adi Wibowo</span>
+<span class="font-label-xs text-label-xs text-on-surface-variant">+62 812-8829-4411</span>
+<span class="font-label-xs text-label-xs text-primary font-medium">Klinik Medika Pratama</span>
+</div>
+</div>
+</td>
+<td class="py-3.5 px-4 whitespace-nowrap">
+<div class="relative inline-block">
+<select aria-label="Pipeline Stage dr. Aryo" class="appearance-none pl-6 pr-6 py-1 bg-surface-container-low text-on-surface rounded-full font-label-xs text-label-xs font-semibold focus:outline-none cursor-pointer">
+<option selected="">🟡 Warm Lead</option>
+<option>🔵 Lead (Baru)</option>
+<option>🔥 Hot Lead</option>
+<option>✅ Pelanggan</option>
+</select>
+<span class="material-symbols-outlined absolute right-1.5 top-1.5 text-[14px] text-on-surface-variant pointer-events-none">expand_more</span>
+<span class="w-2 h-2 rounded-full bg-primary absolute left-2.5 top-2.5"></span>
+</div>
+</td>
+<td class="py-3.5 px-4">
+<div class="flex flex-wrap gap-1">
+<span class="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-label-xs text-label-xs font-semibold">Klinik</span>
+<span class="px-2 py-0.5 rounded bg-secondary-container/60 text-on-secondary-fixed-variant font-label-xs text-label-xs font-semibold">VIP Grosir</span>
+</div>
+</td>
+<td class="py-3.5 px-4 max-w-xs">
+<div class="flex items-center gap-1.5 text-on-surface-variant hover:text-on-surface cursor-pointer group-hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-[16px] text-outline">edit_note</span>
+<span class="font-body-sm text-body-sm truncate" title="Tertarik paket 5 botol herbal">Tertarik paket 5 botol herbal</span>
+</div>
+</td>
+<td class="py-3.5 px-4 text-right whitespace-nowrap">
+<div class="flex items-center justify-end gap-1.5">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-secondary-container text-on-secondary-fixed-variant font-label-xs text-label-xs font-bold">
+<span class="material-symbols-outlined text-[13px] text-primary">bolt</span>
+                      Day 2/5
+                    </span>
+<button class="p-1.5 rounded-full hover:bg-surface-container-high text-primary transition-colors" title="Kirim Chat WhatsApp" type="button">
+<span class="material-symbols-outlined text-[18px]">chat</span>
+</button>
+<button class="p-1.5 rounded-full hover:bg-surface-container-high text-on-surface-variant transition-colors" title="Detail Kontak" type="button">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- ROW 2: Butuh Jagung Super -->
+<tr class="hover:bg-surface-container-low/40 transition-colors group bg-surface-container-low/20">
+<td class="py-3.5 px-4">
+<div class="flex items-center gap-3">
+<div class="w-9 h-9 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center font-label-lg text-label-lg font-bold">
+                      BJ
+                    </div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-lg text-label-lg font-bold text-on-surface truncate">Butuh Jagung Super</span>
+<span class="font-label-xs text-label-xs text-on-surface-variant">+62 819-2540-5719</span>
+<span class="font-label-xs text-label-xs text-outline font-medium">Inbound Katalog</span>
+</div>
+</div>
+</td>
+<td class="py-3.5 px-4 whitespace-nowrap">
+<div class="relative inline-block">
+<select aria-label="Pipeline Stage Butuh Jagung" class="appearance-none pl-6 pr-6 py-1 bg-surface-container-low text-on-surface rounded-full font-label-xs text-label-xs font-semibold focus:outline-none cursor-pointer">
+<option>🟡 Warm Lead</option>
+<option selected="">🔵 Lead (Baru)</option>
+<option>🔥 Hot Lead</option>
+<option>✅ Pelanggan</option>
+</select>
+<span class="material-symbols-outlined absolute right-1.5 top-1.5 text-[14px] text-on-surface-variant pointer-events-none">expand_more</span>
+<span class="w-2 h-2 rounded-full bg-tertiary absolute left-2.5 top-2.5"></span>
+</div>
+</td>
+<td class="py-3.5 px-4">
+<div class="flex flex-wrap gap-1">
+<span class="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-label-xs text-label-xs font-semibold">Inbound Form</span>
+<span class="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-label-xs text-label-xs font-semibold">Jawa Timur</span>
+</div>
+</td>
+<td class="py-3.5 px-4 max-w-xs">
+<div class="flex items-center gap-1.5 text-on-surface-variant hover:text-on-surface cursor-pointer">
+<span class="material-symbols-outlined text-[16px] text-outline">edit_note</span>
+<span class="font-body-sm text-body-sm truncate" title="Minta katalog kargo via WA">Minta katalog kargo via WA</span>
+</div>
+</td>
+<td class="py-3.5 px-4 text-right whitespace-nowrap">
+<div class="flex items-center justify-end gap-1.5">
+<button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary-container text-on-primary-container hover:bg-primary hover:text-on-primary font-label-xs text-label-xs font-bold transition-all shadow-sm" type="button">
+<span class="material-symbols-outlined text-[13px]">bolt</span>
+                      Mulai Sequence
+                    </button>
+<button class="p-1.5 rounded-full hover:bg-surface-container-high text-primary transition-colors" title="Kirim Chat WhatsApp" type="button">
+<span class="material-symbols-outlined text-[18px]">chat</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- ROW 3: Hanggaryogha (PT CSCODS) - Hot Leads -->
+<tr class="hover:bg-surface-container-low/40 transition-colors group">
+<td class="py-3.5 px-4">
+<div class="flex items-center gap-3">
+<div class="w-9 h-9 rounded-full bg-error-container text-on-error-container flex items-center justify-center font-label-lg text-label-lg font-bold">
+                      HG
+                    </div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-1">
+<span class="font-label-lg text-label-lg font-bold text-on-surface truncate">Hanggaryogha</span>
+<span class="material-symbols-outlined text-[14px] text-error">local_fire_department</span>
+</div>
+<span class="font-label-xs text-label-xs text-on-surface-variant">+62 821-4311-3560</span>
+<span class="font-label-xs text-label-xs text-primary font-semibold">PT CSCODS Global</span>
+</div>
+</div>
+</td>
+<td class="py-3.5 px-4 whitespace-nowrap">
+<div class="relative inline-block">
+<select aria-label="Pipeline Stage Hanggaryogha" class="appearance-none pl-6 pr-6 py-1 bg-error-container/50 text-on-error-container rounded-full font-label-xs text-label-xs font-bold focus:outline-none cursor-pointer">
+<option>🟡 Warm Lead</option>
+<option>🔵 Lead (Baru)</option>
+<option selected="">🔥 Hot Lead</option>
+<option>✅ Pelanggan</option>
+</select>
+<span class="material-symbols-outlined absolute right-1.5 top-1.5 text-[14px] text-on-error-container pointer-events-none">expand_more</span>
+<span class="w-2 h-2 rounded-full bg-error absolute left-2.5 top-2.5 animate-pulse"></span>
+</div>
+</td>
+<td class="py-3.5 px-4">
+<div class="flex flex-wrap gap-1">
+<span class="px-2 py-0.5 rounded bg-error-container/70 text-on-error-container font-label-xs text-label-xs font-bold">Enterprise</span>
+<span class="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-label-xs text-label-xs font-semibold">Urgent</span>
+</div>
+</td>
+<td class="py-3.5 px-4 max-w-xs">
+<div class="flex items-center gap-1.5 text-on-surface-variant hover:text-on-surface cursor-pointer">
+<span class="material-symbols-outlined text-[16px] text-error">priority_high</span>
+<span class="font-body-sm text-body-sm font-semibold text-on-surface truncate" title="Menunggu invoice proforma tier enterprise">Menunggu invoice proforma</span>
+</div>
+</td>
+<td class="py-3.5 px-4 text-right whitespace-nowrap">
+<div class="flex items-center justify-end gap-1.5">
+<button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container-high text-on-surface font-label-xs text-label-xs font-bold hover:bg-surface-container-highest transition-colors" type="button">
+<span class="material-symbols-outlined text-[13px]">receipt</span>
+                      Buat Invoice
+                    </button>
+<button class="p-1.5 rounded-full hover:bg-surface-container-high text-primary transition-colors" title="Kirim Chat WhatsApp" type="button">
+<span class="material-symbols-outlined text-[18px]">chat</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- ROW 4: Miftakhul Khoiri -->
+<tr class="hover:bg-surface-container-low/40 transition-colors group bg-surface-container-low/20">
+<td class="py-3.5 px-4">
+<div class="flex items-center gap-3">
+<div class="w-9 h-9 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-label-lg text-label-lg font-bold">
+                      MK
+                    </div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-lg text-label-lg font-bold text-on-surface truncate">Miftakhul Khoiri</span>
+<span class="font-label-xs text-label-xs text-on-surface-variant">+62 833-4562-0578</span>
+<span class="font-label-xs text-label-xs text-on-secondary-container font-semibold">Toko Herbal Berkah</span>
+</div>
+</div>
+</td>
+<td class="py-3.5 px-4 whitespace-nowrap">
+<div class="relative inline-block">
+<select aria-label="Pipeline Stage Miftakhul" class="appearance-none pl-6 pr-6 py-1 bg-secondary-container/50 text-on-secondary-fixed-variant rounded-full font-label-xs text-label-xs font-bold focus:outline-none cursor-pointer">
+<option>🟡 Warm Lead</option>
+<option>🔵 Lead (Baru)</option>
+<option>🔥 Hot Lead</option>
+<option selected="">✅ Pelanggan</option>
+</select>
+<span class="material-symbols-outlined absolute right-1.5 top-1.5 text-[14px] text-on-secondary-fixed-variant pointer-events-none">expand_more</span>
+<span class="w-2 h-2 rounded-full bg-primary-container absolute left-2.5 top-2.5"></span>
+</div>
+</td>
+<td class="py-3.5 px-4">
+<div class="flex flex-wrap gap-1">
+<span class="px-2 py-0.5 rounded bg-secondary-container text-on-secondary-fixed-variant font-label-xs text-label-xs font-bold">Repeat Order</span>
+<span class="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-label-xs text-label-xs font-semibold">Jawa Tengah</span>
+</div>
+</td>
+<td class="py-3.5 px-4 max-w-xs">
+<div class="flex items-center gap-1.5 text-on-surface-variant hover:text-on-surface cursor-pointer">
+<span class="material-symbols-outlined text-[16px] text-primary">check_circle</span>
+<span class="font-body-sm text-body-sm truncate" title="Pembayaran terkonfirmasi BCA Rp 4.250.000">Pembayaran terkonfirmasi</span>
+</div>
+</td>
+<td class="py-3.5 px-4 text-right whitespace-nowrap">
+<div class="flex items-center justify-end gap-1.5">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container-low text-on-surface-variant font-label-xs text-label-xs font-semibold">
+<span class="material-symbols-outlined text-[13px] text-primary">favorite</span>
+                      Post-Sales Nurture
+                    </span>
+<button class="p-1.5 rounded-full hover:bg-surface-container-high text-primary transition-colors" title="Kirim Chat WhatsApp" type="button">
+<span class="material-symbols-outlined text-[18px]">chat</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- ROW 5: Goa Pindul Tour -->
+<tr class="hover:bg-surface-container-low/40 transition-colors group">
+<td class="py-3.5 px-4">
+<div class="flex items-center gap-3">
+<div class="w-9 h-9 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center font-label-lg text-label-lg font-bold">
+                      GP
+                    </div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-lg text-label-lg font-bold text-on-surface truncate">Goa Pindul Tour &amp; Travel</span>
+<span class="font-label-xs text-label-xs text-on-surface-variant">+62 817-9079-2048</span>
+<span class="font-label-xs text-label-xs text-outline font-medium">Bpk. Haryadi</span>
+</div>
+</div>
+</td>
+<td class="py-3.5 px-4 whitespace-nowrap">
+<div class="relative inline-block">
+<select aria-label="Pipeline Stage Goa Pindul" class="appearance-none pl-6 pr-6 py-1 bg-surface-container-low text-on-surface rounded-full font-label-xs text-label-xs font-semibold focus:outline-none cursor-pointer">
+<option selected="">🟡 Prospek Hangat</option>
+<option>🔵 Lead (Baru)</option>
+<option>🔥 Hot Lead</option>
+<option>✅ Pelanggan</option>
+</select>
+<span class="material-symbols-outlined absolute right-1.5 top-1.5 text-[14px] text-on-surface-variant pointer-events-none">expand_more</span>
+<span class="w-2 h-2 rounded-full bg-primary absolute left-2.5 top-2.5"></span>
+</div>
+</td>
+<td class="py-3.5 px-4">
+<div class="flex flex-wrap gap-1">
+<span class="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-label-xs text-label-xs font-semibold">Pariwisata</span>
+<span class="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-label-xs text-label-xs font-semibold">Yogyakarta</span>
+</div>
+</td>
+<td class="py-3.5 px-4 max-w-xs">
+<div class="flex items-center gap-1.5 text-on-surface-variant hover:text-on-surface cursor-pointer">
+<span class="material-symbols-outlined text-[16px] text-outline">schedule</span>
+<span class="font-body-sm text-body-sm truncate" title="Follow up tanggal 10 setelah rapat direksi">Follow up tgl 10</span>
+</div>
+</td>
+<td class="py-3.5 px-4 text-right whitespace-nowrap">
+<div class="flex items-center justify-end gap-1.5">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container-high text-on-surface-variant font-label-xs text-label-xs font-semibold">
+<span class="material-symbols-outlined text-[13px]">pause</span>
+                      Sequence Paused
+                    </span>
+<button class="p-1.5 rounded-full hover:bg-surface-container-high text-primary transition-colors" title="Kirim Chat WhatsApp" type="button">
+<span class="material-symbols-outlined text-[18px]">chat</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- ROW 6: Alfamind Sukses Mandiri -->
+<tr class="hover:bg-surface-container-low/40 transition-colors group bg-surface-container-low/20">
+<td class="py-3.5 px-4">
+<div class="flex items-center gap-3">
+<div class="w-9 h-9 rounded-full bg-tertiary-container/30 text-tertiary flex items-center justify-center font-label-lg text-label-lg font-bold">
+                      AS
+                    </div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-lg text-label-lg font-bold text-on-surface truncate">Alfamind Sukses Mandiri</span>
+<span class="font-label-xs text-label-xs text-on-surface-variant">+62 818-9023-0640</span>
+<span class="font-label-xs text-label-xs text-outline font-medium">Bpk. Rahmat</span>
+</div>
+</div>
+</td>
+<td class="py-3.5 px-4 whitespace-nowrap">
+<div class="relative inline-block">
+<select aria-label="Pipeline Stage Alfamind" class="appearance-none pl-6 pr-6 py-1 bg-surface-container-low text-on-surface rounded-full font-label-xs text-label-xs font-semibold focus:outline-none cursor-pointer">
+<option>🟡 Warm Lead</option>
+<option selected="">🔵 Lead (Baru)</option>
+<option>🔥 Hot Lead</option>
+<option>✅ Pelanggan</option>
+</select>
+<span class="material-symbols-outlined absolute right-1.5 top-1.5 text-[14px] text-on-surface-variant pointer-events-none">expand_more</span>
+<span class="w-2 h-2 rounded-full bg-tertiary absolute left-2.5 top-2.5"></span>
+</div>
+</td>
+<td class="py-3.5 px-4">
+<div class="flex flex-wrap gap-1">
+<span class="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-label-xs text-label-xs font-semibold">Retail B2B</span>
+<span class="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-label-xs text-label-xs font-semibold">Jabodetabek</span>
+</div>
+</td>
+<td class="py-3.5 px-4 max-w-xs">
+<div class="flex items-center gap-1.5 text-on-surface-variant hover:text-on-surface cursor-pointer">
+<span class="material-symbols-outlined text-[16px] text-outline">webhook</span>
+<span class="font-body-sm text-body-sm truncate" title="Follow up otomatis via n8n webhook">Follow up via n8n</span>
+</div>
+</td>
+<td class="py-3.5 px-4 text-right whitespace-nowrap">
+<div class="flex items-center justify-end gap-1.5">
+<button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary-container text-on-primary-container hover:bg-primary hover:text-on-primary font-label-xs text-label-xs font-bold transition-all shadow-sm" type="button">
+<span class="material-symbols-outlined text-[13px]">bolt</span>
+                      Sequence
+                    </button>
+<button class="p-1.5 rounded-full hover:bg-surface-container-high text-primary transition-colors" title="Kirim Chat WhatsApp" type="button">
+<span class="material-symbols-outlined text-[18px]">chat</span>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Table Footer / Pagination -->
+<div class="p-4 bg-surface-container-lowest flex flex-col sm:flex-row items-center justify-between gap-space-sm">
+<div class="flex items-center gap-2 font-body-sm text-body-sm text-on-surface-variant">
+<span>Menampilkan <strong class="text-on-surface">1 - 6</strong> dari <strong class="text-on-surface">100</strong> prospek</span>
+<span class="text-outline-variant">|</span>
+<label class="flex items-center gap-1">
+<span>Baris:</span>
+<select class="bg-surface-container-low text-on-surface rounded px-2 py-0.5 text-xs font-semibold focus:outline-none">
+<option>10</option>
+<option>25</option>
+<option>50</option>
+</select>
+</label>
+</div>
+<div class="flex items-center gap-1">
+<button class="p-1.5 rounded-lg bg-surface-container-low text-on-surface-variant/40 cursor-not-allowed" disabled="" type="button">
+<span class="material-symbols-outlined text-[18px]">chevron_left</span>
+</button>
+<button class="w-8 h-8 rounded-lg bg-primary-container text-on-primary-container font-label-md text-label-md font-bold flex items-center justify-center" type="button">1</button>
+<button class="w-8 h-8 rounded-lg text-on-surface hover:bg-surface-container-low font-label-md text-label-md flex items-center justify-center transition-colors" type="button">2</button>
+<button class="w-8 h-8 rounded-lg text-on-surface hover:bg-surface-container-low font-label-md text-label-md flex items-center justify-center transition-colors" type="button">3</button>
+<span class="px-1 text-on-surface-variant">...</span>
+<button class="w-8 h-8 rounded-lg text-on-surface hover:bg-surface-container-low font-label-md text-label-md flex items-center justify-center transition-colors" type="button">10</button>
+<button class="p-1.5 rounded-lg bg-surface-container-low text-on-surface hover:bg-surface-container-high transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- RIGHT COLUMN: Automation & Follow-Up Task Panel (col-span-4) -->
+<div class="xl:col-span-4 flex flex-col gap-space-md">
+<!-- Smart Sequencer Card -->
+<div class="p-4 bg-secondary-container/20 rounded-xl shadow-sm flex flex-col gap-3 relative overflow-hidden">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[22px]">smart_toy</span>
+<span class="font-headline-sm text-headline-sm font-bold text-on-surface">Smart Auto-Stop</span>
+</div>
+<!-- Emerald Active Pill -->
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-secondary-container text-on-secondary-fixed-variant font-label-xs text-label-xs font-bold">
+<span class="w-2 h-2 rounded-full bg-primary animate-ping"></span>
+            Aktif
+          </span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
+          Rantai pesan sequence otomatis dihentikan <strong>seketika saat calon pembeli membalas/chat</strong>, menjaga obrolan tetap personal dan bebas banned.
+        </p>
+<div class="flex items-center justify-between pt-1">
+<span class="font-label-xs text-label-xs text-on-surface-variant">Deteksi respon otomatis AI</span>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-10 h-5 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-surface after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-surface after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-container"></div>
+</label>
+</div>
+</div>
+<!-- Tugas Follow-Up Terjadwal Card -->
+<div class="p-4 bg-surface-container-lowest rounded-xl shadow-sm flex flex-col gap-space-md">
+<!-- Header -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[20px]">schedule</span>
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm font-bold text-on-surface">Tugas Follow-Up</span>
+<span class="font-label-xs text-label-xs text-on-surface-variant">3 tugas terjadwal hari ini</span>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="font-label-xs text-label-xs text-on-surface-variant font-bold">Auto</span>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-9 h-5 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-surface after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-surface after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-container"></div>
+</label>
+</div>
+</div>
+<!-- Task Items Stack -->
+<div class="flex flex-col gap-2.5">
+<!-- Task Item 1: High Priority Urgent -->
+<div class="p-3 rounded-lg bg-surface-container-low hover:bg-surface-container transition-all flex flex-col gap-2">
+<div class="flex items-start justify-between gap-2">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md font-bold text-on-surface">Kirim Penawaran Spesial Promo 9.9</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">dr. Aryo Adi Wibowo • Klinik Medika</span>
+</div>
+<span class="px-2 py-0.5 rounded bg-error-container text-on-error-container font-label-xs text-label-xs font-bold whitespace-nowrap">
+                15 mnt lagi
+              </span>
+</div>
+<div class="flex items-center justify-between pt-1">
+<span class="font-label-xs text-label-xs text-outline flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">history_toggle_off</span>
+                Target: 11:30 WIB
+              </span>
+<button class="px-3 py-1 bg-primary-container text-on-primary-container hover:bg-primary hover:text-on-primary rounded-full font-label-xs text-label-xs font-bold transition-all shadow-sm flex items-center gap-1" type="button">
+<span class="material-symbols-outlined text-[14px]">send</span>
+                Kirim Sekarang
+              </button>
+</div>
+</div>
+<!-- Task Item 2: Invoice DP -->
+<div class="p-3 rounded-lg bg-surface-container-low hover:bg-surface-container transition-all flex flex-col gap-2">
+<div class="flex items-start justify-between gap-2">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md font-bold text-on-surface">Konfirmasi Transfer DP Invoice #INV-89</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Hanggaryogha • PT CSCODS</span>
+</div>
+<span class="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-label-xs text-label-xs font-semibold whitespace-nowrap">
+                1 jam lagi
+              </span>
+</div>
+<div class="flex items-center justify-between pt-1">
+<span class="font-label-xs text-label-xs text-outline flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">schedule</span>
+                Target: 12:45 WIB
+              </span>
+<button class="px-3 py-1 bg-surface-container-lowest hover:bg-surface-container-high text-on-surface rounded-full font-label-xs text-label-xs font-bold transition-all shadow-sm flex items-center gap-1" type="button">
+<span class="material-symbols-outlined text-[14px] text-primary">chat</span>
+                Chat WA
+              </button>
+</div>
+</div>
+<!-- Task Item 3: Automated Day-3 Nurture -->
+<div class="p-3 rounded-lg bg-surface-container-low hover:bg-surface-container transition-all flex flex-col gap-2">
+<div class="flex items-start justify-between gap-2">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md font-bold text-on-surface">Sapaan Day-3 Testimoni Produk</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Butuh Jagung Super • Inbound</span>
+</div>
+<span class="px-2 py-0.5 rounded bg-secondary-container text-on-secondary-fixed-variant font-label-xs text-label-xs font-bold whitespace-nowrap flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">smart_toy</span>
+                Bot
+              </span>
+</div>
+<div class="flex items-center justify-between pt-1">
+<span class="font-label-xs text-label-xs text-outline flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">alarm</span>
+                Otomatis: 14:00 WIB
+              </span>
+<span class="font-label-xs text-label-xs text-primary font-semibold">Siap Meluncur</span>
+</div>
+</div>
+</div>
+<!-- Add Follow-up Button -->
+<button class="w-full py-2 bg-surface-container-low hover:bg-surface-container-high text-on-surface rounded-xl font-label-md text-label-md font-bold flex items-center justify-center gap-1.5 transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">add_circle</span>
+<span>+ Jadwalkan Follow-up Baru</span>
+</button>
+</div>
+<!-- Quick Conversion Funnel Sparkline Card -->
+<div class="p-4 bg-surface-container-lowest rounded-xl shadow-sm flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<span class="font-label-xs text-label-xs uppercase font-bold text-on-surface-variant">Konversi Pipeline Mingguan</span>
+<span class="font-label-xs text-label-xs font-bold text-primary">+18.4% vs mgg lalu</span>
+</div>
+<!-- Clean Inline SVG Area Chart -->
+<div class="w-full h-20 pt-1">
+<svg class="w-full h-full overflow-visible" preserveaspectratio="none" viewbox="0 0 240 60">
+<defs>
+<lineargradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#10b981" stop-opacity="0.35"></stop>
+<stop offset="100%" stop-color="#10b981" stop-opacity="0.0"></stop>
+</lineargradient>
+</defs>
+<path d="M 0,50 Q 40,40 80,35 T 160,20 T 240,8 L 240,60 L 0,60 Z" fill="url(#chartGradient)"></path>
+<path d="M 0,50 Q 40,40 80,35 T 160,20 T 240,8" fill="none" stroke="#10b981" stroke-linecap="round" stroke-width="2.5"></path>
+<circle cx="240" cy="8" fill="#006c49" r="4"></circle>
+</svg>
+</div>
+<div class="grid grid-cols-3 gap-2 pt-1 text-center font-label-xs text-label-xs">
+<div class="flex flex-col">
+<span class="text-on-surface-variant">Leads</span>
+<span class="font-bold text-on-surface">1,842</span>
+</div>
+<div class="flex flex-col">
+<span class="text-on-surface-variant">Prospek</span>
+<span class="font-bold text-on-surface">703</span>
+</div>
+<div class="flex flex-col">
+<span class="text-on-surface-variant">Closing</span>
+<span class="font-bold text-primary">88</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div></main></div></body></html>

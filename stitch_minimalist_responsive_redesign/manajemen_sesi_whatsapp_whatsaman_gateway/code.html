@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{colors:{"surface-container-low":"#eff4ff","on-primary-fixed-variant":"#005236","surface-container-lowest":"#ffffff","on-surface":"#0b1c30","on-error":"#ffffff","tertiary-fixed-dim":"#93ccff","surface-variant":"#d3e4fe","on-primary":"#ffffff","surface-container-highest":"#d3e4fe","primary-fixed":"#6ffbbe","surface-tint":"#006c49","outline":"#6c7a71","on-error-container":"#93000a","on-background":"#0b1c30","outline-variant":"#bbcabf","secondary-fixed-dim":"#68dba9","on-tertiary-fixed-variant":"#004b73","background":"#f8f9ff","on-secondary-fixed-variant":"#005137","tertiary":"#006398","tertiary-fixed":"#cce5ff","on-primary-container":"#00422b","surface-container":"#e5eeff","surface-dim":"#cbdbf5","on-primary-fixed":"#002113","surface-container-high":"#dce9ff","inverse-primary":"#4edea3","on-secondary-fixed":"#002114","secondary-fixed":"#85f8c4","primary-container":"#10b981","primary-fixed-dim":"#4edea3","inverse-surface":"#213145","on-surface-variant":"#3c4a42","error":"#ba1a1a","on-tertiary-container":"#003c5e","inverse-on-surface":"#eaf1ff","on-tertiary-fixed":"#001d31","secondary":"#006c4a","primary":"#006c49","secondary-container":"#82f5c1","tertiary-container":"#4aaaef","on-secondary":"#ffffff","on-tertiary":"#ffffff","surface-bright":"#f8f9ff","error-container":"#ffdad6","on-secondary-container":"#00714e","surface":"#f8f9ff"},borderRadius:{"DEFAULT":"0.25rem","lg":"0.5rem","xl":"0.75rem","full":"9999px"},spacing:{"space-lg":"1.25rem","gutter":"1rem","margin-desktop":"1.75rem","space-xs":"0.25rem","space-md":"0.875rem","space-2xl":"2.5rem","space-sm":"0.5rem","margin":"1rem","gutter-desktop":"1.25rem","space-xl":"1.75rem"},fontFamily:{"headline-xl":["Plus Jakarta Sans"],"label-lg":["Plus Jakarta Sans"],"headline-lg":["Plus Jakarta Sans"],"label-md":["Plus Jakarta Sans"],"headline-xl-mobile":["Plus Jakarta Sans"],"label-xs":["Plus Jakarta Sans"],"body-lg":["Plus Jakarta Sans"],"body-md":["Plus Jakarta Sans"],"body-sm":["Plus Jakarta Sans"],"headline-sm":["Plus Jakarta Sans"]},fontSize:{"headline-xl":["30px",{lineHeight:"38px",letterSpacing:"-0.02em",fontWeight:"700"}],"label-lg":["13px",{lineHeight:"18px",fontWeight:"600"}],"headline-lg":["22px",{lineHeight:"28px",letterSpacing:"-0.015em",fontWeight:"700"}],"label-md":["12px",{lineHeight:"16px",letterSpacing:"0.02em",fontWeight:"600"}],"headline-xl-mobile":["24px",{lineHeight:"32px",letterSpacing:"-0.015em",fontWeight:"700"}],"label-xs":["11px",{lineHeight:"14px",letterSpacing:"0.04em",fontWeight:"700"}],"body-lg":["15px",{lineHeight:"22px",fontWeight:"400"}],"body-md":["14px",{lineHeight:"20px",fontWeight:"400"}],"body-sm":["13px",{lineHeight:"18px",fontWeight:"400"}],"headline-sm":["18px",{lineHeight:"24px",letterSpacing:"-0.01em",fontWeight:"600"}]}}}};</script></head><body class="bg-surface font-body-md text-on-surface antialiased"><aside class="fixed left-0 top-0 h-screen w-64 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-50 flex flex-col justify-between overflow-y-auto"><div class="flex flex-col"><div class="h-16 px-space-md flex items-center justify-between bg-surface-container-lowest"><div class="flex items-center gap-space-sm"><img alt="WhatsAman Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1WlOfUmew9CQf59fuHcyGEEmPJ3L9zycaF2-92sv0FxwVoOfAg3ylPAdZzoNS3mqQ3bbVa_lb_Gdm8CKLEUa24crHQm0uVxsy1Dn8JuEeKSZBjuEtJgtuWfU8N_VokXnwVVlN3jbItj1wGvavMSomek3aHtZhN4MBiQF8g4FC71AlFph8A4cmS21uK-KdTSv2b67fP4FUpRRIPGjdjWt-aRKV7cNnkR9xOKHyUrbXHDRta06ABxeJxc7qE"/><div class="flex flex-col"><span class="font-headline-sm text-headline-sm tracking-tight text-on-surface font-bold leading-none">WhatsAman</span><span class="font-label-xs text-label-xs text-on-surface-variant flex items-center gap-1.5 mt-1"><span class="w-1.5 h-1.5 rounded-full bg-primary-container animate-pulse"></span>Gateway Ready</span></div></div><button class="p-1 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low rounded-lg transition-colors" type="button"><span class="material-symbols-outlined text-[20px]">dock_to_left</span></button></div><div class="px-space-md my-space-xs"><div class="p-space-xs px-space-sm bg-surface-container-low rounded-xl flex items-center justify-between"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-primary-container ring-2 ring-secondary-container"></span><div class="flex flex-col"><span class="font-label-md text-label-md text-on-surface font-bold leading-tight">SAMSUNG S23</span><span class="font-label-xs text-label-xs text-primary font-semibold">Connected (Session 1)</span></div></div><span class="material-symbols-outlined text-on-surface-variant text-[18px]">unfold_more</span></div></div><nav class="flex flex-col gap-0.5 px-space-sm mt-space-xs" data-active-classes="bg-surface-container-low text-primary font-bold shadow-none"><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="dashboard" href="#">Dashboard</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg bg-surface-container-low text-primary font-bold shadow-none transition-all font-label-lg text-label-lg" data-path="sesi-whatsapp" href="#">Sesi WhatsApp</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="obrolan-inbox" href="#">Obrolan (Inbox)</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="crm-pipeline" href="#">CRM &amp; Pipeline</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="kontak" href="#">Kontak</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="grup-whatsapp" href="#">Grup WhatsApp</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="broadcast-massal" href="#">Broadcast Massal</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="message-tester" href="#">Message Tester</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="template-auto-reply" href="#">Template &amp; Auto-Reply</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="webhooks-integrasi" href="#">Webhooks &amp; Integrasi</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="infrastruktur" href="#">Infrastruktur</a><a class="flex items-center justify-between px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all font-label-lg text-label-lg" data-path="audit-logs" href="#">Audit Logs</a></nav></div><div class="p-space-sm flex flex-col gap-2 bg-surface-container-low/50 m-space-sm rounded-xl"><div class="flex items-center justify-between px-space-xs"><span class="font-label-xs text-label-xs text-on-surface-variant">Mode Privasi</span><button class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-container-highest text-on-surface font-label-xs text-label-xs" type="button"><span class="material-symbols-outlined text-[14px]">visibility_off</span><span>Alt+P</span></button></div><div class="flex items-center justify-between px-space-xs pt-1"><div class="flex items-center gap-1.5"><button class="font-label-xs text-label-xs text-on-surface-variant hover:text-on-surface font-bold bg-surface-container-high px-1.5 py-0.5 rounded" type="button">ID</button><button class="font-label-xs text-label-xs text-on-surface-variant hover:text-on-surface px-1.5 py-0.5 rounded" type="button">EN</button></div><button class="p-1 text-on-surface-variant hover:text-on-surface rounded-lg hover:bg-surface-container-high transition-colors" type="button"><span class="material-symbols-outlined text-[18px]">light_mode</span></button></div><div class="pt-1 px-space-xs flex items-center justify-between"><span class="font-label-xs text-label-xs text-on-surface-variant flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-primary-container animate-ping"></span>Core Gateway</span><span class="font-label-xs text-label-xs text-primary font-bold">Online 99.98%</span></div></div></aside><div class="pl-64"><header class="fixed top-0 left-64 right-0 h-16 bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex items-center justify-between px-space-lg"><div class="flex items-center gap-space-md"><div class="hidden md:flex items-center gap-2 font-label-xs text-label-xs text-on-surface-variant"><a class="hover:text-primary transition-colors flex items-center gap-1" href="#"><span class="material-symbols-outlined text-[15px]">home</span>WhatsAman</a><span>/</span><span class="text-on-surface font-bold">Sesi WhatsApp</span></div><div class="relative w-80 lg:w-96 flex items-center"><span class="material-symbols-outlined absolute left-3 text-on-surface-variant text-[20px]">search</span><input class="w-full pl-10 pr-16 py-2 bg-surface-container-lowest rounded-full font-body-sm text-body-sm text-on-surface placeholder:text-on-surface-variant/70 shadow-[0_1px_4px_rgba(0,0,0,0.03)] focus:outline-none focus:ring-2 focus:ring-primary-container" placeholder="Cari sesi WhatsApp, ID perangkat, nomor..." type="text"/><span class="absolute right-3 px-1.5 py-0.5 bg-surface-container-low font-label-xs text-label-xs text-on-surface-variant rounded border border-outline-variant/30">Ctrl+K</span></div></div><div class="flex items-center gap-space-sm"><div class="flex items-center gap-2"><button class="flex items-center gap-1.5 px-3 py-1.5 bg-primary-container text-on-primary-container hover:bg-primary hover:text-on-primary rounded-full font-label-md text-label-md font-bold transition-all" type="button"><span class="material-symbols-outlined text-[18px]">add</span><span>Sesi Baru</span></button><button class="flex items-center gap-1.5 px-3 py-1.5 bg-surface-container-lowest text-on-surface hover:bg-surface-container-low hover:text-on-surface rounded-full font-label-md text-label-md font-semibold transition-all shadow-[0_1px_3px_rgba(0,0,0,0.04)]" type="button"><span class="material-symbols-outlined text-[18px]">qr_code_scanner</span><span>Scan QR</span></button><button class="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low rounded-full transition-colors" title="Refresh Status" type="button"><span class="material-symbols-outlined text-[20px]">refresh</span></button></div><div class="h-6 w-px bg-outline-variant/40 mx-1"></div><div class="relative"><button class="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low rounded-full transition-colors relative" type="button"><span class="material-symbols-outlined text-[22px]">notifications</span><span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-error ring-2 ring-surface"></span></button></div><div class="flex items-center gap-2.5 pl-1"><div class="relative"><img alt="Profile" class="w-8 h-8 rounded-full object-cover ring-2 ring-primary-container/20" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBrPT2zLitf3BAk6tsmu57PNBTgUJRSjP8YLQsi8OBmdJXhp80lg92GA1M_5qEp_rXbYSbDKXnJH8G1Z9qSIbupocWerzPa8oqWoGyIAsuZJ7MITAquYZIkHoheFdYOVr8C5mYhhihy_FoXRrgtAaeg2cjM05oqMc2A_4Ukj4H9Kfpe9nd4XQIkQw3aCowq2lGLd8RIu2JYmd_whZ9GSIZpEdDa1I67v1gdbvcNo5sX61hstQPJ8cGv"/><span class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-primary-container ring-2 ring-surface"></span></div><div class="hidden xl:flex flex-col text-left"><span class="font-label-md text-label-md text-on-surface font-bold leading-tight">Admin Operasional</span><span class="font-label-xs text-label-xs text-on-surface-variant">Superadmin • Aktif</span></div><span class="material-symbols-outlined text-on-surface-variant text-[18px]">expand_more</span></div></div></header><main class="w-full pt-16 bg-surface px-space-lg py-space-md min-h-screen"><div class="flex flex-col w-full pb-space-2xl space-y-space-xl">
+<!-- Top Heading & Global Actions -->
+<section class="flex flex-col lg:flex-row lg:items-center justify-between gap-space-md">
+<div class="space-y-1">
+<div class="flex flex-wrap items-center gap-2">
+<h1 class="font-headline-lg text-headline-lg text-on-surface tracking-tight">Manajemen Sesi WhatsApp</h1>
+<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-surface-container-high text-primary font-label-xs text-label-xs font-bold uppercase tracking-wider">
+          Baileys MultiDevice v6.5
+        </span>
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-surface-container-lowest text-primary font-label-xs text-label-xs font-bold shadow-sm">
+<span class="w-2 h-2 rounded-full bg-primary-container animate-pulse"></span>
+          3 dari 5 Sesi Aktif
+        </span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-3xl">
+        Kelola koneksi multi-perangkat WhatsApp, otentikasi QR Code realtime, Pairing Code 8-digit, pemantauan kesehatan sesi, dan proteksi anti-blokir otomatis.
+      </p>
+</div>
+<!-- Quick Operations -->
+<div class="flex items-center gap-2.5 flex-wrap">
+<button class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-surface-container-lowest text-on-surface hover:bg-surface-container-low transition-colors shadow-sm font-label-md text-label-md" type="button">
+<span class="material-symbols-outlined text-[18px]">history</span>
+<span>Riwayat Koneksi</span>
+</button>
+<button class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-surface-container-lowest text-on-surface hover:bg-surface-container-low transition-colors shadow-sm font-label-md text-label-md" title="Segarkan Semua Sesi" type="button">
+<span class="material-symbols-outlined text-[18px]">sync</span>
+<span>Segarkan Status</span>
+</button>
+<button class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary-container text-on-primary-container hover:bg-primary hover:text-on-primary transition-all shadow-sm font-label-md text-label-md font-bold" type="button">
+<span class="material-symbols-outlined text-[20px]">add</span>
+<span>Tambah Sesi Baru</span>
+</button>
+</div>
+</section>
+<!-- 4-Column KPI Dashboard Metric Band -->
+<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md">
+<!-- KPI 1 -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col justify-between relative overflow-hidden group">
+<div class="flex items-center justify-between">
+<span class="font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider">Total Sesi Aktif</span>
+<div class="w-8 h-8 rounded-lg bg-surface-container-low flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]">devices</span>
+</div>
+</div>
+<div class="my-3">
+<div class="flex items-baseline gap-2">
+<span class="font-headline-xl text-headline-xl text-on-surface font-bold">3</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">/ 5 Kuota Perangkat</span>
+</div>
+<div class="w-full bg-surface-container-low h-1.5 rounded-full mt-2.5 overflow-hidden">
+<div class="bg-primary-container h-full rounded-full transition-all duration-500" style="width: 60%"></div>
+</div>
+</div>
+<div class="flex items-center justify-between font-label-xs text-label-xs pt-1">
+<span class="text-primary font-semibold flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span> Socket Stabil
+        </span>
+<span class="text-on-surface-variant">Alokasi RAM: 73.4 MB</span>
+</div>
+</div>
+<!-- KPI 2 -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col justify-between relative overflow-hidden group">
+<div class="flex items-center justify-between">
+<span class="font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider">Terkirim Hari Ini</span>
+<div class="w-8 h-8 rounded-lg bg-surface-container-low flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined text-[20px]">send</span>
+</div>
+</div>
+<div class="my-3">
+<div class="flex items-baseline gap-2">
+<span class="font-headline-xl text-headline-xl text-on-surface font-bold">4.820</span>
+<span class="font-label-xs text-label-xs text-primary font-bold bg-surface-container-low px-1.5 py-0.5 rounded">
+            +15.2%
+          </span>
+</div>
+<div class="flex items-center gap-1 text-on-surface-variant font-label-xs text-label-xs mt-1.5">
+<span class="material-symbols-outlined text-[14px] text-primary">check_circle</span>
+<span>Rasio Keberhasilan: <strong class="text-on-surface">99.82%</strong></span>
+</div>
+</div>
+<div class="flex items-center justify-between font-label-xs text-label-xs pt-1">
+<span class="text-on-surface-variant">Antrean Keluar: <strong class="text-on-surface">12</strong></span>
+<span class="text-error font-semibold">Gagal: 4</span>
+</div>
+</div>
+<!-- KPI 3 -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col justify-between relative overflow-hidden group">
+<div class="flex items-center justify-between">
+<span class="font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider">Proteksi Anti-Blokir</span>
+<div class="w-8 h-8 rounded-lg bg-surface-container-low flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]">shield_with_heart</span>
+</div>
+</div>
+<div class="my-3">
+<div class="flex items-baseline gap-2">
+<span class="font-headline-xl text-headline-xl text-primary font-bold">0 / 100</span>
+<span class="font-label-xs text-label-xs text-primary font-bold bg-surface-container-low px-2 py-0.5 rounded-full">
+            Risiko Minimal
+          </span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Smart Jitter Delay (3-8 dtk) Aktif</p>
+</div>
+<div class="flex items-center justify-between font-label-xs text-label-xs pt-1">
+<span class="text-primary font-semibold flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span> Warm-Up Mode
+        </span>
+<span class="text-on-surface-variant">5 Sesi Terlindungi</span>
+</div>
+</div>
+<!-- KPI 4 -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col justify-between relative overflow-hidden group">
+<div class="flex items-center justify-between">
+<span class="font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider">Uptime Mesin Gateway</span>
+<div class="w-8 h-8 rounded-lg bg-surface-container-low flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined text-[20px]">network_check</span>
+</div>
+</div>
+<div class="my-3">
+<div class="flex items-baseline gap-2">
+<span class="font-headline-xl text-headline-xl text-on-surface font-bold">99.98%</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">30 Hari</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Terhubung terus selama 14 hari tanpa putus</p>
+</div>
+<div class="flex items-center justify-between font-label-xs text-label-xs pt-1">
+<span class="text-primary font-semibold">Latency: 28ms</span>
+<span class="text-on-surface-variant">Redis Cache OK</span>
+</div>
+</div>
+</section>
+<!-- Filter & View Controls -->
+<section class="bg-surface-container-lowest rounded-xl p-space-sm shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-space-sm">
+<!-- Filter Tabs -->
+<div class="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0">
+<button class="px-3 py-1.5 rounded-lg bg-surface-container text-primary font-label-md text-label-md font-bold transition-all shadow-none" type="button">
+        Semua Sesi (5)
+      </button>
+<button class="px-3 py-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low font-label-md text-label-md transition-all" type="button">
+        Online (3)
+      </button>
+<button class="px-3 py-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low font-label-md text-label-md transition-all" type="button">
+        Terputus (1)
+      </button>
+<button class="px-3 py-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low font-label-md text-label-md transition-all" type="button">
+        Butuh QR (1)
+      </button>
+</div>
+<!-- Search and View Switcher -->
+<div class="flex items-center gap-space-sm">
+<div class="relative w-full sm:w-64">
+<span class="material-symbols-outlined absolute left-2.5 top-2 text-on-surface-variant text-[18px]">search</span>
+<input class="w-full pl-9 pr-8 py-1.5 bg-surface-container-low rounded-lg font-body-sm text-body-sm text-on-surface placeholder:text-on-surface-variant/70 focus:outline-none focus:bg-surface-container-lowest shadow-none" placeholder="Cari nama, nomor, ID..." type="text"/>
+<span class="absolute right-2.5 top-2 font-label-xs text-label-xs text-on-surface-variant px-1 rounded bg-surface-container-high">/</span>
+</div>
+<div class="flex items-center p-1 bg-surface-container-low rounded-lg">
+<button class="p-1 rounded bg-surface-container-lowest text-on-surface shadow-sm" title="Mode Grid" type="button">
+<span class="material-symbols-outlined text-[18px]">grid_view</span>
+</button>
+<button class="p-1 rounded text-on-surface-variant hover:text-on-surface" title="Mode Daftar" type="button">
+<span class="material-symbols-outlined text-[18px]">table_rows</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Main Sessions Grid -->
+<section class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-space-lg">
+<!-- CARD 1: CONNECTED (SAMSUNG S23 - DEFAULT) -->
+<article class="bg-surface-container-lowest rounded-xl shadow-sm flex flex-col justify-between overflow-hidden transition-all duration-200 hover:shadow-md">
+<div>
+<!-- Card Header -->
+<div class="p-space-md bg-gradient-to-r from-surface-container-low/40 via-surface-container-lowest to-transparent flex items-start justify-between">
+<div class="flex items-center gap-3">
+<div class="w-11 h-11 rounded-xl bg-primary text-on-primary font-bold flex items-center justify-center text-label-lg font-label-lg shadow-sm">
+              AK
+            </div>
+<div>
+<div class="flex items-center gap-2">
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-bold tracking-tight">SAMSUNG S23</h2>
+<span class="px-1.5 py-0.5 rounded bg-surface-container-high text-primary font-label-xs text-label-xs font-bold">
+                  DEFAULT
+                </span>
+</div>
+<p class="font-label-xs text-label-xs text-on-surface-variant mt-0.5">Device ID: nomer-aman-kerja</p>
+</div>
+</div>
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-container-low text-primary font-label-xs text-label-xs font-bold">
+<span class="w-2 h-2 rounded-full bg-primary-container animate-pulse"></span>
+            ONLINE
+          </span>
+</div>
+<!-- Technical Specification Matrix -->
+<div class="px-space-md py-space-sm space-y-2.5">
+<div class="flex items-center justify-between font-body-sm text-body-sm py-1">
+<span class="text-on-surface-variant font-medium">Engine Gateway</span>
+<span class="text-on-surface font-semibold">Baileys (MultiDevice v6.5)</span>
+</div>
+<div class="flex items-center justify-between font-body-sm text-body-sm py-1">
+<span class="text-on-surface-variant font-medium">Nomor WhatsApp</span>
+<span class="text-on-surface font-bold tracking-wide">+62 822-2308-9790</span>
+</div>
+<div class="flex items-center justify-between font-body-sm text-body-sm py-1">
+<span class="text-on-surface-variant font-medium">Sinkron Terakhir</span>
+<span class="text-primary font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px]">check</span> Baru saja (09:13:48 WIB)
+            </span>
+</div>
+<!-- Session Health & Anti-Ban Gauge -->
+<div class="p-space-sm bg-surface-container-low rounded-xl space-y-2 mt-2">
+<div class="flex items-center justify-between font-label-xs text-label-xs">
+<span class="text-on-surface-variant font-bold flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-primary">verified_user</span>
+                KESEHATAN SESI (ANTI-BLOKIR)
+              </span>
+<span class="px-2 py-0.5 rounded bg-surface-container-lowest text-primary font-bold">
+                RISIKO 0/100 (AMAN)
+              </span>
+</div>
+<div class="w-full bg-surface-container h-2 rounded-full overflow-hidden">
+<div class="bg-primary-container h-full rounded-full" style="width: 100%"></div>
+</div>
+<div class="flex items-center justify-between font-label-xs text-label-xs text-on-surface-variant">
+<span>Terkirim hari ini: <strong class="text-on-surface">1.240</strong></span>
+<span>Gagal: <strong class="text-on-surface">0</strong></span>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer Action Area -->
+<div class="p-space-md bg-surface-container-low/40 flex items-center justify-between gap-2 mt-2">
+<div class="flex items-center gap-1.5">
+<button class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-surface-container-lowest text-on-surface hover:bg-surface-container-low transition-colors font-label-sm text-label-sm font-semibold shadow-sm" type="button">
+<span class="material-symbols-outlined text-[16px] text-primary">chat</span>
+<span>Buka Inbox</span>
+</button>
+<button class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-on-surface-variant hover:text-error hover:bg-surface-container-lowest transition-colors font-label-sm text-label-sm font-medium" type="button">
+<span class="material-symbols-outlined text-[16px]">power_settings_new</span>
+<span>Putuskan</span>
+</button>
+</div>
+<div class="flex items-center gap-1">
+<button class="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-lowest transition-colors" title="Pengaturan Lanjutan Sesi" type="button">
+<span class="material-symbols-outlined text-[18px]">settings</span>
+</button>
+<button class="p-1.5 rounded-lg text-on-surface-variant hover:text-error hover:bg-surface-container-lowest transition-colors" title="Hapus Sesi" type="button">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</div>
+</div>
+</article>
+<!-- CARD 2: PAIRING CODE / QR INTERACTIVE (CUSTOMER SERVICE CS 2) -->
+<article class="bg-surface-container-lowest rounded-xl shadow-sm flex flex-col justify-between overflow-hidden transition-all duration-200 hover:shadow-md">
+<div>
+<!-- Card Header -->
+<div class="p-space-md bg-surface-container-low/30 flex items-start justify-between">
+<div class="flex items-center gap-3">
+<div class="w-11 h-11 rounded-xl bg-surface-container-high text-on-surface-variant font-bold flex items-center justify-center text-label-lg font-label-lg">
+              CS
+            </div>
+<div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-bold tracking-tight">Customer Service CS 2</h2>
+<p class="font-label-xs text-label-xs text-on-surface-variant mt-0.5">Device ID: cs-support-session</p>
+</div>
+</div>
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 font-label-xs text-label-xs font-bold">
+<span class="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
+            MENUNGGU QR SCAN
+          </span>
+</div>
+<!-- Embedded Interactive Pairing Module -->
+<div class="p-space-md space-y-space-sm">
+<!-- Mode Tabs -->
+<div class="flex items-center p-1 bg-surface-container-low rounded-lg text-label-xs font-label-xs font-bold">
+<button class="flex-1 py-1 text-center rounded bg-surface-container-lowest text-primary shadow-sm" type="button">
+              Scan QR Code
+            </button>
+<button class="flex-1 py-1 text-center rounded text-on-surface-variant hover:text-on-surface" type="button">
+              Pairing Code 8-Digit
+            </button>
+</div>
+<!-- Realistic QR Mockup Box with Branding Centerpiece -->
+<div class="bg-surface-container-low/60 rounded-xl p-space-md flex flex-col items-center justify-center text-center relative group">
+<div class="relative bg-surface-container-lowest p-3 rounded-xl shadow-sm">
+<!-- SVG Visual Representation of QR Code with Center WhatsApp Node -->
+<svg class="w-36 h-36" fill="none" viewbox="0 0 148 148" xmlns="http://www.w3.org/2000/svg">
+<!-- QR Position Detection Markers Top-Left -->
+<rect fill="#0B1C30" height="36" rx="4" width="36" x="8" y="8"></rect>
+<rect fill="#FFFFFF" height="24" rx="2" width="24" x="14" y="14"></rect>
+<rect fill="#0B1C30" height="16" rx="1" width="16" x="18" y="18"></rect>
+<!-- Top-Right -->
+<rect fill="#0B1C30" height="36" rx="4" width="36" x="104" y="8"></rect>
+<rect fill="#FFFFFF" height="24" rx="2" width="24" x="110" y="14"></rect>
+<rect fill="#0B1C30" height="16" rx="1" width="16" x="114" y="18"></rect>
+<!-- Bottom-Left -->
+<rect fill="#0B1C30" height="36" rx="4" width="36" x="8" y="104"></rect>
+<rect fill="#FFFFFF" height="24" rx="2" width="24" x="14" y="110"></rect>
+<rect fill="#0B1C30" height="16" rx="1" width="16" x="18" y="114"></rect>
+<!-- Scattered Pattern Pixels -->
+<rect fill="#0B1C30" height="8" rx="1" width="8" x="52" y="10"></rect>
+<rect fill="#006C49" height="6" rx="1" width="6" x="68" y="12"></rect>
+<rect fill="#0B1C30" height="10" rx="1" width="10" x="82" y="8"></rect>
+<rect fill="#0B1C30" height="6" rx="1" width="14" x="52" y="24"></rect>
+<rect fill="#0B1C30" height="8" rx="1" width="8" x="74" y="28"></rect>
+<rect fill="#006C49" height="6" rx="1" width="6" x="88" y="32"></rect>
+<rect fill="#0B1C30" height="8" rx="1" width="8" x="10" y="52"></rect>
+<rect fill="#0B1C30" height="12" rx="1" width="6" x="24" y="56"></rect>
+<rect fill="#006C49" height="8" rx="1" width="8" x="36" y="52"></rect>
+<rect fill="#0B1C30" height="6" rx="1" width="12" x="10" y="70"></rect>
+<rect fill="#0B1C30" height="6" rx="1" width="14" x="28" y="80"></rect>
+<rect fill="#0B1C30" height="10" rx="1" width="10" x="104" y="54"></rect>
+<rect fill="#0B1C30" height="8" rx="1" width="16" x="122" y="68"></rect>
+<rect fill="#006C49" height="12" rx="1" width="8" x="108" y="82"></rect>
+<rect fill="#0B1C30" height="8" rx="1" width="10" x="52" y="108"></rect>
+<rect fill="#0B1C30" height="16" rx="1" width="8" x="68" y="104"></rect>
+<rect fill="#0B1C30" height="6" rx="1" width="12" x="82" y="112"></rect>
+<rect fill="#0B1C30" height="8" rx="1" width="8" x="104" y="104"></rect>
+<rect fill="#006C49" height="6" rx="1" width="18" x="120" y="116"></rect>
+<rect fill="#0B1C30" height="10" rx="1" width="10" x="110" y="128"></rect>
+<!-- Center Badge with WhatsAman Emerald Accent -->
+<circle cx="74" cy="74" fill="#FFFFFF" r="16"></circle>
+<circle cx="74" cy="74" fill="#10B981" r="13"></circle>
+<path d="M70 70C70 67.7909 71.7909 66 74 66C76.2091 66 78 67.7909 78 70C78 71.3924 77.2885 72.6193 76.2163 73.3377L76.5 77.5L72.5 76C71.0101 75.3289 70 73.7845 70 72V70Z" fill="white"></path>
+</svg>
+</div>
+<!-- Countdown Timer & Refresh -->
+<div class="flex items-center gap-2 mt-3 font-label-xs text-label-xs text-on-surface-variant">
+<span class="material-symbols-outlined text-[15px] text-amber-600">timer</span>
+<span>QR kedaluwarsa dalam <strong class="text-on-surface font-bold">42 detik</strong></span>
+<button class="text-primary font-bold hover:underline ml-1" type="button">Segarkan</button>
+</div>
+</div>
+<!-- Pairing Alternative Info -->
+<div class="flex items-center justify-between p-2 rounded-lg bg-surface-container-low font-label-xs text-label-xs">
+<span class="text-on-surface-variant">Kode Pairing 8-Digit:</span>
+<span class="font-mono text-on-surface font-bold tracking-widest bg-surface-container-lowest px-2 py-0.5 rounded shadow-sm">
+              7K4M - 9PW2
+            </span>
+</div>
+<!-- Quick instructions -->
+<ol class="font-label-xs text-label-xs text-on-surface-variant space-y-1 pl-4 list-decimal">
+<li>Buka WhatsApp di ponsel &gt; Ketuk Menu/Setelan.</li>
+<li>Pilih <strong>Perangkat Tertaut</strong> &gt; <strong>Tautkan Perangkat</strong>.</li>
+<li>Arahkan kamera ke QR Code di atas.</li>
+</ol>
+</div>
+</div>
+<!-- Footer Action Area -->
+<div class="p-space-md bg-surface-container-low/40 flex items-center justify-between gap-2">
+<button class="w-full py-2 rounded-lg bg-surface-container-lowest text-on-surface hover:bg-surface-container-low transition-colors font-label-sm text-label-sm font-semibold shadow-sm flex items-center justify-center gap-1.5" type="button">
+<span class="material-symbols-outlined text-[16px]">sync</span>
+<span>Cek Status Sambungan</span>
+</button>
+<button class="p-2 rounded-lg text-on-surface-variant hover:text-error hover:bg-surface-container-lowest transition-colors" title="Batalkan Pairing" type="button">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+</div>
+</article>
+<!-- CARD 3: ONLINE 2 (XIAOMI REDMI NOTE 12 - ADMIN TOKO) -->
+<article class="bg-surface-container-lowest rounded-xl shadow-sm flex flex-col justify-between overflow-hidden transition-all duration-200 hover:shadow-md">
+<div>
+<!-- Card Header -->
+<div class="p-space-md bg-surface-container-low/30 flex items-start justify-between">
+<div class="flex items-center gap-3">
+<div class="w-11 h-11 rounded-xl bg-surface-container-high text-primary font-bold flex items-center justify-center text-label-lg font-label-lg shadow-sm">
+              XM
+            </div>
+<div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-bold tracking-tight">Xiaomi Redmi Note 12</h2>
+<p class="font-label-xs text-label-xs text-on-surface-variant mt-0.5">Device ID: admin-toko-retail</p>
+</div>
+</div>
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-container-low text-primary font-label-xs text-label-xs font-bold">
+<span class="w-2 h-2 rounded-full bg-primary-container"></span>
+            ONLINE
+          </span>
+</div>
+<!-- Details -->
+<div class="px-space-md py-space-sm space-y-2.5">
+<div class="flex items-center justify-between font-body-sm text-body-sm py-1">
+<span class="text-on-surface-variant font-medium">Engine Gateway</span>
+<span class="text-on-surface font-semibold">Baileys (MultiDevice v6.5)</span>
+</div>
+<div class="flex items-center justify-between font-body-sm text-body-sm py-1">
+<span class="text-on-surface-variant font-medium">Nomor WhatsApp</span>
+<span class="text-on-surface font-bold tracking-wide">+62 857-1239-8450</span>
+</div>
+<div class="flex items-center justify-between font-body-sm text-body-sm py-1">
+<span class="text-on-surface-variant font-medium">Uptime Sesi</span>
+<span class="text-on-surface font-semibold">4 Hari 18 Jam</span>
+</div>
+<!-- Session Health Indicator -->
+<div class="p-space-sm bg-surface-container-low rounded-xl space-y-2 mt-2">
+<div class="flex items-center justify-between font-label-xs text-label-xs">
+<span class="text-on-surface-variant font-bold flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-primary">verified_user</span>
+                KESEHATAN SESI (ANTI-BLOKIR)
+              </span>
+<span class="px-2 py-0.5 rounded bg-surface-container-lowest text-primary font-bold">
+                RISIKO 2/100 (SANGAT BAIK)
+              </span>
+</div>
+<div class="w-full bg-surface-container h-2 rounded-full overflow-hidden">
+<div class="bg-primary-container h-full rounded-full" style="width: 96%"></div>
+</div>
+<div class="flex items-center justify-between font-label-xs text-label-xs text-on-surface-variant">
+<span>Terkirim hari ini: <strong class="text-on-surface">640</strong></span>
+<span>Gagal: <strong class="text-on-surface">1</strong></span>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer Action Area -->
+<div class="p-space-md bg-surface-container-low/40 flex items-center justify-between gap-2 mt-2">
+<div class="flex items-center gap-1.5">
+<button class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-surface-container-lowest text-on-surface hover:bg-surface-container-low transition-colors font-label-sm text-label-sm font-semibold shadow-sm" type="button">
+<span class="material-symbols-outlined text-[16px] text-primary">chat</span>
+<span>Buka Inbox</span>
+</button>
+<button class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-on-surface-variant hover:text-error hover:bg-surface-container-lowest transition-colors font-label-sm text-label-sm font-medium" type="button">
+<span class="material-symbols-outlined text-[16px]">power_settings_new</span>
+<span>Putuskan</span>
+</button>
+</div>
+<div class="flex items-center gap-1">
+<button class="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-lowest transition-colors" title="Pengaturan Lanjutan Sesi" type="button">
+<span class="material-symbols-outlined text-[18px]">settings</span>
+</button>
+<button class="p-1.5 rounded-lg text-on-surface-variant hover:text-error hover:bg-surface-container-lowest transition-colors" title="Hapus Sesi" type="button">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</div>
+</div>
+</article>
+<!-- CARD 4: DISCONNECTED / LOGGED OUT -->
+<article class="bg-surface-container-lowest rounded-xl shadow-sm flex flex-col justify-between overflow-hidden transition-all duration-200 hover:shadow-md">
+<div>
+<!-- Card Header -->
+<div class="p-space-md bg-error-container/20 flex items-start justify-between">
+<div class="flex items-center gap-3">
+<div class="w-11 h-11 rounded-xl bg-surface-container-high text-on-surface-variant font-bold flex items-center justify-center text-label-lg font-label-lg">
+              BC
+            </div>
+<div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-bold tracking-tight">Nomor Cadangan Broadcast</h2>
+<p class="font-label-xs text-label-xs text-on-surface-variant mt-0.5">Device ID: nomor-cadangan-02</p>
+</div>
+</div>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-error-container text-on-error-container font-label-xs text-label-xs font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-error"></span>
+            DISCONNECTED
+          </span>
+</div>
+<!-- Technical Details -->
+<div class="px-space-md py-space-sm space-y-2.5">
+<div class="flex items-center justify-between font-body-sm text-body-sm py-1">
+<span class="text-on-surface-variant font-medium">Engine Gateway</span>
+<span class="text-on-surface font-semibold">Baileys (MultiDevice v6.5)</span>
+</div>
+<div class="flex items-center justify-between font-body-sm text-body-sm py-1">
+<span class="text-on-surface-variant font-medium">Nomor WhatsApp</span>
+<span class="text-on-surface font-semibold">+62 813-8899-7711</span>
+</div>
+<div class="flex items-center justify-between font-body-sm text-body-sm py-1">
+<span class="text-on-surface-variant font-medium">Terakhir Terhubung</span>
+<span class="text-on-surface-variant">Kemarin, 18:40:12 WIB</span>
+</div>
+<!-- Alert Notification Box -->
+<div class="p-space-sm bg-surface-container-low rounded-xl flex items-start gap-2.5 mt-2">
+<span class="material-symbols-outlined text-[20px] text-error shrink-0 mt-0.5">info</span>
+<div class="space-y-0.5">
+<span class="font-label-xs text-label-xs text-on-surface font-bold">Sesi Terputus dari Ponsel</span>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
+                Kredensial lokal valid tetapi koneksi socket WhatsApp terputus. Klik sambung ulang untuk memulihkan sesi.
+              </p>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer Action Area -->
+<div class="p-space-md bg-surface-container-low/40 flex items-center justify-between gap-2 mt-2">
+<div class="flex items-center gap-1.5">
+<button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-container text-on-primary-container hover:bg-primary hover:text-on-primary transition-all font-label-sm text-label-sm font-bold shadow-sm" type="button">
+<span class="material-symbols-outlined text-[16px]">bolt</span>
+<span>Hubungkan Ulang</span>
+</button>
+<button class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-surface-container-lowest text-on-surface hover:bg-surface-container-low transition-colors font-label-sm text-label-sm font-semibold shadow-sm" type="button">
+<span class="material-symbols-outlined text-[16px]">qr_code_scanner</span>
+<span>Scan Baru</span>
+</button>
+</div>
+<button class="p-1.5 rounded-lg text-error hover:bg-error-container transition-colors" title="Hapus Sesi Terputus" type="button">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</div>
+</article>
+<!-- CARD 5: EMPTY SLOT / QUICK ADD SESSION -->
+<article class="bg-surface-container-low/40 rounded-xl p-space-lg flex flex-col items-center justify-center text-center transition-all duration-200 hover:bg-surface-container-low group min-h-[360px]">
+<div class="w-16 h-16 rounded-2xl bg-surface-container-lowest shadow-sm flex items-center justify-center text-primary group-hover:scale-105 transition-transform mb-4">
+<span class="material-symbols-outlined text-[32px]">phonelink_ring</span>
+</div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface font-bold">Slot Sesi Tersedia (Slot 5/5)</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant max-w-xs mt-1.5 mb-6">
+        Tambahkan nomor WhatsApp tim marketing, CS, atau cadangan bot tanpa memerlukan instalasi emulator tambahan.
+      </p>
+<button class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary-container text-on-primary-container hover:bg-primary hover:text-on-primary font-label-md text-label-md font-bold transition-all shadow-sm" type="button">
+<span class="material-symbols-outlined text-[20px]">add_circle</span>
+<span>Mulai Pairing Baru</span>
+</button>
+<span class="font-label-xs text-label-xs text-on-surface-variant mt-3 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">shield</span>
+        Terenkripsi End-to-End dengan Baileys KeyStore
+      </span>
+</article>
+</section>
+<!-- Educational Section: Security & Anti-Banned Best Practices -->
+<section class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-space-sm mb-space-md">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-surface-container-low flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]">security</span>
+</div>
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface font-bold">Panduan Proteksi Akun &amp; Anti-Banned WhatsApp</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Rekomendasi teknis WhatsAman untuk menjaga reputasi nomor dan keawetan sesi API Anda.</p>
+</div>
+</div>
+<a class="inline-flex items-center gap-1 font-label-sm text-label-sm text-primary font-bold hover:underline" href="#">
+<span>Baca Dokumentasi Lengkap</span>
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</a>
+</div>
+<!-- Best Practice Cards Grid -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-space-md">
+<div class="bg-surface-container-low/60 rounded-xl p-space-md space-y-2">
+<div class="flex items-center gap-2 text-primary font-label-md text-label-md font-bold">
+<span class="material-symbols-outlined text-[18px]">hourglass_empty</span>
+<span>1. Jeda Pesan Acak (Random Jitter)</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
+          Gunakan interval pengiriman antara 5 hingga 15 detik pada pesan massal untuk menyerupai pola ketikan manusia alami dan menghindari pemicu filter spam sistem WhatsApp.
+        </p>
+</div>
+<div class="bg-surface-container-low/60 rounded-xl p-space-md space-y-2">
+<div class="flex items-center gap-2 text-primary font-label-md text-label-md font-bold">
+<span class="material-symbols-outlined text-[18px]">local_fire_department</span>
+<span>2. Tahapan Warm-Up Nomor Baru</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
+          Jangan langsung mengirim broadcast ratusan pesan pada kartu perdana baru. Mulai dengan 20-50 pesan interaktif hari pertama, dan naikkan bertahap selama 7-14 hari.
+        </p>
+</div>
+<div class="bg-surface-container-low/60 rounded-xl p-space-md space-y-2">
+<div class="flex items-center gap-2 text-primary font-label-md text-label-md font-bold">
+<span class="material-symbols-outlined text-[18px]">lock</span>
+<span>3. Isolasi Sesi &amp; Kredensial Enkripsi</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
+          Folder kredensial multi-device WhatsAman dilindungi AES-256 lokal. Hindari login-logout berulang kali di banyak ponsel agar token auth tidak dicabut oleh server WhatsApp.
+        </p>
+</div>
+</div>
+</section>
+</div>
+<script>
+  // Simple reactive timer for QR code demonstration
+  let seconds = 42;
+  const timerDisplay = document.querySelector('.material-symbols-outlined.text-amber-600')?.nextElementSibling?.querySelector('strong');
+  if (timerDisplay) {
+    setInterval(() => {
+      if (seconds > 1) {
+        seconds--;
+        timerDisplay.textContent = seconds + ' detik';
+      } else {
+        seconds = 45;
+        timerDisplay.textContent = '45 detik';
+      }
+    }, 1000);
+  }
+</script></main></div></body></html>

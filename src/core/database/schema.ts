@@ -1,3 +1,4 @@
+import Database from 'better-sqlite3';
 import { getDatabase } from './connection';
 import { logger } from '../../utils/logger';
 
@@ -418,5 +419,52 @@ export function initializeDatabaseSchema(): void {
     // Index already exists
   }
 
-  logger.info('Database schema initialized successfully with CRM, Sequencer, Webhooks & Recurring extensions.');
+  // ==========================================================================
+  // Versioned migration system (PRAGMA user_version)
+  // --------------------------------------------------------------------------
+  // Legacy migrations above use ALTER TABLE + try/catch, which silently swallows
+  // real errors and historically caused ordering bugs (e.g. an index created
+  // before its column existed). New schema changes MUST be added as ordered
+  // migrations below instead of more try/catch blocks. `user_version` is read
+  // once and each unapplied migration runs exactly once, inside a transaction.
+  // ==========================================================================
+  const currentVersion = db.pragma('user_version', { simple: true }) as number;
+
+  interface Migration {
+    version: number;
+    name: string;
+    up: (db: Database.Database) => void;
+  }
+
+  const migrations: Migration[] = [
+    // Example shape for future migrations — DO NOT renumber, only append:
+    // {
+    //   version: 2,
+    //   name: 'add_chat_denormalized_table',
+    //   up: (db) => {
+    //     db.exec(`CREATE TABLE IF NOT EXISTS chats (...);`);
+    //   }
+    // }
+  ];
+
+  const pending = migrations.filter((m) => m.version > currentVersion);
+  if (pending.length > 0) {
+    logger.info(
+      { from: currentVersion, to: pending[pending.length - 1].version, count: pending.length },
+      'Running pending database migrations'
+    );
+    for (const migration of pending) {
+      const runMigration = db.transaction(() => {
+        migration.up(db);
+        db.pragma(`user_version = ${migration.version}`);
+      });
+      runMigration();
+      logger.info({ version: migration.version, name: migration.name }, 'Database migration applied');
+    }
+  }
+
+  logger.info(
+    { userVersion: db.pragma('user_version', { simple: true }) },
+    'Database schema initialized successfully with CRM, Sequencer, Webhooks & Recurring extensions.'
+  );
 }
