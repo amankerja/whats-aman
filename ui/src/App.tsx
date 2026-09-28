@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   LayoutDashboard,
   Smartphone,
@@ -52,8 +52,53 @@ import {
   Video,
   Image,
   HardDrive,
-  Settings
+  Settings,
+  Webhook,
+  Code2,
+  ExternalLink,
+  Share2,
+  Globe,
+  Languages
 } from 'lucide-react';
+import { translations, Language } from './i18n';
+
+export interface IntegrationConfig {
+  id: string;
+  sessionId?: string;
+  provider: 'google_form' | 'cf7' | 'woocommerce' | 'elementor' | 'caldera' | 'formidable' | 'custom';
+  name: string;
+  secretToken?: string;
+  templateText: string;
+  adminPhone?: string;
+  adminTemplateText?: string;
+  isActive: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface OutgoingWebhook {
+  id: string;
+  name: string;
+  targetUrl: string;
+  events?: string[];
+  sessionId?: string;
+  secretKey?: string;
+  isActive: boolean;
+  failureCount: number;
+  lastDeliveredAt?: number;
+  createdAt: number;
+}
+
+export interface IntegrationLog {
+  id: string;
+  provider: string;
+  sessionId: string;
+  targetPhone: string;
+  status: 'SUCCESS' | 'FAILED';
+  payload: any;
+  errorMessage?: string;
+  createdAt: number;
+}
 
 interface SessionMeta {
   id: string;
@@ -220,6 +265,39 @@ function parsePhoneFromJid(jid: string): string | null {
   return user;
 }
 
+function isSameChat(
+  chatJidA?: string | null,
+  chatJidB?: string | null,
+  phoneA?: string | null,
+  phoneB?: string | null
+): boolean {
+  if (!chatJidA || !chatJidB) return false;
+  if (chatJidA === chatJidB) return true;
+
+  // Normalize device extensions (e.g. 628123:0@s.whatsapp.net -> 628123@s.whatsapp.net)
+  const cleanA = chatJidA.includes(':') && chatJidA.includes('@') ? chatJidA.replace(/:[0-9]+@/, '@') : chatJidA;
+  const cleanB = chatJidB.includes(':') && chatJidB.includes('@') ? chatJidB.replace(/:[0-9]+@/, '@') : chatJidB;
+  if (cleanA === cleanB) return true;
+
+  // Groups and Channels must match strictly
+  if (cleanA.endsWith('@g.us') || cleanB.endsWith('@g.us') || cleanA.endsWith('@newsletter') || cleanB.endsWith('@newsletter')) {
+    return cleanA === cleanB;
+  }
+
+  // Extract phone numbers from JID if available
+  const digitsA = phoneA || parsePhoneFromJid(cleanA);
+  const digitsB = phoneB || parsePhoneFromJid(cleanB);
+
+  if (digitsA && digitsB) {
+    return digitsA === digitsB;
+  }
+
+  if (digitsA && (cleanB.startsWith(digitsA) || cleanB.includes(digitsA))) return true;
+  if (digitsB && (cleanA.startsWith(digitsB) || cleanA.includes(digitsB))) return true;
+
+  return false;
+}
+
 const TWO_DIGIT_COUNTRY_CODE = /^(?:2[07]|3[0-469]|4[013-9]|5[1-8]|6[0-6]|8[1246]|9[0-58])/;
 
 function formatPhoneForDisplay(phoneOrJid: string): string {
@@ -376,7 +454,7 @@ interface ChatAvatarProps {
 const loadedAvatarUrls = new Set<string>();
 const failedAvatarUrls = new Set<string>();
 
-const ChatAvatar: React.FC<ChatAvatarProps> = ({
+const ChatAvatar: React.FC<ChatAvatarProps> = React.memo(({
   sessionId,
   jid,
   name,
@@ -471,7 +549,164 @@ const ChatAvatar: React.FC<ChatAvatarProps> = ({
       )}
     </div>
   );
-};
+});
+
+interface ChatInputBoxProps {
+  onSend: (text: string) => void;
+  onAttach: () => void;
+  disabled?: boolean;
+  placeholder?: string;
+  sendTitle?: string;
+  attachTitle?: string;
+}
+
+const ChatInputBox: React.FC<ChatInputBoxProps> = React.memo(({
+  onSend,
+  onAttach,
+  disabled = false,
+  placeholder,
+  sendTitle,
+  attachTitle,
+}) => {
+  const [text, setText] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = text.trim();
+    if (!trimmed || disabled) return;
+    onSend(trimmed);
+    setText('');
+  };
+
+  return (
+    <div className="room-input-footer">
+      <form className="input-form" onSubmit={handleSubmit}>
+        <button
+          type="button"
+          className="btn-input-accessory"
+          title="Emoji"
+          onClick={() => setText(prev => prev + ' 😊')}
+        >
+          <Smile size={20} />
+        </button>
+        <button
+          type="button"
+          className="btn-input-accessory"
+          title={attachTitle || 'Lampirkan File'}
+          onClick={onAttach}
+        >
+          <Paperclip size={20} />
+        </button>
+        <input
+          type="text"
+          placeholder={placeholder || 'Ketik pesan...'}
+          value={text}
+          onChange={e => setText(e.target.value)}
+          className="message-text-input"
+          disabled={disabled}
+        />
+        <button
+          type="submit"
+          disabled={!text.trim() || disabled}
+          className="btn-send-message"
+          title={sendTitle || 'Kirim'}
+        >
+          <Send size={18} style={{ marginLeft: '2px' }} />
+        </button>
+      </form>
+    </div>
+  );
+});
+
+interface ChatMessageBubbleProps {
+  message: ChatMessage;
+  isMe: boolean;
+  showDateSeparator: boolean;
+  dateSeparatorText?: string;
+  senderDisplayName?: string;
+  isGroupChat: boolean;
+}
+
+const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = React.memo(({
+  message: m,
+  isMe,
+  showDateSeparator,
+  dateSeparatorText,
+  senderDisplayName,
+  isGroupChat
+}) => {
+  return (
+    <React.Fragment key={m.id}>
+      {showDateSeparator && dateSeparatorText && (
+        <div className="chat-date-separator">
+          <span>{dateSeparatorText}</span>
+        </div>
+      )}
+      <div className={`message-bubble-wrapper ${isMe ? 'outgoing' : 'incoming'}`}>
+        <div className={`message-bubble ${isMe ? 'outgoing' : 'incoming'}`}>
+          {!isMe && isGroupChat && senderDisplayName && (
+            <div className="message-sender">
+              {senderDisplayName}
+            </div>
+          )}
+          {m.media_url && m.media_type === 'audio' && (
+            <div className="chat-audio-media">
+              <audio controls preload="metadata" className="chat-audio-player" src={m.media_url}>
+                Browser tidak mendukung pemutar audio.
+              </audio>
+            </div>
+          )}
+          {m.media_url && m.media_type === 'video' && (
+            <div className="chat-video-media">
+              <video controls preload="metadata" className="chat-video-player" src={m.media_url}>
+                Browser tidak mendukung pemutar video.
+              </video>
+            </div>
+          )}
+          {m.media_url && m.media_type === 'document' && (
+            <div className="chat-document-media">
+              <a href={m.media_url} target="_blank" rel="noreferrer" download className="chat-doc-card">
+                <FileText size={26} className="chat-doc-icon" />
+                <div className="chat-doc-info">
+                  <span className="chat-doc-name">{m.caption || 'Dokumen File'}</span>
+                  <span className="chat-doc-action">Klik untuk Mengunduh</span>
+                </div>
+              </a>
+            </div>
+          )}
+          {m.media_url && (m.media_type === 'image' || m.media_type === 'sticker' || !m.media_type) && (
+            <div style={{ marginBottom: '0.375rem', borderRadius: '8px', overflow: 'hidden' }}>
+              <img
+                src={m.media_url}
+                alt="Media message"
+                className={m.media_type === 'sticker' ? 'chat-sticker-media' : 'chat-image-media'}
+                onClick={() => window.open(m.media_url, '_blank')}
+              />
+            </div>
+          )}
+          {!m.media_url && m.media_type && (
+            <div className="chat-media-badge">
+              {m.media_type === 'audio' ? <Mic size={14} /> : m.media_type === 'video' ? <Video size={14} /> : m.media_type === 'document' ? <FileText size={14} /> : <Image size={14} />}
+              <span>{m.media_type === 'audio' ? 'Voice Note' : m.media_type === 'video' ? 'Video' : m.media_type === 'document' ? 'Dokumen' : 'Foto'}</span>
+            </div>
+          )}
+          <div className="message-text">{m.content_text || m.caption}</div>
+          <div className="message-meta">
+            <span className="message-time">
+              {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+            {isMe && (
+              <CheckCheck
+                size={14}
+                className={`message-status-icon ${m.status === 'READ' ? 'read' : ''}`}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+    </React.Fragment>
+  );
+});
 
 export default function App() {
   // Theme state: light or dark
@@ -488,13 +723,26 @@ export default function App() {
 
   // Active navigation tab
   const [activeTab, setActiveTab] = useState<
-    'dashboard' | 'sessions' | 'chats' | 'crm' | 'contacts' | 'groups' | 'campaigns' | 'tester' | 'automation' | 'infrastructure' | 'logs'
+    'dashboard' | 'sessions' | 'chats' | 'crm' | 'contacts' | 'groups' | 'campaigns' | 'tester' | 'automation' | 'integrations' | 'infrastructure' | 'logs'
   >('dashboard');
 
   // AMAN CHAT Pro: Privacy & Security Mode (Alt + P)
   const [privacyMode, setPrivacyMode] = useState<boolean>(() => {
     return localStorage.getItem('whatsaman_privacy') === 'true';
   });
+
+  // Multilingual Support (i18n: Indonesian / English)
+  const [lang, setLang] = useState<Language>(() => {
+    return (localStorage.getItem('whatsaman_lang') as Language) || 'id';
+  });
+  const t = translations[lang];
+
+  const toggleLanguage = () => {
+    const nextLang: Language = lang === 'id' ? 'en' : 'id';
+    setLang(nextLang);
+    localStorage.setItem('whatsaman_lang', nextLang);
+    addLog(nextLang === 'id' ? 'Bahasa antarmuka diubah ke Bahasa Indonesia' : 'Interface language switched to English', 'info');
+  };
 
   // AMAN CHAT Pro: CRM Pipeline, Follow-up Sequencer & Sales Funnel
   const [crmStageFilter, setCrmStageFilter] = useState<'ALL' | 'lead' | 'prospect' | 'customer' | 'churned'>('ALL');
@@ -568,7 +816,88 @@ export default function App() {
   const [chatReplyText, setChatReplyText] = useState('');
   const [isNewChatModal, setIsNewChatModal] = useState(false);
   const [newChatPhone, setNewChatPhone] = useState('');
+  const [isRefreshingChats, setIsRefreshingChats] = useState(false);
+  const [refreshSuccess, setRefreshSuccess] = useState(false);
+  const [isRefreshingThread, setIsRefreshingThread] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  // O(1) Fast Lookups & Memoized Filtering
+  const contactsMap = useMemo(() => {
+    const map = new Map<string, Contact>();
+    for (const c of contacts) {
+      if (c.phone) map.set(c.phone, c);
+      if (c.jid) map.set(c.jid, c);
+    }
+    return map;
+  }, [contacts]);
+
+  const groupsMap = useMemo(() => {
+    const map = new Map<string, Group>();
+    for (const g of groups) {
+      if (g.jid) map.set(g.jid, g);
+    }
+    return map;
+  }, [groups]);
+
+  const findContact = useCallback((phoneOrJid?: string | null): Contact | null => {
+    if (!phoneOrJid) return null;
+    const direct = contactsMap.get(phoneOrJid);
+    if (direct) return direct;
+    const cleanPhone = phoneOrJid.split('@')[0].replace(/[^0-9]/g, '');
+    if (cleanPhone) return contactsMap.get(cleanPhone) || null;
+    return null;
+  }, [contactsMap]);
+
+  const unreadChatsCount = useMemo(() => {
+    return chats.filter(c => (c.unread_count || 0) > 0 && !c.chat_jid.includes('broadcast')).length;
+  }, [chats]);
+
+  const filteredChats = useMemo(() => {
+    const query = chatSearchQuery.trim().toLowerCase();
+    return chats.filter(c => {
+      if (c.chat_jid.includes('broadcast')) return false;
+      const isGroup = c.chat_jid.endsWith('@g.us');
+      const isNewsletter = c.chat_jid.endsWith('@newsletter');
+      const isPersonal = !isGroup && !isNewsletter;
+      const isUnread = (c.unread_count || 0) > 0;
+
+      if (chatFilter === 'personal' && !isPersonal) return false;
+      if (chatFilter === 'groups' && !isGroup) return false;
+      if (chatFilter === 'channels' && !isNewsletter) return false;
+      if (chatFilter === 'unread' && !isUnread) return false;
+
+      if (!query) return true;
+
+      const groupMatch = isGroup ? groupsMap.get(c.chat_jid) : null;
+      const nameToSearch = groupMatch?.name || c.name || c.push_name || '';
+      return `${c.chat_jid} ${nameToSearch} ${c.last_message || ''}`.toLowerCase().includes(query);
+    });
+  }, [chats, chatFilter, chatSearchQuery, groupsMap]);
+
+  const filteredContacts = useMemo(() => {
+    const query = chatSearchQuery.trim().toLowerCase();
+    if (!query) return contacts;
+    return contacts.filter(c =>
+      `${c.phone} ${c.name || ''} ${c.push_name || ''} ${c.tags.join(' ')}`.toLowerCase().includes(query)
+    );
+  }, [contacts, chatSearchQuery]);
+
+  const filteredGroups = useMemo(() => {
+    const query = chatSearchQuery.trim().toLowerCase();
+    if (!query) return groups;
+    return groups.filter(g =>
+      `${g.jid} ${g.name || ''}`.toLowerCase().includes(query)
+    );
+  }, [groups, chatSearchQuery]);
+
+  const filteredChannels = useMemo(() => {
+    const query = chatSearchQuery.trim().toLowerCase();
+    return chats.filter(c => {
+      if (!c.chat_jid.endsWith('@newsletter')) return false;
+      if (!query) return true;
+      return `${c.chat_jid} ${c.name || ''} ${c.push_name || ''} ${c.last_message || ''}`.toLowerCase().includes(query);
+    });
+  }, [chats, chatSearchQuery]);
 
   // Chat Page Broadcast State
   const [isChatBroadcastModal, setIsChatBroadcastModal] = useState(false);
@@ -593,6 +922,27 @@ export default function App() {
   const [testerMediaCaption, setTesterMediaCaption] = useState('Lampiran file WhatsAman');
   const [testerLoading, setTesterLoading] = useState(false);
   const [testerResponse, setTesterResponse] = useState<any | null>(null);
+
+  // Webhooks & 3rd-Party Integrations State
+  const [integrationConfigs, setIntegrationConfigs] = useState<IntegrationConfig[]>([]);
+  const [outgoingWebhooks, setOutgoingWebhooks] = useState<OutgoingWebhook[]>([]);
+  const [integrationLogs, setIntegrationLogs] = useState<IntegrationLog[]>([]);
+  const [selectedIntegrationTab, setSelectedIntegrationTab] = useState<'google_form' | 'woocommerce' | 'cf7' | 'elementor' | 'caldera' | 'formidable' | 'outgoing' | 'logs'>('google_form');
+  const [copiedWebhookUrl, setCopiedWebhookUrl] = useState(false);
+  const [copiedScriptCode, setCopiedScriptCode] = useState(false);
+  const [isTestIntegrationModal, setIsTestIntegrationModal] = useState(false);
+  const [testIntegrationPhone, setTestIntegrationPhone] = useState('');
+  const [testIntegrationName, setTestIntegrationName] = useState('Budi Santoso');
+  const [testIntegrationFormName, setTestIntegrationFormName] = useState('Formulir Pendaftaran');
+  const [testIntegrationLoading, setTestIntegrationLoading] = useState(false);
+  const [testIntegrationResult, setTestIntegrationResult] = useState<any>(null);
+  const [editIntegrationConfig, setEditIntegrationConfig] = useState<IntegrationConfig | null>(null);
+  const [isEditIntegrationModal, setIsEditIntegrationModal] = useState(false);
+  const [isAddOutgoingWebhookModal, setIsAddOutgoingWebhookModal] = useState(false);
+  const [newWebhookName, setNewWebhookName] = useState('');
+  const [newWebhookUrl, setNewWebhookUrl] = useState('');
+  const [newWebhookSecret, setNewWebhookSecret] = useState('');
+  const [newWebhookEvents, setNewWebhookEvents] = useState<string[]>(['message.received', 'message.ack']);
 
   // Modals state
   const [isAddSessionModal, setIsAddSessionModal] = useState(false);
@@ -675,8 +1025,10 @@ export default function App() {
   const wsRef = useRef<WebSocket | null>(null);
   const selectedSessionIdRef = useRef<string>(selectedSessionId);
   const activeChatJidRef = useRef<string | null>(activeChatJid);
+  const chatsRef = useRef<ChatItem[]>(chats);
   selectedSessionIdRef.current = selectedSessionId;
   activeChatJidRef.current = activeChatJid;
+  chatsRef.current = chats;
 
   // Set Theme attribute on HTML tag
   useEffect(() => {
@@ -827,6 +1179,48 @@ export default function App() {
     }
   };
 
+  const handleManualRefreshChats = async () => {
+    if (isRefreshingChats) return;
+    setIsRefreshingChats(true);
+    setRefreshSuccess(false);
+    try {
+      const promises: Promise<any>[] = [];
+      if (selectedSessionId) {
+        promises.push(fetchChats(selectedSessionId));
+        promises.push(fetchGroups(selectedSessionId));
+        promises.push(fetchContacts(selectedSessionId));
+        if (activeChatJid) {
+          promises.push(fetchChatMessages(selectedSessionId, activeChatJid));
+        }
+      }
+      promises.push(fetchSessions());
+      await Promise.all(promises);
+      setRefreshSuccess(true);
+      setTimeout(() => setRefreshSuccess(false), 2500);
+    } catch (err) {
+      console.error('Error refreshing chats:', err);
+    } finally {
+      setTimeout(() => {
+        setIsRefreshingChats(false);
+      }, 450);
+    }
+  };
+
+  const handleRefreshActiveThread = async () => {
+    if (!selectedSessionId || !activeChatJid || isRefreshingThread) return;
+    setIsRefreshingThread(true);
+    try {
+      await fetchChatMessages(selectedSessionId, activeChatJid);
+      await fetchChats(selectedSessionId);
+    } catch (err) {
+      console.error('Error refreshing thread:', err);
+    } finally {
+      setTimeout(() => {
+        setIsRefreshingThread(false);
+      }, 450);
+    }
+  };
+
   const fetchRules = async () => {
     try {
       const res = await fetch('/api/v1/automation');
@@ -867,6 +1261,156 @@ export default function App() {
     }
   };
 
+  const fetchIntegrationConfigs = async () => {
+    try {
+      const res = await fetch(`/api/v1/integrations/configs${selectedSessionId ? `?sessionId=${selectedSessionId}` : ''}`);
+      const data = await res.json();
+      if (data.success) setIntegrationConfigs(data.data);
+    } catch (err) {
+      console.error('Failed to fetch integration configs:', err);
+    }
+  };
+
+  const fetchOutgoingWebhooks = async () => {
+    try {
+      const res = await fetch(`/api/v1/webhooks${selectedSessionId ? `?sessionId=${selectedSessionId}` : ''}`);
+      const data = await res.json();
+      if (data.success) setOutgoingWebhooks(data.data);
+    } catch (err) {
+      console.error('Failed to fetch webhooks:', err);
+    }
+  };
+
+  const fetchIntegrationLogs = async () => {
+    try {
+      const res = await fetch(`/api/v1/integrations/logs?limit=50${selectedSessionId ? `&sessionId=${selectedSessionId}` : ''}`);
+      const data = await res.json();
+      if (data.success) setIntegrationLogs(data.data);
+    } catch (err) {
+      console.error('Failed to fetch integration logs:', err);
+    }
+  };
+
+  const handleSaveIntegrationConfig = async (conf: Partial<IntegrationConfig>) => {
+    try {
+      const res = await fetch('/api/v1/integrations/configs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(conf)
+      });
+      const data = await res.json();
+      if (data.success) {
+        addLog(`Konfigurasi integrasi ${conf.name} berhasil disimpan`, 'success');
+        fetchIntegrationConfigs();
+        setIsEditIntegrationModal(false);
+      } else {
+        alert(data.message || 'Gagal menyimpan konfigurasi');
+      }
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const handleTestIncomingWebhook = async () => {
+    if (!testIntegrationPhone.trim()) {
+      alert('Masukkan nomor WhatsApp tujuan uji coba!');
+      return;
+    }
+    setTestIntegrationLoading(true);
+    setTestIntegrationResult(null);
+    try {
+      const sId = selectedSessionId || sessions[0]?.id || 'default';
+      const provider = selectedIntegrationTab === 'logs' || selectedIntegrationTab === 'outgoing' ? 'google_form' : selectedIntegrationTab;
+      const res = await fetch(`/api/v1/integrations/webhook/${provider}/${sId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: testIntegrationName,
+          phone: testIntegrationPhone,
+          form_name: testIntegrationFormName,
+          order_id: '1001',
+          currency: 'Rp',
+          total: '250.000',
+          status: 'Processing',
+          items_summary: '1x Kopi Arabika, 2x Roti Bakar',
+          message: 'Halo, saya ingin bertanya info katalog terbaru'
+        })
+      });
+      const data = await res.json();
+      setTestIntegrationResult(data);
+      if (data.success) {
+        addLog(`Test webhook ${provider} berhasil dikirim ke ${testIntegrationPhone}`, 'success');
+        fetchIntegrationLogs();
+      }
+    } catch (err: any) {
+      setTestIntegrationResult({ success: false, message: err.message });
+    } finally {
+      setTestIntegrationLoading(false);
+    }
+  };
+
+  const handleCreateOutgoingWebhook = async () => {
+    if (!newWebhookName.trim() || !newWebhookUrl.trim()) {
+      alert('Nama dan URL Webhook wajib diisi!');
+      return;
+    }
+    try {
+      const res = await fetch('/api/v1/webhooks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newWebhookName,
+          targetUrl: newWebhookUrl,
+          secretKey: newWebhookSecret || undefined,
+          events: newWebhookEvents,
+          sessionId: selectedSessionId || undefined
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        addLog(`Outgoing Webhook ${newWebhookName} berhasil ditambahkan`, 'success');
+        setIsAddOutgoingWebhookModal(false);
+        setNewWebhookName('');
+        setNewWebhookUrl('');
+        setNewWebhookSecret('');
+        fetchOutgoingWebhooks();
+      } else {
+        alert(data.message || 'Gagal menambahkan webhook');
+      }
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const handleDeleteOutgoingWebhook = async (id: string) => {
+    if (!confirm('Hapus webhook subscription ini?')) return;
+    try {
+      const res = await fetch(`/api/v1/webhooks/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        addLog('Webhook subscription dihapus', 'info');
+        fetchOutgoingWebhooks();
+      }
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const handleTestOutgoingWebhook = async (id: string) => {
+    try {
+      const res = await fetch(`/api/v1/webhooks/${id}/test`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        alert(`Test Ping terkirim! Status Code: ${data.data?.status || 200}`);
+        fetchOutgoingWebhooks();
+      } else {
+        alert(`Gagal kirim test ping: ${data.message}`);
+      }
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
   // Setup WebSocket connection for real-time synchronization
   useEffect(() => {
     fetchSessions();
@@ -893,11 +1437,22 @@ export default function App() {
 
         ws.onopen = () => {
           addLog('WebSocket terhubung ke WhatsAman Core Engine', 'success');
+          // Reconnection recovery: automatically catch up on missed chats and messages
+          const curSession = selectedSessionIdRef.current;
+          const curChat = activeChatJidRef.current;
+          if (curSession) {
+            fetchSessions();
+            fetchChats(curSession);
+            if (curChat) {
+              fetchChatMessages(curSession, curChat);
+            }
+          }
         };
 
         ws.onmessage = evt => {
           try {
             const msg = JSON.parse(evt.data);
+
             if (msg.event?.startsWith('session.')) {
               fetchSessions();
               addLog(`Event Sesi: ${msg.event} (${msg.payload?.sessionId || ''})`, 'info');
@@ -941,26 +1496,129 @@ export default function App() {
                   fetchGroups(msg.payload?.sessionId);
                   fetchChats(msg.payload?.sessionId);
                 }
-              }
-            }
-            if (msg.event === 'message.received') {
-              addLog(`Pesan Masuk: "${msg.payload?.message?.text || '[Media]'}"`, 'info');
-              const curSession = selectedSessionIdRef.current;
-              const curChat = activeChatJidRef.current;
-              if (curSession) {
-                fetchChats(curSession);
-                if (curChat && (msg.payload?.message?.chatJid === curChat || msg.payload?.message?.to === curChat)) {
-                  fetchChatMessages(curSession, curChat);
+              } else if (msg.event === 'session.history_synced') {
+                addLog(`Sinkronisasi riwayat pesan WhatsApp selesai (${msg.payload?.msgsCount || 0} pesan)`, 'success');
+                const curSession = selectedSessionIdRef.current;
+                const curChat = activeChatJidRef.current;
+                if (curSession && curSession === msg.payload?.sessionId) {
+                  fetchContacts(curSession);
+                  fetchGroups(curSession);
+                  fetchChats(curSession);
+                  if (curChat) {
+                    fetchChatMessages(curSession, curChat);
+                  }
                 }
               }
             }
-            if (msg.event === 'message.ack' || msg.event === 'message.sent') {
+
+            // Real-time Delta Push for incoming and outgoing messages
+            if (msg.event === 'message.received' || msg.event === 'message.sent') {
+              const newMsg = msg.payload?.message;
               const curSession = selectedSessionIdRef.current;
               const curChat = activeChatJidRef.current;
-              if (curSession && curChat) {
-                fetchChatMessages(curSession, curChat);
+
+              if (newMsg && curSession && curSession === newMsg.sessionId) {
+                if (msg.event === 'message.received') {
+                  addLog(`Pesan Masuk: "${newMsg.text || (newMsg.mediaType ? `[${newMsg.mediaType}]` : 'Pesan')}"`, 'info');
+                }
+
+                // Check if message belongs to currently opened chat (robust LID / phone resolution)
+                const activeChatItem = chatsRef.current.find(c => c.chat_jid === curChat);
+                const curPhone = activeChatItem?.resolved_phone || parsePhoneFromJid(curChat || '');
+                const msgPhone = newMsg.resolvedPhone || parsePhoneFromJid(newMsg.chatJid);
+                const isCurrentActive = Boolean(
+                  curChat &&
+                  (isSameChat(curChat, newMsg.chatJid, curPhone, msgPhone) ||
+                   Boolean(newMsg.to && isSameChat(curChat, newMsg.to, curPhone, msgPhone)))
+                );
+
+                if (isCurrentActive) {
+                  // DELTA: append directly without heavy HTTP round-trip
+                  setChatMessages(prev => {
+                    if (prev.some(m => m.id === newMsg.id || m.message_id === newMsg.id)) {
+                      return prev;
+                    }
+                    const incomingMsg: ChatMessage = {
+                      id: newMsg.id,
+                      session_id: newMsg.sessionId,
+                      message_id: newMsg.id,
+                      chat_jid: newMsg.chatJid,
+                      sender_jid: newMsg.senderJid,
+                      from_me: newMsg.fromMe ? 1 : 0,
+                      content_text: newMsg.text,
+                      media_type: newMsg.mediaType,
+                      media_url: newMsg.mediaUrl,
+                      caption: newMsg.caption,
+                      status: newMsg.fromMe ? 'SENT' : 'DELIVERED',
+                      timestamp: newMsg.timestamp
+                    };
+                    return [...prev, incomingMsg];
+                  });
+
+                  setTimeout(() => {
+                    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+                  }, 50);
+                }
+
+                // DELTA: update sidebar chat preview in-place and bubble to top
+                setChats(prevChats => {
+                  const targetIndex = prevChats.findIndex(c => {
+                    const cPhone = c.resolved_phone || parsePhoneFromJid(c.chat_jid);
+                    return isSameChat(c.chat_jid, newMsg.chatJid, cPhone, msgPhone) ||
+                           Boolean(newMsg.to && isSameChat(c.chat_jid, newMsg.to, cPhone, msgPhone));
+                  });
+
+                  const snippetText = newMsg.text || (newMsg.mediaType ? `[${newMsg.mediaType.toUpperCase()}]` : 'Pesan');
+
+                  if (targetIndex !== -1) {
+                    const target = prevChats[targetIndex];
+                    const updatedChat: ChatItem = {
+                      ...target,
+                      last_message: snippetText,
+                      last_from_me: newMsg.fromMe ? 1 : 0,
+                      last_status: newMsg.fromMe ? 'SENT' : 'DELIVERED',
+                      timestamp: newMsg.timestamp,
+                      unread_count: isCurrentActive ? 0 : ((target.unread_count || 0) + (newMsg.fromMe ? 0 : 1))
+                    };
+                    const remaining = prevChats.filter((_, idx) => idx !== targetIndex);
+                    return [updatedChat, ...remaining];
+                  } else {
+                    // Chat not in sidebar yet: fetch to load full metadata
+                    fetchChats(curSession);
+                    return prevChats;
+                  }
+                });
               }
             }
+
+            // Real-time Delta Push for Status Receipts (SENT, DELIVERED, READ)
+            if (msg.event === 'message.ack') {
+              const { messageId, status } = msg.payload || {};
+              if (messageId && status) {
+                setChatMessages(prev =>
+                  prev.map(m => (m.message_id === messageId || m.id === messageId ? { ...m, status } : m))
+                );
+              }
+            }
+
+            // Real-time Delta Push for Media Updates (when media finishes background download)
+            if (msg.event === 'message.updated') {
+              const updatedMsg = msg.payload?.message;
+              if (updatedMsg?.id) {
+                setChatMessages(prev =>
+                  prev.map(m =>
+                    (m.message_id === updatedMsg.id || m.id === updatedMsg.id)
+                      ? {
+                          ...m,
+                          media_url: updatedMsg.mediaUrl || m.media_url,
+                          content_text: updatedMsg.text || m.content_text
+                        }
+                      : m
+                  )
+                );
+              }
+            }
+
             if (msg.event === 'campaign.updated') {
               fetchCampaigns();
             }
@@ -1378,6 +2036,9 @@ export default function App() {
       fetchSalesAnalytics(selectedSessionId, crmTimeRange);
       fetchBotConfig(selectedSessionId);
       fetchCrmAutoDispatch();
+      fetchIntegrationConfigs();
+      fetchOutgoingWebhooks();
+      fetchIntegrationLogs();
     }
   }, [selectedSessionId, crmTimeRange]);
 
@@ -1469,9 +2130,9 @@ export default function App() {
   };
 
   // Direct Chat Send
-  const handleSendChatMessage = async () => {
-    if (!selectedSessionId || !activeChatJid || !chatReplyText.trim()) return;
-    const textToSend = chatReplyText;
+  const handleSendChatMessage = useCallback(async (textOverride?: string) => {
+    const textToSend = (typeof textOverride === 'string' ? textOverride : chatReplyText).trim();
+    if (!selectedSessionId || !activeChatJid || !textToSend) return;
     setChatReplyText('');
     try {
       const res = await fetch('/api/v1/messages/text', {
@@ -1493,7 +2154,7 @@ export default function App() {
     } catch (err: any) {
       alert(err.message);
     }
-  };
+  }, [selectedSessionId, activeChatJid, chatReplyText]);
 
   const handleStartNewChat = () => {
     if (!newChatPhone.trim()) return;
@@ -2011,17 +2672,18 @@ export default function App() {
   const isGlobalConnected = sessions.some(s => s.status === 'CONNECTED');
 
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'sessions', label: 'Sessions', icon: Smartphone },
-    { id: 'chats', label: 'Chats', icon: MessageSquare },
-    { id: 'crm', label: 'CRM & Pipeline', icon: Zap },
-    { id: 'contacts', label: 'Contacts', icon: Users },
-    { id: 'groups', label: 'Groups', icon: Layers },
-    { id: 'campaigns', label: 'Campaigns', icon: Radio },
-    { id: 'tester', label: 'Message Tester', icon: Send },
-    { id: 'automation', label: 'Templates & Rules', icon: ClipboardList },
-    { id: 'infrastructure', label: 'Infrastructure', icon: Server },
-    { id: 'logs', label: 'Audit Logs', icon: FileText }
+    { id: 'dashboard', label: t.nav.dashboard, icon: LayoutDashboard },
+    { id: 'sessions', label: t.nav.sessions, icon: Smartphone },
+    { id: 'chats', label: t.nav.chats, icon: MessageSquare },
+    { id: 'crm', label: t.nav.crm, icon: Zap },
+    { id: 'contacts', label: t.nav.contacts, icon: Users },
+    { id: 'groups', label: t.nav.groups, icon: Layers },
+    { id: 'campaigns', label: t.nav.campaigns, icon: Radio },
+    { id: 'tester', label: t.nav.tester, icon: Send },
+    { id: 'automation', label: t.nav.automation, icon: ClipboardList },
+    { id: 'integrations', label: t.nav.integrations, icon: Webhook },
+    { id: 'infrastructure', label: t.nav.infrastructure, icon: Server },
+    { id: 'logs', label: t.nav.logs, icon: FileText }
   ];
 
   return (
@@ -2037,6 +2699,13 @@ export default function App() {
             <span className="font-extrabold text-base tracking-tight text-slate-900">WhatsAman</span>
           </div>
           <div className="flex items-center gap-1">
+            <button
+              className="btn-icon"
+              onClick={toggleLanguage}
+              title={lang === 'id' ? 'Switch to English' : 'Ubah ke Bahasa Indonesia'}
+            >
+              <Globe size={18} />
+            </button>
             <button
               className={`btn-icon ${privacyMode ? 'text-rose-500' : ''}`}
               onClick={() => {
@@ -2158,10 +2827,24 @@ export default function App() {
             )}
           </button>
 
+          {/* Language Switcher Button */}
+          <button
+            className="theme-toggle-btn"
+            onClick={toggleLanguage}
+            title={lang === 'id' ? 'Ganti Bahasa ke English (Switch to English)' : 'Switch Language to Bahasa Indonesia'}
+          >
+            <Globe size={17} className="text-blue-600" />
+            {!isCollapsed && (
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-700">
+                {lang === 'id' ? '🇮🇩 ID (Indonesia)' : '🇬🇧 EN (English)'}
+              </span>
+            )}
+          </button>
+
           {/* Theme Toggle Button */}
           <button className="theme-toggle-btn" onClick={toggleTheme} title="Ganti Mode Tampilan (Terang / Gelap)">
             {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
-            {!isCollapsed && <span className="text-xs font-medium">{theme === 'dark' ? 'Light Theme' : 'Dark Theme'}</span>}
+            {!isCollapsed && <span className="text-xs font-medium">{theme === 'dark' ? t.common.lightTheme : t.common.darkTheme}</span>}
           </button>
 
           {/* Core Status Pill */}
@@ -2184,18 +2867,32 @@ export default function App() {
           <div className="space-y-6">
             <header className="page-header">
               <div className="page-header__title-group">
-                <h1>Dashboard</h1>
+                <h1>{t.dashboard.title}</h1>
                 <span className={`status-badge ${isGlobalConnected ? 'connected' : 'disconnected'}`}>
-                  {isGlobalConnected ? 'Connected' : 'Disconnected'}
+                  {isGlobalConnected ? t.common.connected : t.common.disconnected}
                 </span>
               </div>
-              <div className="page-header__actions">
+              <div className="page-header__actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await fetchSessions();
+                    await fetchSystemStatus();
+                    if (selectedSessionId) await fetchChats(selectedSessionId);
+                  }}
+                  className="btn-secondary"
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                  title="Refresh Dashboard"
+                >
+                  <RefreshCw size={15} />
+                  <span>{t.common.refresh}</span>
+                </button>
                 <button onClick={() => setIsAddSessionModal(true)} className="btn-primary">
                   <Plus size={16} />
-                  <span>New Session</span>
+                  <span>{t.dashboard.newSession}</span>
                 </button>
               </div>
-              <p className="page-header__subtitle">Overview of your WhatsApp instances, traffic volume, and activity metrics</p>
+              <p className="page-header__subtitle">{t.dashboard.subtitle}</p>
             </header>
 
             {/* WhatsAman 4-Card Stats Grid */}
@@ -2203,29 +2900,29 @@ export default function App() {
               <div className="stat-card">
                 <MessageSquare className="stat-watermark" />
                 <div className="stat-header">
-                  <span className="stat-label">Active Sessions</span>
+                  <span className="stat-label">{t.dashboard.activeSessions}</span>
                   <Smartphone size={20} className="stat-icon" />
                 </div>
                 <div className="stat-value">{sessions.filter(s => s.status === 'CONNECTED').length}</div>
                 <div className="stat-detail">
-                  {sessions.filter(s => s.status === 'CONNECTED').length} running of {sessions.length} registered
+                  {sessions.filter(s => s.status === 'CONNECTED').length} {t.dashboard.runningOf} {sessions.length} registered
                 </div>
               </div>
 
               <div className="stat-card">
                 <Send className="stat-watermark" />
                 <div className="stat-header">
-                  <span className="stat-label">Broadcast Sent</span>
+                  <span className="stat-label">{t.dashboard.broadcastSent}</span>
                   <Send size={20} className="stat-icon" />
                 </div>
                 <div className="stat-value">{campaigns.reduce((acc, c) => acc + (c.sent_count || 0), 0)}</div>
-                <div className="stat-detail">{campaigns.length} campaigns configured</div>
+                <div className="stat-detail">{campaigns.length} {t.campaigns.totalCampaigns.toLowerCase()}</div>
               </div>
 
               <div className="stat-card">
                 <Users className="stat-watermark" />
                 <div className="stat-header">
-                  <span className="stat-label">Contacts Directory</span>
+                  <span className="stat-label">{t.dashboard.totalContacts}</span>
                   <Users size={20} className="stat-icon" />
                 </div>
                 <div className="stat-value">{contacts.length}</div>
@@ -2235,7 +2932,7 @@ export default function App() {
               <div className="stat-card">
                 <Activity className="stat-watermark" />
                 <div className="stat-header">
-                  <span className="stat-label">System Memory</span>
+                  <span className="stat-label">{t.dashboard.systemHealth}</span>
                   <Server size={20} className="stat-icon" />
                 </div>
                 <div className="stat-value">{systemStatus ? `${systemStatus.memory.heapUsedMb} MB` : '—'}</div>
@@ -2248,13 +2945,13 @@ export default function App() {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">Sales CRM & Funnel Metrics</h2>
+                    <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">{t.crm.title}</h2>
                     <span className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
                       Pro Analytics
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Pantau konversi prospek, status follow-up jatuh tempo, dan efektivitas closing penjualan
+                    {t.crm.subtitle}
                   </p>
                 </div>
 
@@ -2274,7 +2971,7 @@ export default function App() {
                             : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
                         }`}
                       >
-                        {r === 'today' ? 'Hari Ini' : r === '7d' ? '7 Hari' : r === '30d' ? '30 Hari' : r === '90d' ? '90 Hari' : 'Semua'}
+                        {r === 'today' ? t.crm.timeRangeToday : r === '7d' ? t.crm.timeRange7d : r === '30d' ? t.crm.timeRange30d : r === '90d' ? '90 Days' : t.crm.timeRangeAll}
                       </button>
                     ))}
                   </div>
@@ -2284,10 +2981,10 @@ export default function App() {
                     href={`/api/v1/crm/export-csv?sessionId=${selectedSessionId}`}
                     download
                     className="btn-secondary btn-sm flex items-center gap-1.5"
-                    title="Unduh seluruh rekapitulasi CRM, broadcast, dan follow-up ke CSV"
+                    title="Export CSV"
                   >
                     <Download size={14} />
-                    <span>Ekspor CSV</span>
+                    <span>Export CSV</span>
                   </a>
                 </div>
               </div>
@@ -2295,51 +2992,51 @@ export default function App() {
               {/* 8-Card Sales Funnel Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
                 <div className="crm-stat-card">
-                  <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Leads</div>
+                  <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{t.crm.totalLeads}</div>
                   <div className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 mt-1">{crmAnalytics?.totalLeads ?? contacts.length}</div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">Kontak terdaftar</div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">{t.contacts.totalContacts}</div>
                 </div>
 
                 <div className="crm-stat-card">
                   <div className="text-[11px] font-bold text-sky-600 uppercase tracking-wider">New Leads</div>
                   <div className="text-2xl font-extrabold text-sky-700 dark:text-sky-400 mt-1">{crmAnalytics?.newLeads ?? 0}</div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">Dalam rentang waktu</div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">Pipeline Leads</div>
                 </div>
 
                 <div className="crm-stat-card">
                   <div className="text-[11px] font-bold text-amber-600 uppercase tracking-wider">Hot Leads 🔥</div>
                   <div className="text-2xl font-extrabold text-amber-700 dark:text-amber-400 mt-1">{crmAnalytics?.hotLeads ?? 0}</div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">Tag prioritas tinggi</div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">High Priority</div>
                 </div>
 
                 <div className="crm-stat-card">
-                  <div className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">Converted (💰)</div>
+                  <div className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">{t.crm.customer} (💰)</div>
                   <div className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-400 mt-1">{crmAnalytics?.convertedCustomers ?? 0}</div>
-                  <div className="text-[11px] text-emerald-600 mt-0.5 font-medium">Customer closing</div>
+                  <div className="text-[11px] text-emerald-600 mt-0.5 font-medium">Converted</div>
                 </div>
 
                 <div className="crm-stat-card">
-                  <div className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">Conversion Rate</div>
+                  <div className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">{t.crm.conversionRate}</div>
                   <div className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-400 mt-1">{crmAnalytics?.conversionRate ?? 0}%</div>
                   <div className="text-[11px] text-slate-500 mt-0.5">Customer / Leads</div>
                 </div>
 
                 <div className="crm-stat-card">
-                  <div className="text-[11px] font-bold text-rose-600 uppercase tracking-wider">Follow-up Due</div>
+                  <div className="text-[11px] font-bold text-rose-600 uppercase tracking-wider">{t.crm.pendingTasks}</div>
                   <div className="text-2xl font-extrabold text-rose-700 dark:text-rose-400 mt-1">{crmAnalytics?.followUpDue ?? 0}</div>
-                  <div className="text-[11px] text-rose-500 mt-0.5 font-semibold">Perlu direspon segera</div>
+                  <div className="text-[11px] text-rose-500 mt-0.5 font-semibold">Due Follow-ups</div>
                 </div>
 
                 <div className="crm-stat-card">
-                  <div className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider">Follow-up Selesai</div>
+                  <div className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider">Follow-up Done</div>
                   <div className="text-2xl font-extrabold text-indigo-700 dark:text-indigo-400 mt-1">{crmAnalytics?.followUpCompleted ?? 0}</div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">Tugas terselesaikan</div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">Tasks Completed</div>
                 </div>
 
                 <div className="crm-stat-card">
                   <div className="text-[11px] font-bold text-purple-600 uppercase tracking-wider">Reply Rate</div>
                   <div className="text-2xl font-extrabold text-purple-700 dark:text-purple-400 mt-1">{crmAnalytics?.replyRate ?? 0}%</div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">Respon masuk vs kirim</div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">Inbound / Outbound</div>
                 </div>
               </div>
             </div>
@@ -2348,11 +3045,11 @@ export default function App() {
             <section className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-base font-bold text-slate-900">Sessions Overview</h2>
-                  <p className="text-xs text-slate-500">Live operational status of WhatsApp engine sockets</p>
+                  <h2 className="text-base font-bold text-slate-900">{t.sessions.title}</h2>
+                  <p className="text-xs text-slate-500">{t.sessions.subtitle}</p>
                 </div>
                 <button onClick={() => setActiveTab('sessions')} className="btn-secondary btn-sm">
-                  <span>Manage All</span>
+                  <span>{t.common.actions}</span>
                   <ChevronRight size={14} />
                 </button>
               </div>
@@ -2362,10 +3059,10 @@ export default function App() {
                   <thead>
                     <tr className="table-row header">
                       <th>SESSION ID</th>
-                      <th>NAME / PHONE</th>
-                      <th>STATUS</th>
-                      <th>LAST ACTIVE</th>
-                      <th style={{ textAlign: 'right' }}>ACTIONS</th>
+                      <th>{t.sessions.phoneLabel.toUpperCase()}</th>
+                      <th>{t.common.status.toUpperCase()}</th>
+                      <th>{t.sessions.lastConnected.toUpperCase()}</th>
+                      <th style={{ textAlign: 'right' }}>{t.common.actions.toUpperCase()}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2373,7 +3070,7 @@ export default function App() {
                       <tr>
                         <td colSpan={5}>
                           <div className="p-8 text-center text-slate-400 text-sm">
-                            No WhatsApp sessions initialized. Click <b>"New Session"</b> to link your WhatsApp account.
+                            {t.sessions.noSessions}
                           </div>
                         </td>
                       </tr>
@@ -2409,12 +3106,12 @@ export default function App() {
                           </td>
                           <td>
                             <span className={`status-pill ${s.status.toLowerCase()}`}>
-                              {s.status === 'CONNECTED' ? 'Ready' : s.status.toLowerCase().replace('_', ' ')}
+                              {s.status === 'CONNECTED' ? t.common.online : s.status.toLowerCase().replace('_', ' ')}
                             </span>
                           </td>
                           <td>
                             <span className="text-xs text-slate-500 font-medium">
-                              {s.lastConnectedAt ? new Date(s.lastConnectedAt).toLocaleTimeString() : 'Never active'}
+                              {s.lastConnectedAt ? new Date(s.lastConnectedAt).toLocaleTimeString() : '—'}
                             </span>
                           </td>
                           <td style={{ textAlign: 'right' }}>
@@ -2426,15 +3123,15 @@ export default function App() {
                                 }}
                                 className="btn-secondary btn-sm"
                               >
-                                View
+                                {t.chats.tabChats}
                               </button>
                               {s.status === 'CONNECTED' ? (
                                 <button onClick={() => handleDisconnectSession(s.id)} className="btn-danger btn-sm">
-                                  Disconnect
+                                  {t.sessions.disconnectSession}
                                 </button>
                               ) : (
                                 <button onClick={() => handleConnectSessionDirect(s.id)} className="btn-primary btn-sm">
-                                  Connect
+                                  {t.sessions.connectSession}
                                 </button>
                               )}
                             </div>
@@ -2452,13 +3149,13 @@ export default function App() {
               <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3">
                 <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                   <Zap size={16} className="text-emerald-600" />
-                  <span>Quick Test & Send</span>
+                  <span>{t.dashboard.testMessaging}</span>
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Quickly test message dispatch or verify phone numbers using WhatsAman message tester.
+                  {t.tester.subtitle}
                 </p>
                 <button onClick={() => setActiveTab('tester')} className="btn-secondary w-full text-xs">
-                  <span>Open Message Tester</span>
+                  <span>{t.tester.title}</span>
                   <ChevronRight size={14} />
                 </button>
               </div>
@@ -2466,13 +3163,13 @@ export default function App() {
               <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3">
                 <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                   <MessageSquare size={16} className="text-blue-600" />
-                  <span>Live Inbox Chat</span>
+                  <span>{t.chats.title}</span>
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Chat directly with your WhatsApp contacts with full image and attachment support.
+                  {t.chats.subtitle}
                 </p>
                 <button onClick={() => setActiveTab('chats')} className="btn-secondary w-full text-xs">
-                  <span>Open Live Chats</span>
+                  <span>{t.chats.title}</span>
                   <ChevronRight size={14} />
                 </button>
               </div>
@@ -2480,13 +3177,13 @@ export default function App() {
               <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3">
                 <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                   <Bot size={16} className="text-indigo-600" />
-                  <span>Auto-Responder Bot</span>
+                  <span>{t.automation.title}</span>
                 </h3>
                 <p className="text-xs text-slate-500">
-                  {rules.filter(r => r.is_active).length} active trigger rules with dynamic spintax variation.
+                  {t.automation.subtitle}
                 </p>
                 <button onClick={() => setActiveTab('automation')} className="btn-secondary w-full text-xs">
-                  <span>Manage Automation</span>
+                  <span>{t.automation.title}</span>
                   <ChevronRight size={14} />
                 </button>
               </div>
@@ -2499,16 +3196,16 @@ export default function App() {
           <div className="space-y-6">
             <header className="page-header">
               <div className="page-header__title-group">
-                <h1>Sessions</h1>
-                <span className="status-badge connected">{sessions.length} Configured</span>
+                <h1>{t.sessions.title}</h1>
+                <span className="status-badge connected">{sessions.length} {t.common.active}</span>
               </div>
               <div className="page-header__actions">
                 <button onClick={() => setIsAddSessionModal(true)} className="btn-primary">
                   <Plus size={16} />
-                  <span>New Session</span>
+                  <span>{t.sessions.newSession}</span>
                 </button>
               </div>
-              <p className="page-header__subtitle">Manage and monitor WhatsApp MultiDevice connection sessions</p>
+              <p className="page-header__subtitle">{t.sessions.subtitle}</p>
             </header>
 
             {/* Filter and Search Bar */}
@@ -2517,7 +3214,7 @@ export default function App() {
                 <Search size={16} className="absolute left-3 top-2.5 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Search sessions by name or ID..."
+                  placeholder={t.common.search}
                   value={sessionSearchQuery}
                   onChange={e => setSessionSearchQuery(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-emerald-500"
@@ -2525,16 +3222,16 @@ export default function App() {
               </div>
 
               <div className="flex items-center gap-2 w-full sm:w-auto">
-                <span className="text-xs text-slate-500 font-medium">Status:</span>
+                <span className="text-xs text-slate-500 font-medium">{t.common.status}:</span>
                 <select
                   value={sessionStatusFilter}
                   onChange={e => setSessionStatusFilter(e.target.value)}
                   className="text-xs font-semibold py-2 px-3 bg-white border border-slate-200 rounded-lg text-slate-800"
                 >
-                  <option value="ALL">All Statuses</option>
-                  <option value="CONNECTED">Connected</option>
-                  <option value="QR_READY">QR Ready</option>
-                  <option value="DISCONNECTED">Disconnected</option>
+                  <option value="ALL">{t.common.all}</option>
+                  <option value="CONNECTED">{t.common.connected}</option>
+                  <option value="QR_READY">{t.common.qrReady}</option>
+                  <option value="DISCONNECTED">{t.common.disconnected}</option>
                 </select>
               </div>
             </div>
@@ -2544,13 +3241,13 @@ export default function App() {
               {sessions.length === 0 ? (
                 <div className="col-span-full bg-white rounded-xl border border-slate-200 p-12 text-center text-slate-400 space-y-3">
                   <Smartphone size={40} className="mx-auto text-slate-300" />
-                  <h3 className="font-semibold text-slate-700">No Sessions Found</h3>
+                  <h3 className="font-semibold text-slate-700">{t.sessions.noSessions}</h3>
                   <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                    Create a new WhatsApp session to scan QR code or connect via 8-digit pairing code.
+                    {t.sessions.subtitle}
                   </p>
                   <button onClick={() => setIsAddSessionModal(true)} className="btn-primary mt-2">
                     <Plus size={16} />
-                    <span>Create Session</span>
+                    <span>{t.sessions.newSession}</span>
                   </button>
                 </div>
               ) : (
@@ -2581,7 +3278,7 @@ export default function App() {
                           <h3 title={s.name}>{s.name}</h3>
                         </div>
                         <span className={`status-pill ${s.status.toLowerCase()}`}>
-                          {s.status === 'CONNECTED' ? 'Ready' : s.status.toLowerCase().replace('_', ' ')}
+                          {s.status === 'CONNECTED' ? t.common.online : s.status.toLowerCase().replace('_', ' ')}
                         </span>
                       </div>
 
@@ -2589,15 +3286,15 @@ export default function App() {
                       {s.status === 'QR_READY' && s.qrCode && (
                         <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-center mb-4">
                           <img src={s.qrCode} alt="Scan QR" className="w-44 h-44 mx-auto rounded-lg shadow-sm border border-slate-200" />
-                          <p className="text-xs font-semibold text-slate-700 mt-2">Scan QR with WhatsApp</p>
-                          <p className="text-[11px] text-slate-400">Linked Devices → Link a device</p>
+                          <p className="text-xs font-semibold text-slate-700 mt-2">{t.sessions.scanQrTitle}</p>
+                          <p className="text-[11px] text-slate-400">{t.sessions.scanQrDesc}</p>
                         </div>
                       )}
 
                       {/* Pairing Code Display box if waiting for Pairing */}
                       {s.status === 'PAIRING_READY' && s.pairingCode && (
                         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center mb-4">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">Pairing Code (8-Digit)</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">{t.sessions.pairingCodeTitle}</span>
                           <div className="text-2xl font-black mono text-emerald-900 tracking-widest my-2 select-all">
                             {s.pairingCode}
                           </div>
@@ -2610,7 +3307,7 @@ export default function App() {
                             className="btn-sm bg-white text-emerald-800 border-emerald-300 mx-auto"
                           >
                             {copiedPairingCode ? <Check size={14} /> : <Copy size={14} />}
-                            <span>{copiedPairingCode ? 'Copied' : 'Copy Code'}</span>
+                            <span>{copiedPairingCode ? t.common.copied : t.common.copy}</span>
                           </button>
                         </div>
                       )}
@@ -2621,7 +3318,7 @@ export default function App() {
                           <span className="info-value">Baileys (MultiDevice)</span>
                         </div>
                         <div className="info-row">
-                          <span className="info-label">PHONE NUMBER</span>
+                          <span className="info-label">{t.sessions.phoneLabel.toUpperCase()}</span>
                           <span className="info-value mono">{s.phoneNumber ? formatPhoneForDisplay(s.phoneNumber) : 'Unpaired'}</span>
                         </div>
                         <div className="info-row">
@@ -2629,9 +3326,9 @@ export default function App() {
                           <span className="info-value mono text-xs">{s.id}</span>
                         </div>
                         <div className="info-row">
-                          <span className="info-label">LAST ACTIVE</span>
+                          <span className="info-label">{t.sessions.lastConnected.toUpperCase()}</span>
                           <span className="info-value">
-                            {s.lastConnectedAt ? new Date(s.lastConnectedAt).toLocaleTimeString() : 'Never'}
+                            {s.lastConnectedAt ? new Date(s.lastConnectedAt).toLocaleTimeString() : '—'}
                           </span>
                         </div>
                       </div>
@@ -2640,7 +3337,7 @@ export default function App() {
                         <button
                           onClick={() => setActiveQrModal({ open: true, session: s })}
                           className="btn-action"
-                          title="View QR Code / Pairing"
+                          title="QR / Pairing"
                         >
                           <QrCode size={14} />
                           <span>QR / Pair</span>
@@ -2652,10 +3349,10 @@ export default function App() {
                             setActiveTab('chats');
                           }}
                           className="btn-action"
-                          title="Open Live Chat"
+                          title={t.chats.title}
                         >
                           <MessageSquare size={14} />
-                          <span>Chat</span>
+                          <span>{t.chats.tabChats}</span>
                         </button>
 
                         {s.status === 'CONNECTED' ? (
@@ -2663,18 +3360,18 @@ export default function App() {
                             <button
                               onClick={() => handleDisconnectSession(s.id)}
                               className="btn-action danger"
-                              title="Disconnect Session"
+                              title={t.sessions.disconnectSession}
                             >
                               <Pause size={14} />
-                              <span>Stop</span>
+                              <span>{t.sessions.disconnectSession}</span>
                             </button>
                             <button
                               onClick={() => handleLogoutSession(s.id)}
                               className="btn-action danger"
-                              title="Log out from WhatsApp"
+                              title={t.sessions.logoutSession}
                             >
                               <LogOut size={14} />
-                              <span>Logout</span>
+                              <span>{t.sessions.logoutSession}</span>
                             </button>
                           </>
                         ) : (
@@ -2688,17 +3385,17 @@ export default function App() {
                               })
                             }
                             className="btn-action"
-                            title="Connect WhatsApp"
+                            title={t.sessions.connectSession}
                           >
                             <Play size={14} />
-                            <span>Connect</span>
+                            <span>{t.sessions.connectSession}</span>
                           </button>
                         )}
 
                         <button
                           onClick={() => handleDeleteSession(s.id)}
                           className="btn-action danger ml-auto"
-                          title="Delete Session"
+                          title={t.sessions.deleteSession}
                         >
                           <Trash2 size={14} />
                         </button>
@@ -2715,8 +3412,8 @@ export default function App() {
           <div className="chats-page">
             <header className="page-header">
               <div className="page-header__title-group">
-                <h1>Chats</h1>
-                <span className="status-badge connected">{chats.length} active</span>
+                <h1>{t.chats.title}</h1>
+                <span className="status-badge connected">{chats.length} {t.chats.activeChats}</span>
               </div>
               <div className="page-header__actions" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                 {/* Auto Reply Quick Status & Config Pill */}
@@ -2733,13 +3430,13 @@ export default function App() {
                 }}>
                   <Bot size={15} style={{ color: botConfig.autoReplyEnabled !== false ? '#059669' : '#94a3b8' }} />
                   <span style={{ color: botConfig.autoReplyEnabled !== false ? '#065f46' : '#64748b' }}>
-                    Auto Reply: <strong>{botConfig.autoReplyEnabled !== false ? 'AKTIF' : 'OFF'}</strong>
+                    {t.chats.autoReply}: <strong>{botConfig.autoReplyEnabled !== false ? t.chats.autoReplyOn : t.chats.autoReplyOff}</strong>
                   </span>
                   <button
                     type="button"
                     onClick={() => handleToggleAutoReplyGlobal(botConfig.autoReplyEnabled === false)}
                     style={{ border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }}
-                    title="Aktifkan / Nonaktifkan Auto Reply Sesi Ini"
+                    title={t.chats.toggleAutoReply}
                   >
                     {botConfig.autoReplyEnabled !== false ? (
                       <ToggleRight size={22} style={{ color: '#10b981' }} />
@@ -2751,11 +3448,34 @@ export default function App() {
                     type="button"
                     onClick={() => setIsChatAutoReplyModal(true)}
                     style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#475569', padding: '2px', display: 'flex', alignItems: 'center' }}
-                    title="Pengaturan Auto Reply & Rules"
+                    title="Auto Reply Settings"
                   >
                     <Settings size={14} />
                   </button>
                 </div>
+
+                {/* Manual Refresh Button */}
+                <button
+                  type="button"
+                  onClick={handleManualRefreshChats}
+                  disabled={isRefreshingChats}
+                  className="btn-secondary"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    backgroundColor: refreshSuccess ? '#ecfdf5' : '#ffffff',
+                    color: refreshSuccess ? '#059669' : '#334155',
+                    borderColor: refreshSuccess ? '#a7f3d0' : '#cbd5e1',
+                    fontWeight: 600,
+                    cursor: isRefreshingChats ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                  title={t.chats.refreshChat}
+                >
+                  <RefreshCw size={15} className={isRefreshingChats ? 'animate-spin' : ''} />
+                  <span>{isRefreshingChats ? t.common.refreshing : refreshSuccess ? t.common.synced : t.chats.refreshChat}</span>
+                </button>
 
                 {/* Broadcast Button */}
                 <button
@@ -2768,15 +3488,15 @@ export default function App() {
                   style={{ backgroundColor: '#0284c7', color: '#ffffff', border: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
                   <Send size={15} />
-                  <span>Kirim Broadcast</span>
+                  <span>{t.chats.sendBroadcast}</span>
                 </button>
 
                 <button onClick={() => setIsNewChatModal(true)} className="btn-primary">
                   <Plus size={16} />
-                  <span>New Chat</span>
+                  <span>{t.chats.newChat}</span>
                 </button>
               </div>
-              <p className="page-header__subtitle">Real-time two-way WhatsApp conversation inbox and customer replies</p>
+              <p className="page-header__subtitle">{t.chats.subtitle}</p>
             </header>
 
             <div className="chats-layout">
@@ -2786,7 +3506,7 @@ export default function App() {
                   {/* Session Selector */}
                   <div className="session-select-group">
                     <label className="form-label" htmlFor="chat-session-select">
-                      Session
+                      {t.common.session}
                     </label>
                     <select
                       id="chat-session-select"
@@ -2802,7 +3522,7 @@ export default function App() {
                     </select>
                   </div>
 
-                  {/* Segmented control: Chats | Contacts | Groups | Saluran */}
+                  {/* Segmented control: Chats | Contacts | Groups | Channels */}
                   <div className="chats-tabs" role="tablist">
                     <button
                       type="button"
@@ -2811,7 +3531,7 @@ export default function App() {
                       className={`chats-tab ${chatsSidebarTab === 'chats' ? 'active' : ''}`}
                       onClick={() => setChatsSidebarTab('chats')}
                     >
-                      Chats ({chats.filter(c => !c.chat_jid.endsWith('@newsletter')).length})
+                      {t.chats.tabChats} ({chats.filter(c => !c.chat_jid.endsWith('@newsletter')).length})
                     </button>
                     <button
                       type="button"
@@ -2820,7 +3540,7 @@ export default function App() {
                       className={`chats-tab ${chatsSidebarTab === 'contacts' ? 'active' : ''}`}
                       onClick={() => setChatsSidebarTab('contacts')}
                     >
-                      Contacts ({contacts.length})
+                      {t.chats.tabContacts} ({contacts.length})
                     </button>
                     <button
                       type="button"
@@ -2829,7 +3549,7 @@ export default function App() {
                       className={`chats-tab ${chatsSidebarTab === 'groups' ? 'active' : ''}`}
                       onClick={() => setChatsSidebarTab('groups')}
                     >
-                      Groups ({groups.length})
+                      {t.chats.tabGroups} ({groups.length})
                     </button>
                     <button
                       type="button"
@@ -2838,27 +3558,49 @@ export default function App() {
                       className={`chats-tab ${chatsSidebarTab === 'channels' ? 'active' : ''}`}
                       onClick={() => setChatsSidebarTab('channels')}
                     >
-                      Saluran ({chats.filter(c => c.chat_jid.endsWith('@newsletter')).length})
+                      {t.chats.tabChannels} ({chats.filter(c => c.chat_jid.endsWith('@newsletter')).length})
                     </button>
                   </div>
 
-                  {/* Search Input */}
-                  <div className="chat-search-input">
-                    <Search size={16} />
-                    <input
-                      type="text"
-                      placeholder={
-                        chatsSidebarTab === 'chats'
-                          ? 'Search chats or phone...'
-                          : chatsSidebarTab === 'contacts'
-                          ? 'Search contacts...'
-                          : chatsSidebarTab === 'groups'
-                          ? 'Search groups...'
-                          : 'Search saluran...'
-                      }
-                      value={chatSearchQuery}
-                      onChange={e => setChatSearchQuery(e.target.value)}
-                    />
+                  {/* Search Input & Quick Refresh */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div className="chat-search-input" style={{ flex: 1 }}>
+                      <Search size={16} />
+                      <input
+                        type="text"
+                        placeholder={
+                          chatsSidebarTab === 'chats'
+                            ? t.chats.searchChats
+                            : chatsSidebarTab === 'contacts'
+                            ? t.chats.searchContacts
+                            : chatsSidebarTab === 'groups'
+                            ? t.chats.searchGroups
+                            : t.chats.searchChannels
+                        }
+                        value={chatSearchQuery}
+                        onChange={e => setChatSearchQuery(e.target.value)}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleManualRefreshChats}
+                      disabled={isRefreshingChats}
+                      style={{
+                        padding: '0.45rem',
+                        borderRadius: '8px',
+                        border: '1px solid var(--border, #e2e8f0)',
+                        backgroundColor: '#ffffff',
+                        cursor: isRefreshingChats ? 'not-allowed' : 'pointer',
+                        color: isRefreshingChats ? '#2563eb' : '#64748b',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}
+                      title={t.chats.refreshChat}
+                    >
+                      <RefreshCw size={15} className={isRefreshingChats ? 'animate-spin' : ''} />
+                    </button>
                   </div>
 
                   {chatsSidebarTab === 'chats' && (
@@ -2878,7 +3620,7 @@ export default function App() {
                           whiteSpace: 'nowrap'
                         }}
                       >
-                        Semua ({chats.filter(c => !c.chat_jid.includes('broadcast')).length})
+                        {t.chats.filterAll} ({chats.filter(c => !c.chat_jid.includes('broadcast')).length})
                       </button>
                       <button
                         type="button"
@@ -2895,7 +3637,7 @@ export default function App() {
                           whiteSpace: 'nowrap'
                         }}
                       >
-                        Pribadi ({chats.filter(c => !c.chat_jid.endsWith('@g.us') && !c.chat_jid.endsWith('@newsletter') && !c.chat_jid.includes('broadcast')).length})
+                        {t.chats.filterPersonal} ({chats.filter(c => !c.chat_jid.endsWith('@g.us') && !c.chat_jid.endsWith('@newsletter') && !c.chat_jid.includes('broadcast')).length})
                       </button>
                       <button
                         type="button"
@@ -2912,7 +3654,7 @@ export default function App() {
                           whiteSpace: 'nowrap'
                         }}
                       >
-                        Grup ({chats.filter(c => c.chat_jid.endsWith('@g.us')).length})
+                        {t.chats.filterGroups} ({chats.filter(c => c.chat_jid.endsWith('@g.us')).length})
                       </button>
                       <button
                         type="button"
@@ -2929,7 +3671,7 @@ export default function App() {
                           whiteSpace: 'nowrap'
                         }}
                       >
-                        Channel ({chats.filter(c => c.chat_jid.endsWith('@newsletter')).length})
+                        {t.chats.filterChannels} ({chats.filter(c => c.chat_jid.endsWith('@newsletter')).length})
                       </button>
                       <button
                         type="button"
@@ -2946,7 +3688,7 @@ export default function App() {
                           whiteSpace: 'nowrap'
                         }}
                       >
-                        Belum Dibaca ({chats.filter(c => (c.unread_count || 0) > 0 && !c.chat_jid.includes('broadcast')).length})
+                        {t.chats.filterUnread} ({unreadChatsCount})
                       </button>
                     </div>
                   )}
@@ -2956,233 +3698,203 @@ export default function App() {
                 <div className="chats-list">
                   {chatsSidebarTab === 'chats' && (
                     <>
-                      {chats.length === 0 ? (
+                      {filteredChats.length === 0 ? (
                         <div className="empty-table-state" style={{ padding: '3rem 1.5rem' }}>
                           <MessageSquare size={36} />
                           <h3>No conversations yet</h3>
                           <p>Click "New Chat" or switch to "Contacts" to start messaging.</p>
                         </div>
                       ) : (
-                        chats
-                          .filter(c => {
-                            if (c.chat_jid.includes('broadcast')) return false;
-                            const isGroup = c.chat_jid.endsWith('@g.us');
-                            const isNewsletter = c.chat_jid.endsWith('@newsletter');
-                            const isPersonal = !isGroup && !isNewsletter;
-                            const isUnread = (c.unread_count || 0) > 0;
-
-                             if (chatFilter === 'personal' && !isPersonal) return false;
-                             if (chatFilter === 'groups' && !isGroup) return false;
-                             if (chatFilter === 'channels' && !isNewsletter) return false;
-                             if (chatFilter === 'unread' && !isUnread) return false;
-
-                            const groupMatch = isGroup ? groups.find(g => g.jid === c.chat_jid) : null;
-                            const nameToSearch = groupMatch?.name || c.name || c.push_name || '';
-                            return `${c.chat_jid} ${nameToSearch} ${c.last_message || ''}`.toLowerCase().includes(chatSearchQuery.toLowerCase());
-                          })
-                          .map(c => {
-                            const isActive = activeChatJid === c.chat_jid;
-                            const isGroup = c.chat_jid.endsWith('@g.us');
-                            const isNewsletter = c.chat_jid.endsWith('@newsletter');
-                            const groupMatch = isGroup ? groups.find(g => g.jid === c.chat_jid) : null;
-                            const currentSession = sessions.find(s => s.id === selectedSessionId);
-                            const isSelf = Boolean(
-                              (c.resolved_phone && currentSession?.phoneNumber && c.resolved_phone === currentSession.phoneNumber) ||
-                              (currentSession?.phoneNumber && c.chat_jid.startsWith(currentSession.phoneNumber))
-                            );
-                            const phoneDisplay = c.resolved_phone ? formatPhoneForDisplay(c.resolved_phone) : formatPhoneForDisplay(c.chat_jid);
-                            const matchedContact = contacts.find(contact => 
-                              (c.resolved_phone && contact.phone === c.resolved_phone) ||
-                              (contact.jid && (contact.jid === c.chat_jid || (c.resolved_phone && contact.jid.startsWith(c.resolved_phone)))) ||
-                              (contact.phone && c.chat_jid.includes(contact.phone))
-                            );
-                            const displayName = isSelf 
-                              ? 'Anda (Catatan Anda)'
-                              : (
-                                  groupMatch?.name || 
-                                  matchedContact?.name || 
-                                  (c.name && !c.name.includes('@') && !/^\d+$/.test(c.name) ? c.name : null) || 
-                                  matchedContact?.push_name || 
-                                  c.push_name || 
-                                  phoneDisplay || 
-                                  c.chat_jid
-                                );
-                            return (
-                              <div
-                                key={c.chat_jid}
-                                role="button"
-                                tabIndex={0}
-                                className={`chat-item-card ${isActive ? 'active' : ''}`}
-                                onClick={() => {
-                                  setActiveChatJid(c.chat_jid);
-                                  if (selectedSessionId) {
-                                    fetchChatMessages(selectedSessionId, c.chat_jid);
-                                  }
-                                }}
-                              >
-                                <ChatAvatar
-                                  sessionId={selectedSessionId}
-                                  jid={c.resolved_phone ? `${c.resolved_phone}@s.whatsapp.net` : c.chat_jid}
-                                  name={displayName}
-                                  isGroup={isGroup}
-                                  isNewsletter={isNewsletter}
-                                  size={18}
-                                />
-                                <div className="chat-item-info">
-                                  <div className="chat-item-top">
-                                    <span className="chat-item-name privacy-blur" title={displayName}>
-                                      {displayName}
+                        filteredChats.map(c => {
+                          const isActive = activeChatJid === c.chat_jid;
+                          const isGroup = c.chat_jid.endsWith('@g.us');
+                          const isNewsletter = c.chat_jid.endsWith('@newsletter');
+                          const groupMatch = isGroup ? groupsMap.get(c.chat_jid) : null;
+                          const currentSession = sessions.find(s => s.id === selectedSessionId);
+                          const isSelf = Boolean(
+                            (c.resolved_phone && currentSession?.phoneNumber && c.resolved_phone === currentSession.phoneNumber) ||
+                            (currentSession?.phoneNumber && c.chat_jid.startsWith(currentSession.phoneNumber))
+                          );
+                          const phoneDisplay = c.resolved_phone ? formatPhoneForDisplay(c.resolved_phone) : formatPhoneForDisplay(c.chat_jid);
+                          const matchedContact = (c.resolved_phone ? contactsMap.get(c.resolved_phone) : null) || contactsMap.get(c.chat_jid);
+                          const displayName = isSelf 
+                            ? 'Anda (Catatan Anda)'
+                            : (
+                                groupMatch?.name || 
+                                matchedContact?.name || 
+                                (c.name && !c.name.includes('@') && !/^\d+$/.test(c.name) ? c.name : null) || 
+                                matchedContact?.push_name || 
+                                c.push_name || 
+                                phoneDisplay || 
+                                c.chat_jid
+                              );
+                          return (
+                            <div
+                              key={c.chat_jid}
+                              role="button"
+                              tabIndex={0}
+                              className={`chat-item-card ${isActive ? 'active' : ''}`}
+                              onClick={() => {
+                                setActiveChatJid(c.chat_jid);
+                                if (selectedSessionId) {
+                                  fetchChatMessages(selectedSessionId, c.chat_jid);
+                                }
+                              }}
+                            >
+                              <ChatAvatar
+                                sessionId={selectedSessionId}
+                                jid={c.resolved_phone ? `${c.resolved_phone}@s.whatsapp.net` : c.chat_jid}
+                                name={displayName}
+                                isGroup={isGroup}
+                                isNewsletter={isNewsletter}
+                                size={18}
+                              />
+                              <div className="chat-item-info">
+                                <div className="chat-item-top">
+                                  <span className="chat-item-name privacy-blur" title={displayName}>
+                                    {displayName}
+                                  </span>
+                                  {isGroup && <span className="chat-kind-badge">Group</span>}
+                                  {isNewsletter && <span className="chat-kind-badge">Channel</span>}
+                                  {c.timestamp ? (
+                                    <span className="chat-item-time">
+                                      {new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </span>
-                                    {isGroup && <span className="chat-kind-badge">Group</span>}
-                                    {isNewsletter && <span className="chat-kind-badge">Channel</span>}
-                                    {c.timestamp ? (
-                                      <span className="chat-item-time">
-                                        {new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                      </span>
-                                    ) : null}
-                                  </div>
-                                  <div className="chat-item-bottom">
-                                    <span className="chat-item-snippet privacy-blur" title={c.last_message || ''}>
-                                      {c.last_message || <span className="no-message">No messages yet</span>}
+                                  ) : null}
+                                </div>
+                                <div className="chat-item-bottom">
+                                  <span className="chat-item-snippet privacy-blur" title={c.last_message || ''}>
+                                    {c.last_message || <span className="no-message">No messages yet</span>}
+                                  </span>
+                                  {(c.unread_count || 0) > 0 && (
+                                    <span className="chat-unread-badge">
+                                      {c.unread_count! > 99 ? '99+' : c.unread_count}
                                     </span>
-                                    {(c.unread_count || 0) > 0 && (
-                                      <span className="chat-unread-badge">
-                                        {c.unread_count! > 99 ? '99+' : c.unread_count}
-                                      </span>
-                                    )}
-                                  </div>
+                                  )}
                                 </div>
                               </div>
-                            );
-                          })
+                            </div>
+                          );
+                        })
                       )}
                     </>
                   )}
 
                   {chatsSidebarTab === 'contacts' && (
                     <>
-                      {contacts.length === 0 ? (
+                      {filteredContacts.length === 0 ? (
                         <div className="empty-table-state" style={{ padding: '3rem 1.5rem' }}>
                           <Users size={36} />
                           <h3>No contacts saved</h3>
                           <p>Add contacts in the Contacts menu or import via Excel.</p>
                         </div>
                       ) : (
-                        contacts
-                          .filter(c => `${c.phone} ${c.name || ''} ${c.push_name || ''} ${c.tags.join(' ')}`.toLowerCase().includes(chatSearchQuery.toLowerCase()))
-                          .map(c => {
-                            const contactJid = `${c.phone}@s.whatsapp.net`;
-                            const isActive = activeChatJid === contactJid;
-                            const displayName = c.name || c.push_name || formatPhoneForDisplay(c.phone) || `+${c.phone}`;
-                            return (
-                              <div
-                                key={c.id}
-                                role="button"
-                                tabIndex={0}
-                                className={`chat-item-card ${isActive ? 'active' : ''}`}
-                                onClick={() => {
-                                  setActiveChatJid(contactJid);
-                                  if (selectedSessionId) {
-                                    fetchChatMessages(selectedSessionId, contactJid);
-                                  }
-                                }}
-                              >
-                                <ChatAvatar
-                                  sessionId={selectedSessionId}
-                                  jid={c.phone ? `${c.phone}@s.whatsapp.net` : (c.jid || undefined)}
-                                  name={displayName}
-                                  size={18}
-                                />
-                                <div className="chat-item-info">
-                                  <div className="chat-item-top">
-                                    <span className="chat-item-name privacy-blur" title={displayName}>
-                                      {displayName}
-                                    </span>
-                                    {c.tags.length > 0 && (
-                                      <span className="chat-kind-badge">{c.tags[0]}</span>
-                                    )}
-                                  </div>
-                                  <div className="chat-item-bottom">
-                                    <span className="chat-item-snippet privacy-blur">
-                                      {formatPhoneForDisplay(c.phone) || `+${c.phone}`}
-                                    </span>
-                                  </div>
+                        filteredContacts.map(c => {
+                          const contactJid = `${c.phone}@s.whatsapp.net`;
+                          const isActive = activeChatJid === contactJid;
+                          const displayName = c.name || c.push_name || formatPhoneForDisplay(c.phone) || `+${c.phone}`;
+                          return (
+                            <div
+                              key={c.id}
+                              role="button"
+                              tabIndex={0}
+                              className={`chat-item-card ${isActive ? 'active' : ''}`}
+                              onClick={() => {
+                                setActiveChatJid(contactJid);
+                                if (selectedSessionId) {
+                                  fetchChatMessages(selectedSessionId, contactJid);
+                                }
+                              }}
+                            >
+                              <ChatAvatar
+                                sessionId={selectedSessionId}
+                                jid={c.phone ? `${c.phone}@s.whatsapp.net` : (c.jid || undefined)}
+                                name={displayName}
+                                size={18}
+                              />
+                              <div className="chat-item-info">
+                                <div className="chat-item-top">
+                                  <span className="chat-item-name privacy-blur" title={displayName}>
+                                    {displayName}
+                                  </span>
+                                  {c.tags.length > 0 && (
+                                    <span className="chat-kind-badge">{c.tags[0]}</span>
+                                  )}
+                                </div>
+                                <div className="chat-item-bottom">
+                                  <span className="chat-item-snippet privacy-blur">
+                                    {formatPhoneForDisplay(c.phone) || `+${c.phone}`}
+                                  </span>
                                 </div>
                               </div>
-                            );
-                          })
+                            </div>
+                          );
+                        })
                       )}
                     </>
                   )}
 
                   {chatsSidebarTab === 'groups' && (
                     <>
-                      {groups.length === 0 ? (
+                      {filteredGroups.length === 0 ? (
                         <div className="empty-table-state" style={{ padding: '3rem 1.5rem' }}>
                           <Users size={36} />
                           <h3>No groups found</h3>
                           <p>WhatsApp groups for this session will appear here.</p>
                         </div>
                       ) : (
-                        groups
-                          .filter(g => `${g.jid} ${g.name || ''}`.toLowerCase().includes(chatSearchQuery.toLowerCase()))
-                          .map(g => {
-                            const isActive = activeChatJid === g.jid;
-                            return (
-                              <div
-                                key={g.jid}
-                                role="button"
-                                tabIndex={0}
-                                className={`chat-item-card ${isActive ? 'active' : ''}`}
-                                onClick={() => {
-                                  setActiveChatJid(g.jid);
-                                  if (selectedSessionId) {
-                                    fetchChatMessages(selectedSessionId, g.jid);
-                                  }
-                                }}
-                              >
-                                <ChatAvatar
-                                  sessionId={selectedSessionId}
-                                  jid={g.jid}
-                                  name={g.name}
-                                  isGroup={true}
-                                  size={18}
-                                />
-                                <div className="chat-item-info">
-                                  <div className="chat-item-top">
-                                    <span className="chat-item-name" title={g.name}>
-                                      {g.name}
-                                    </span>
-                                    <span className="chat-kind-badge">Group</span>
-                                  </div>
-                                  <div className="chat-item-bottom">
-                                    <span className="chat-item-snippet">
-                                      {g.memberCount ? `${g.memberCount} members` : 'WhatsApp Group'}
-                                    </span>
-                                  </div>
+                        filteredGroups.map(g => {
+                          const isActive = activeChatJid === g.jid;
+                          return (
+                            <div
+                              key={g.jid}
+                              role="button"
+                              tabIndex={0}
+                              className={`chat-item-card ${isActive ? 'active' : ''}`}
+                              onClick={() => {
+                                setActiveChatJid(g.jid);
+                                if (selectedSessionId) {
+                                  fetchChatMessages(selectedSessionId, g.jid);
+                                }
+                              }}
+                            >
+                              <ChatAvatar
+                                sessionId={selectedSessionId}
+                                jid={g.jid}
+                                name={g.name}
+                                isGroup={true}
+                                size={18}
+                              />
+                              <div className="chat-item-info">
+                                <div className="chat-item-top">
+                                  <span className="chat-item-name" title={g.name}>
+                                    {g.name}
+                                  </span>
+                                  <span className="chat-kind-badge">Group</span>
+                                </div>
+                                <div className="chat-item-bottom">
+                                  <span className="chat-item-snippet">
+                                    {g.memberCount ? `${g.memberCount} members` : 'WhatsApp Group'}
+                                  </span>
                                 </div>
                               </div>
-                            );
-                          })
+                            </div>
+                          );
+                        })
                       )}
                     </>
                   )}
 
                   {chatsSidebarTab === 'channels' && (
                     <>
-                      {chats.filter(c => c.chat_jid.endsWith('@newsletter')).length === 0 ? (
+                      {filteredChannels.length === 0 ? (
                         <div className="empty-table-state" style={{ padding: '3rem 1.5rem' }}>
                           <Radio size={36} />
                           <h3>Tidak ada Saluran</h3>
                           <p>Saluran / Channel WhatsApp yang Anda ikuti akan muncul di sini.</p>
                         </div>
                       ) : (
-                        chats
-                          .filter(c => {
-                            if (!c.chat_jid.endsWith('@newsletter')) return false;
-                            return `${c.chat_jid} ${c.name || ''} ${c.push_name || ''} ${c.last_message || ''}`.toLowerCase().includes(chatSearchQuery.toLowerCase());
-                          })
-                          .map(c => {
+                        filteredChannels.map(c => {
                             const isActive = activeChatJid === c.chat_jid;
                             const displayName = c.name || c.push_name || 'Saluran WhatsApp';
                             return (
@@ -3256,12 +3968,8 @@ export default function App() {
                             : formatPhoneForDisplay(activeChatJid);
                           const isGroup = activeChatJid.endsWith('@g.us');
                           const isNewsletter = activeChatJid.endsWith('@newsletter');
-                          const groupMatch = isGroup ? groups.find(g => g.jid === activeChatJid) : null;
-                          const matchedContact = contacts.find(c => 
-                            (activeChat?.resolved_phone && c.phone === activeChat.resolved_phone) ||
-                            (c.jid && (c.jid === activeChatJid || (activeChat?.resolved_phone && c.jid.startsWith(activeChat.resolved_phone)))) ||
-                            (c.phone && activeChatJid.includes(c.phone))
-                          );
+                          const groupMatch = isGroup ? groupsMap.get(activeChatJid) : null;
+                          const matchedContact = (activeChat?.resolved_phone ? contactsMap.get(activeChat.resolved_phone) : null) || contactsMap.get(activeChatJid);
                           
                           const headerTitle = isGroup
                             ? groupMatch?.name || 'Grup WhatsApp'
@@ -3309,9 +4017,31 @@ export default function App() {
                         })()}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                        <button
+                          type="button"
+                          onClick={handleRefreshActiveThread}
+                          disabled={isRefreshingThread}
+                          className="btn-secondary"
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            padding: '4px 10px',
+                            fontSize: '0.75rem',
+                            borderRadius: '8px',
+                            backgroundColor: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            color: '#475569',
+                            cursor: isRefreshingThread ? 'not-allowed' : 'pointer'
+                          }}
+                          title={t.chats.refreshThread}
+                        >
+                          <RefreshCw size={13} className={isRefreshingThread ? 'animate-spin' : ''} />
+                          <span>{isRefreshingThread ? t.common.refreshing : t.chats.refreshThread}</span>
+                        </button>
                         <span className="status-pill ready flex items-center gap-1.5" style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem' }}>
                           <CheckCircle size={12} />
-                          <span>Terhubung</span>
+                          <span>{t.common.connected}</span>
                         </span>
                       </div>
                     </div>
@@ -3321,89 +4051,35 @@ export default function App() {
                       {chatMessages.length === 0 ? (
                         <div className="empty-table-state" style={{ margin: 'auto' }}>
                           <MessageSquare size={36} />
-                          <h3>No messages yet</h3>
-                          <p>Start a conversation by typing a message below!</p>
+                          <h3>{t.chats.noMessages}</h3>
+                          <p>{t.chats.startConversation}</p>
                         </div>
                       ) : (
                         chatMessages.map((m, idx) => {
                           const isMe = m.from_me === 1;
-                          const showDateSeparator = idx === 0 || 
-                            new Date(m.timestamp).toDateString() !== new Date(chatMessages[idx - 1].timestamp).toDateString();
+                          const prevMsg = idx > 0 ? chatMessages[idx - 1] : null;
+                          const showDateSeparator = !prevMsg || 
+                            new Date(m.timestamp).toDateString() !== new Date(prevMsg.timestamp).toDateString();
+                          const dateSeparatorText = showDateSeparator ? formatDateSeparator(m.timestamp) : undefined;
+                          
+                          let senderDisplayName = '';
+                          const isGroup = activeChatJid.endsWith('@g.us');
+                          if (!isMe && isGroup) {
+                            const senderPhone = m.sender_jid?.split('@')[0];
+                            const contactMatch = findContact(m.sender_jid) || findContact(senderPhone);
+                            senderDisplayName = contactMatch?.name || contactMatch?.push_name || formatPhoneForDisplay(senderPhone || '') || senderPhone || 'Member';
+                          }
 
                           return (
-                            <React.Fragment key={m.id}>
-                              {showDateSeparator && (
-                                <div className="chat-date-separator">
-                                  <span>{formatDateSeparator(m.timestamp)}</span>
-                                </div>
-                              )}
-                              <div className={`message-bubble-wrapper ${isMe ? 'outgoing' : 'incoming'}`}>
-                                <div className={`message-bubble ${isMe ? 'outgoing' : 'incoming'}`}>
-                                  {!isMe && activeChatJid.endsWith('@g.us') && (
-                                    <div className="message-sender">
-                                      {(() => {
-                                        const senderPhone = m.sender_jid?.split('@')[0];
-                                        const contactMatch = contacts.find(c => c.phone === senderPhone || (c.jid && c.jid === m.sender_jid));
-                                        return contactMatch?.name || contactMatch?.push_name || formatPhoneForDisplay(senderPhone || '') || senderPhone || 'Member';
-                                      })()}
-                                    </div>
-                                  )}
-                                  {m.media_url && m.media_type === 'audio' && (
-                                    <div className="chat-audio-media">
-                                      <audio controls preload="metadata" className="chat-audio-player" src={m.media_url}>
-                                        Browser tidak mendukung pemutar audio.
-                                      </audio>
-                                    </div>
-                                  )}
-                                  {m.media_url && m.media_type === 'video' && (
-                                    <div className="chat-video-media">
-                                      <video controls preload="metadata" className="chat-video-player" src={m.media_url}>
-                                        Browser tidak mendukung pemutar video.
-                                      </video>
-                                    </div>
-                                  )}
-                                  {m.media_url && m.media_type === 'document' && (
-                                    <div className="chat-document-media">
-                                      <a href={m.media_url} target="_blank" rel="noreferrer" download className="chat-doc-card">
-                                        <FileText size={26} className="chat-doc-icon" />
-                                        <div className="chat-doc-info">
-                                          <span className="chat-doc-name">{m.caption || 'Dokumen File'}</span>
-                                          <span className="chat-doc-action">Klik untuk Mengunduh</span>
-                                        </div>
-                                      </a>
-                                    </div>
-                                  )}
-                                  {m.media_url && (m.media_type === 'image' || m.media_type === 'sticker' || !m.media_type) && (
-                                    <div style={{ marginBottom: '0.375rem', borderRadius: '8px', overflow: 'hidden' }}>
-                                      <img
-                                        src={m.media_url}
-                                        alt="Media message"
-                                        className={m.media_type === 'sticker' ? 'chat-sticker-media' : 'chat-image-media'}
-                                        onClick={() => window.open(m.media_url, '_blank')}
-                                      />
-                                    </div>
-                                  )}
-                                  {!m.media_url && m.media_type && (
-                                    <div className="chat-media-badge">
-                                      {m.media_type === 'audio' ? <Mic size={14} /> : m.media_type === 'video' ? <Video size={14} /> : m.media_type === 'document' ? <FileText size={14} /> : <Image size={14} />}
-                                      <span>{m.media_type === 'audio' ? 'Voice Note' : m.media_type === 'video' ? 'Video' : m.media_type === 'document' ? 'Dokumen' : 'Foto'}</span>
-                                    </div>
-                                  )}
-                                  <div className="message-text">{m.content_text || m.caption}</div>
-                                  <div className="message-meta">
-                                    <span className="message-time">
-                                      {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </span>
-                                    {isMe && (
-                                      <CheckCheck
-                                        size={14}
-                                        className={`message-status-icon ${m.status === 'READ' ? 'read' : ''}`}
-                                      />
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </React.Fragment>
+                            <ChatMessageBubble
+                              key={m.id}
+                              message={m}
+                              isMe={isMe}
+                              showDateSeparator={showDateSeparator}
+                              dateSeparatorText={dateSeparatorText}
+                              senderDisplayName={senderDisplayName}
+                              isGroupChat={isGroup}
+                            />
                           );
                         })
                       )}
@@ -3411,55 +4087,21 @@ export default function App() {
                     </div>
 
                     {/* Chat Input Footer */}
-                    <div className="room-input-footer">
-                      <form
-                        className="input-form"
-                        onSubmit={e => {
-                          e.preventDefault();
-                          handleSendChatMessage();
-                        }}
-                      >
-                        <button
-                          type="button"
-                          className="btn-input-accessory"
-                          title="Emoji"
-                          onClick={() => setChatReplyText(prev => prev + ' 😊')}
-                        >
-                          <Smile size={20} />
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-input-accessory"
-                          title="Attach Media / Document"
-                          onClick={() => setIsSendMediaModal(true)}
-                        >
-                          <Paperclip size={20} />
-                        </button>
-                        <input
-                          type="text"
-                          placeholder="Ketik pesan..."
-                          value={chatReplyText}
-                          onChange={e => setChatReplyText(e.target.value)}
-                          className="message-text-input"
-                        />
-                        <button
-                          type="submit"
-                          disabled={!chatReplyText.trim()}
-                          className="btn-send-message"
-                          title="Send message"
-                        >
-                          <Send size={18} style={{ marginLeft: '2px' }} />
-                        </button>
-                      </form>
-                    </div>
+                    <ChatInputBox
+                      onSend={handleSendChatMessage}
+                      onAttach={() => setIsSendMediaModal(true)}
+                      placeholder={t.chats.typeMessage}
+                      sendTitle={t.chats.send}
+                      attachTitle={t.chats.attachFile}
+                    />
                   </div>
                 ) : (
                   <div className="chats-room-placeholder">
                     <div className="placeholder-icon">
                       <MessageSquare size={54} />
                     </div>
-                    <h2>Select a conversation</h2>
-                    <p>Choose a chat from the sidebar, select a contact, or click "New Chat" to start messaging.</p>
+                    <h2>{lang === 'id' ? 'Pilih Percakapan' : 'Select a conversation'}</h2>
+                    <p>{lang === 'id' ? 'Pilih obrolan dari bilah samping, pilih kontak, atau klik "Chat Baru" untuk mulai berkirim pesan.' : 'Choose a chat from the sidebar, select a contact, or click "New Chat" to start messaging.'}</p>
                   </div>
                 )}
               </main>
@@ -3473,12 +4115,12 @@ export default function App() {
             <header className="page-header">
               <div className="page-header__title-group">
                 <div className="flex items-center gap-2.5">
-                  <h1>CRM & Pipeline</h1>
+                  <h1>{t.crm.title}</h1>
                   <span className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 text-xs font-bold px-2.5 py-0.5 rounded-full">
                     WhatsAman Pro Engine
                   </span>
                 </div>
-                <span className="status-badge connected">{contacts.length} Total Leads</span>
+                <span className="status-badge connected">{contacts.length} {t.crm.totalLeads}</span>
               </div>
               <div className="page-header__actions flex items-center gap-2 flex-wrap">
                 <button
@@ -3490,16 +4132,16 @@ export default function App() {
                   className="btn-primary"
                 >
                   <Plus size={16} />
-                  <span>Jadwalkan Follow-up</span>
+                  <span>{t.crm.newTask}</span>
                 </button>
                 <a
                   href={`/api/v1/crm/export-csv?sessionId=${selectedSessionId}`}
                   download
                   className="btn-secondary"
-                  title="Unduh data CRM dan tugas follow-up ke CSV"
+                  title={lang === 'id' ? 'Unduh data CRM dan tugas follow-up ke CSV' : 'Export CRM data & follow-up tasks to CSV'}
                 >
                   <Download size={15} />
-                  <span>Ekspor CSV</span>
+                  <span>{lang === 'id' ? 'Ekspor CSV' : 'Export CSV'}</span>
                 </a>
                 <button
                   onClick={() => {
@@ -3508,24 +4150,24 @@ export default function App() {
                     fetchSalesAnalytics(selectedSessionId, crmTimeRange);
                   }}
                   className="btn-secondary"
-                  title="Muat ulang data"
+                  title={t.common.refresh}
                 >
                   <RefreshCw size={15} />
                 </button>
               </div>
               <p className="page-header__subtitle">
-                Pipeline prospek penjualan, follow-up bertahap multi-step otomatis, dan proteksi Auto-Stop saat pelanggan membalas.
+                {t.crm.subtitle}
               </p>
             </header>
 
             {/* Pipeline Stage Funnel Filter Tabs */}
             <div className="flex items-center gap-2 overflow-x-auto pb-1">
               {[
-                { id: 'ALL', label: 'Semua Prospek', count: contacts.length, color: 'border-slate-300 text-slate-700 dark:text-slate-200' },
-                { id: 'lead', label: '🔵 Lead', count: contacts.filter(c => !c.pipeline_stage || c.pipeline_stage === 'lead').length, color: 'border-sky-300 text-sky-700 bg-sky-50 dark:bg-sky-950/40 dark:text-sky-300' },
-                { id: 'prospect', label: '🟡 Prospect', count: contacts.filter(c => c.pipeline_stage === 'prospect').length, color: 'border-amber-300 text-amber-700 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-300' },
-                { id: 'customer', label: '💰 Customer (Closing)', count: contacts.filter(c => c.pipeline_stage === 'customer').length, color: 'border-emerald-300 text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-300' },
-                { id: 'churned', label: '❌ Churned', count: contacts.filter(c => c.pipeline_stage === 'churned').length, color: 'border-rose-300 text-rose-700 bg-rose-50 dark:bg-rose-950/40 dark:text-rose-300' }
+                { id: 'ALL', label: lang === 'id' ? 'Semua Prospek' : 'All Leads', count: contacts.length, color: 'border-slate-300 text-slate-700 dark:text-slate-200' },
+                { id: 'lead', label: `🔵 ${t.crm.lead}`, count: contacts.filter(c => !c.pipeline_stage || c.pipeline_stage === 'lead').length, color: 'border-sky-300 text-sky-700 bg-sky-50 dark:bg-sky-950/40 dark:text-sky-300' },
+                { id: 'prospect', label: `🟡 ${t.crm.prospect}`, count: contacts.filter(c => c.pipeline_stage === 'prospect').length, color: 'border-amber-300 text-amber-700 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-300' },
+                { id: 'customer', label: `💰 ${t.crm.customer}`, count: contacts.filter(c => c.pipeline_stage === 'customer').length, color: 'border-emerald-300 text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-300' },
+                { id: 'churned', label: `❌ ${t.crm.churned}`, count: contacts.filter(c => c.pipeline_stage === 'churned').length, color: 'border-rose-300 text-rose-700 bg-rose-50 dark:bg-rose-950/40 dark:text-rose-300' }
               ].map(s => (
                 <button
                   key={s.id}
@@ -3550,15 +4192,19 @@ export default function App() {
               <div className="lg:col-span-7 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
-                    <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm">Pipeline Kontak Pelanggan</h3>
-                    <p className="text-xs text-slate-500">Klik status stage atau tag untuk memperbarui klasifikasi prospek</p>
+                    <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                      {lang === 'id' ? 'Pipeline Kontak Pelanggan' : 'Customer Pipeline Contacts'}
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      {lang === 'id' ? 'Klik status stage atau tag untuk memperbarui klasifikasi prospek' : 'Click stage status or tags to update customer classification'}
+                    </p>
                   </div>
 
                   <div className="relative w-full sm:w-64">
                     <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
                     <input
                       type="text"
-                      placeholder="Cari nama atau nomor HP..."
+                      placeholder={lang === 'id' ? 'Cari nama atau nomor HP...' : 'Search name or phone...'}
                       value={crmSearchQuery}
                       onChange={e => setCrmSearchQuery(e.target.value)}
                       className="w-full text-xs pl-8 pr-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 focus:outline-none focus:border-emerald-500"
@@ -3569,7 +4215,7 @@ export default function App() {
                 {/* Preset Tag Badges Bar */}
                 <div className="flex items-center gap-1.5 flex-wrap pt-1 text-xs">
                   <span className="text-[11px] font-semibold text-slate-400 mr-1">Quick Tag Filter:</span>
-                  {['ALL', '🔥 Hot Lead', '🟡 Warm Lead', '🔵 New Lead', '💰 Sudah Membeli', '🔄 Follow Up', '❌ Tidak Tertarik', '⭐ VIP'].map(t => (
+                  {['ALL', '🔥 Hot Lead', '🟡 Warm Lead', '🔵 New Lead', '💰 Customer', '🔄 Follow Up', '❌ Lost', '⭐ VIP'].map(t => (
                     <button
                       key={t}
                       onClick={() => setSelectedTagFilter(t)}
@@ -3589,11 +4235,11 @@ export default function App() {
                   <table className="w-full text-left text-xs text-slate-600 dark:text-slate-300">
                     <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 font-bold text-slate-500 uppercase sticky top-0 z-10">
                       <tr>
-                        <th className="py-2.5 px-3">KONTAK</th>
-                        <th className="py-2.5 px-3">PIPELINE STAGE</th>
+                        <th className="py-2.5 px-3">{lang === 'id' ? 'KONTAK' : 'CONTACT'}</th>
+                        <th className="py-2.5 px-3">{lang === 'id' ? 'PIPELINE STAGE' : 'PIPELINE STAGE'}</th>
                         <th className="py-2.5 px-3">TAGS</th>
-                        <th className="py-2.5 px-3">CATATAN</th>
-                        <th className="py-2.5 px-3 text-right">AKSI</th>
+                        <th className="py-2.5 px-3">{lang === 'id' ? 'CATATAN' : 'NOTES'}</th>
+                        <th className="py-2.5 px-3 text-right">{lang === 'id' ? 'AKSI' : 'ACTIONS'}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
@@ -3645,10 +4291,10 @@ export default function App() {
                                       : 'bg-sky-50 text-sky-800 border-sky-300 dark:bg-sky-950/50 dark:text-sky-300'
                                   }`}
                                 >
-                                  <option value="lead">🔵 Lead</option>
-                                  <option value="prospect">🟡 Prospect</option>
-                                  <option value="customer">💰 Customer</option>
-                                  <option value="churned">❌ Churned</option>
+                                  <option value="lead">🔵 {t.crm.lead}</option>
+                                  <option value="prospect">🟡 {t.crm.prospect}</option>
+                                  <option value="customer">💰 {t.crm.customer}</option>
+                                  <option value="churned">❌ {t.crm.churned}</option>
                                 </select>
                               </td>
 
@@ -3670,7 +4316,7 @@ export default function App() {
                                       setIsEditContactTagsModal(true);
                                     }}
                                     className="text-[10px] text-emerald-600 hover:underline"
-                                    title="Edit Tag"
+                                    title={lang === 'id' ? 'Edit Tag' : 'Edit Tags'}
                                   >
                                     <Tag size={12} />
                                   </button>
@@ -3685,11 +4331,11 @@ export default function App() {
                                     setIsNotesModal(true);
                                   }}
                                   className="text-left group flex items-center gap-1 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
-                                  title="Lihat / Edit Catatan Pelanggan"
+                                  title={lang === 'id' ? 'Lihat / Edit Catatan Pelanggan' : 'View / Edit Notes'}
                                 >
                                   <Edit3 size={12} className="text-slate-400 group-hover:text-slate-700" />
                                   <span className="text-[11px] truncate max-w-[120px] italic">
-                                    {c.notes || 'Tambah catatan...'}
+                                    {c.notes || (lang === 'id' ? 'Tambah catatan...' : 'Add notes...')}
                                   </span>
                                 </button>
                               </td>
@@ -3703,7 +4349,7 @@ export default function App() {
                                       setIsApplySeqModal(true);
                                     }}
                                     className="btn-secondary py-1 px-2 text-[10px] flex items-center gap-1"
-                                    title="Terapkan Drip Sequence Otomatis"
+                                    title={t.crm.applySequence}
                                   >
                                     <Zap size={11} className="text-amber-500" />
                                     <span>Sequence</span>
@@ -3717,7 +4363,7 @@ export default function App() {
                                       setIsNewTaskModal(true);
                                     }}
                                     className="btn-secondary py-1 px-2 text-[10px] flex items-center gap-1"
-                                    title="Jadwalkan Follow-up untuk kontak ini"
+                                    title={lang === 'id' ? 'Jadwalkan Follow-up untuk kontak ini' : 'Schedule follow-up for this contact'}
                                   >
                                     <Clock size={11} />
                                     <span>Follow-up</span>
@@ -3730,7 +4376,7 @@ export default function App() {
                                       setActiveTab('chats');
                                     }}
                                     className="btn-icon p-1 text-emerald-600 hover:bg-emerald-50 rounded"
-                                    title="Buka Chat Langsung"
+                                    title={lang === 'id' ? 'Buka Chat Langsung' : 'Open Chat Directly'}
                                   >
                                     <MessageSquare size={14} />
                                   </button>
@@ -3742,7 +4388,7 @@ export default function App() {
                       {contacts.length === 0 && (
                         <tr>
                           <td colSpan={5} className="py-8 text-center text-slate-400">
-                            Belum ada kontak di database sesi ini. Buka WhatsApp Web atau sinkronkan kontak terlebih dahulu.
+                            {lang === 'id' ? 'Belum ada kontak di database sesi ini. Buka WhatsApp Web atau sinkronkan kontak terlebih dahulu.' : 'No contacts in database for this session. Sync contacts or link WhatsApp first.'}
                           </td>
                         </tr>
                       )}
@@ -3757,10 +4403,12 @@ export default function App() {
                 <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4 text-xs text-emerald-900 dark:text-emerald-200 space-y-1.5">
                   <div className="flex items-center gap-2 font-bold text-emerald-800 dark:text-emerald-300">
                     <ShieldCheck size={16} />
-                    <span>Smart Sequencer & Auto-Stop Active</span>
+                    <span>{lang === 'id' ? 'Smart Sequencer & Auto-Stop Aktif' : 'Smart Sequencer & Auto-Stop Active'}</span>
                   </div>
                   <p className="text-[11px] leading-relaxed text-emerald-700 dark:text-emerald-300">
-                    Saat pelanggan merespon atau membalas pesan, rantai sequence yang belum terkirim otomatis dihentikan (Auto-Stop) agar tidak spam.
+                    {lang === 'id'
+                      ? 'Saat pelanggan merespon atau membalas pesan, rantai sequence yang belum terkirim otomatis dihentikan (Auto-Stop) agar tidak spam.'
+                      : 'When a customer replies or messages back, any remaining scheduled follow-up steps are automatically cancelled (Auto-Stop) to prevent spam.'}
                   </p>
                 </div>
 
@@ -3770,13 +4418,13 @@ export default function App() {
                     <div>
                       <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
                         <Clock size={16} className="text-amber-500" />
-                        <span>Tugas Follow-up</span>
+                        <span>{lang === 'id' ? 'Tugas Follow-up' : 'Follow-up Tasks'}</span>
                       </h3>
                       <p className="text-xs text-slate-500">
-                        {crmTasks.filter(t => t.status === 'PENDING').length} tugas pending
+                        {crmTasks.filter(t => t.status === 'PENDING').length} {lang === 'id' ? 'tugas pending' : 'pending tasks'}
                         {crmTasks.filter(t => t.status === 'PENDING' && t.due_at <= Date.now()).length > 0 && (
                           <span className="text-rose-600 font-bold ml-1.5 animate-pulse">
-                            ({crmTasks.filter(t => t.status === 'PENDING' && t.due_at <= Date.now()).length} Jatuh Tempo)
+                            ({crmTasks.filter(t => t.status === 'PENDING' && t.due_at <= Date.now()).length} {lang === 'id' ? 'Jatuh Tempo' : 'Overdue'})
                           </span>
                         )}
                       </p>
@@ -3807,10 +4455,10 @@ export default function App() {
                         onChange={e => setCrmTaskFilter(e.target.value as any)}
                         className="text-xs font-semibold py-1 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900"
                       >
-                        <option value="ALL">Semua ({crmTasks.length})</option>
-                        <option value="PENDING">Pending ({crmTasks.filter(t => t.status === 'PENDING').length})</option>
-                        <option value="COMPLETED">Selesai ({crmTasks.filter(t => t.status === 'COMPLETED').length})</option>
-                        <option value="CANCELLED">Dibatalkan ({crmTasks.filter(t => t.status === 'CANCELLED').length})</option>
+                        <option value="ALL">{t.crm.taskFilterAll} ({crmTasks.length})</option>
+                        <option value="PENDING">{t.crm.taskFilterPending} ({crmTasks.filter(t => t.status === 'PENDING').length})</option>
+                        <option value="COMPLETED">{t.crm.taskFilterCompleted} ({crmTasks.filter(t => t.status === 'COMPLETED').length})</option>
+                        <option value="CANCELLED">{t.crm.taskFilterCancelled} ({crmTasks.filter(t => t.status === 'CANCELLED').length})</option>
                       </select>
                     </div>
                   </div>
@@ -3818,17 +4466,17 @@ export default function App() {
                   {/* Tasks Cards List */}
                   <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
                     {crmTasks
-                      .filter(t => crmTaskFilter === 'ALL' || t.status === crmTaskFilter)
-                      .map(t => {
-                        const isOverdue = t.status === 'PENDING' && t.due_at <= Date.now();
-                        const isToday = t.status === 'PENDING' && new Date(t.due_at).toDateString() === new Date().toDateString();
+                      .filter(task => crmTaskFilter === 'ALL' || task.status === crmTaskFilter)
+                      .map(task => {
+                        const isOverdue = task.status === 'PENDING' && task.due_at <= Date.now();
+                        const isToday = task.status === 'PENDING' && new Date(task.due_at).toDateString() === new Date().toDateString();
                         return (
                           <div
-                            key={t.id}
+                            key={task.id}
                             className={`p-3.5 rounded-lg border transition-all space-y-2 ${
-                              t.status === 'COMPLETED'
+                              task.status === 'COMPLETED'
                                 ? 'bg-slate-50/60 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700/60 opacity-80'
-                                : t.status === 'CANCELLED'
+                                : task.status === 'CANCELLED'
                                 ? 'bg-rose-50/40 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/40 opacity-70'
                                 : isOverdue
                                 ? 'bg-rose-50/80 dark:bg-rose-950/30 border-rose-300 dark:border-rose-800'
@@ -3836,14 +4484,14 @@ export default function App() {
                             }`}
                           >
                             <div className="flex items-center justify-between gap-2">
-                              <span className="font-bold text-xs text-slate-900 dark:text-slate-100 truncate" title={t.title}>
-                                {t.title}
+                              <span className="font-bold text-xs text-slate-900 dark:text-slate-100 truncate" title={task.title}>
+                                {task.title}
                               </span>
                               <span
                                 className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full flex-shrink-0 ${
-                                  t.status === 'COMPLETED'
+                                  task.status === 'COMPLETED'
                                     ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                                    : t.status === 'CANCELLED'
+                                    : task.status === 'CANCELLED'
                                     ? 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
                                     : isOverdue
                                     ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 animate-pulse'
@@ -3852,68 +4500,68 @@ export default function App() {
                                     : 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300'
                                 }`}
                               >
-                                {t.status === 'COMPLETED'
-                                  ? '✓ SELESAI'
-                                  : t.status === 'CANCELLED'
-                                  ? 'AUTO-STOP / BATAL'
+                                {task.status === 'COMPLETED'
+                                  ? (lang === 'id' ? '✓ SELESAI' : '✓ COMPLETED')
+                                  : task.status === 'CANCELLED'
+                                  ? (lang === 'id' ? 'AUTO-STOP / BATAL' : 'AUTO-STOPPED')
                                   : isOverdue
-                                  ? '🔴 TERLEWAT'
+                                  ? (lang === 'id' ? '🔴 TERLEWAT' : '🔴 OVERDUE')
                                   : isToday
-                                  ? '🟡 HARI INI'
-                                  : '🟢 MENDATANG'}
+                                  ? (lang === 'id' ? '🟡 HARI INI' : '🟡 TODAY')
+                                  : (lang === 'id' ? '🟢 MENDATANG' : '🟢 UPCOMING')}
                               </span>
                             </div>
 
                             <div className="text-[11px] text-slate-500 flex items-center justify-between">
                               <span className="privacy-blur font-medium text-slate-700 dark:text-slate-300">
-                                👤 {t.contact_name || formatPhoneForDisplay(t.contact_phone) || `+${t.contact_phone}`}
+                                👤 {task.contact_name || formatPhoneForDisplay(task.contact_phone) || `+${task.contact_phone}`}
                               </span>
                               <span className="font-mono text-[10px]">
-                                ⏰ {new Date(t.due_at).toLocaleDateString('id-ID')} {new Date(t.due_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                                ⏰ {new Date(task.due_at).toLocaleDateString(lang === 'id' ? 'id-ID' : 'en-US')} {new Date(task.due_at).toLocaleTimeString(lang === 'id' ? 'id-ID' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
                               </span>
                             </div>
 
                             {/* Message Template Preview */}
                             <p className="text-[11px] bg-slate-50 dark:bg-slate-900/60 p-2 rounded border border-slate-200 dark:border-slate-700/60 text-slate-700 dark:text-slate-300 italic line-clamp-2">
-                              "{previewTemplate(t.message_template, t.contact_name || 'Sahabat')}"
+                              "{previewTemplate(task.message_template, task.contact_name || (lang === 'id' ? 'Sahabat' : 'Friend'))}"
                             </p>
 
-                            {t.notes && (
+                            {task.notes && (
                               <div className="text-[10px] text-slate-400 italic">
-                                Info: {t.notes}
+                                Info: {task.notes}
                               </div>
                             )}
 
                             {/* Task Action Buttons */}
                             <div className="flex items-center justify-between pt-1">
                               <span className="text-[10px] text-slate-400 font-mono">
-                                Step {t.step_number || 1}
+                                Step {task.step_number || 1}
                               </span>
 
                               <div className="flex items-center gap-1.5">
-                                {t.status === 'PENDING' && (
+                                {task.status === 'PENDING' && (
                                   <>
                                     <button
-                                      onClick={() => handleExecuteFollowUp(t.id)}
+                                      onClick={() => handleExecuteFollowUp(task.id)}
                                       className="btn-primary py-1 px-2.5 text-xs flex items-center gap-1 shadow-sm"
-                                      title="Kirim pesan follow-up ini sekarang ke WhatsApp pelanggan"
+                                      title={lang === 'id' ? 'Kirim pesan follow-up ini sekarang ke WhatsApp pelanggan' : 'Dispatch this follow-up message to customer now'}
                                     >
                                       <Send size={12} />
-                                      <span>Kirim Follow-up</span>
+                                      <span>{t.crm.executeTask}</span>
                                     </button>
                                     <button
-                                      onClick={() => handleCancelFollowUp(t.id)}
+                                      onClick={() => handleCancelFollowUp(task.id)}
                                       className="btn-secondary py-1 px-2 text-[10px]"
-                                      title="Batalkan task ini"
+                                      title={t.crm.cancelTask}
                                     >
-                                      Batalkan
+                                      {t.common.cancel}
                                     </button>
                                   </>
                                 )}
                                 <button
-                                  onClick={() => handleDeleteFollowUp(t.id)}
+                                  onClick={() => handleDeleteFollowUp(task.id)}
                                   className="text-slate-400 hover:text-rose-500 p-1"
-                                  title="Hapus task"
+                                  title={t.common.delete}
                                 >
                                   <Trash2 size={13} />
                                 </button>
@@ -3925,7 +4573,9 @@ export default function App() {
 
                     {crmTasks.length === 0 && (
                       <div className="p-8 text-center text-slate-400 text-xs">
-                        Belum ada tugas follow-up. Klik <b>"Jadwalkan Follow-up"</b> atau terapkan sequence ke salah satu kontak.
+                        {lang === 'id'
+                          ? <>Belum ada tugas follow-up. Klik <b>"Jadwalkan Follow-up"</b> atau terapkan sequence ke salah satu kontak.</>
+                          : <>No follow-up tasks yet. Click <b>"New Follow-Up Task"</b> or apply a sequence to a contact.</>}
                       </div>
                     )}
                   </div>
@@ -3940,22 +4590,24 @@ export default function App() {
           <div className="space-y-6">
             <header className="page-header">
               <div className="page-header__title-group">
-                <h1>Message Tester</h1>
+                <h1>{t.tester.title}</h1>
                 <span className="status-badge connected">Live API Client</span>
               </div>
               <p className="page-header__subtitle">
-                Test WhatsApp API payloads, ad-hoc sends, and instant number verification
+                {t.tester.subtitle}
               </p>
             </header>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Left Column: Send Form */}
               <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4">
-                <h3 className="font-bold text-slate-900 text-sm">Message Request Builder</h3>
+                <h3 className="font-bold text-slate-900 text-sm">
+                  {lang === 'id' ? 'Formulir Uji Kirim Pesan' : 'Message Request Builder'}
+                </h3>
 
                 {/* Session Selector */}
                 <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1">WhatsApp Session</label>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">{t.common.session}</label>
                   <select
                     value={selectedSessionId}
                     onChange={e => setSelectedSessionId(e.target.value)}
@@ -3971,19 +4623,21 @@ export default function App() {
 
                 {/* Message Type Tabs */}
                 <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1">Message Type</label>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">
+                    {lang === 'id' ? 'Tipe Pesan' : 'Message Type'}
+                  </label>
                   <div className="flex gap-2">
                     <button
                       onClick={() => setTesterType('text')}
                       className={`btn-sm flex-1 ${testerType === 'text' ? 'bg-emerald-500 text-slate-900 font-bold border-emerald-500' : 'btn-secondary'}`}
                     >
-                      Text Message
+                      {t.tester.typeText}
                     </button>
                     <button
                       onClick={() => setTesterType('media')}
                       className={`btn-sm flex-1 ${testerType === 'media' ? 'bg-emerald-500 text-slate-900 font-bold border-emerald-500' : 'btn-secondary'}`}
                     >
-                      Media Attachment
+                      {t.tester.typeMedia}
                     </button>
                   </div>
                 </div>
@@ -3991,11 +4645,11 @@ export default function App() {
                 {/* Recipient Phone */}
                 <div>
                   <label className="text-xs font-semibold text-slate-600 block mb-1">
-                    Recipient Phone Number (with Country Code)
+                    {t.tester.recipientPhone}
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. 628123456789 or 08123456789"
+                    placeholder={t.tester.recipientPlaceholder}
                     value={testerRecipient}
                     onChange={e => setTesterRecipient(e.target.value)}
                     className="w-full border border-slate-200 rounded-lg p-2.5 text-xs font-mono focus:outline-none focus:border-emerald-500"
@@ -4005,19 +4659,19 @@ export default function App() {
                 {/* Text Message or Media Input */}
                 {testerType === 'text' ? (
                   <div>
-                    <label className="text-xs font-semibold text-slate-600 block mb-1">Message Content</label>
+                    <label className="text-xs font-semibold text-slate-600 block mb-1">{t.tester.messageText}</label>
                     <textarea
                       rows={4}
                       value={testerMessage}
                       onChange={e => setTesterMessage(e.target.value)}
-                      placeholder="Type test message content..."
+                      placeholder={lang === 'id' ? 'Ketik isi pesan uji coba...' : 'Type test message content...'}
                       className="w-full border border-slate-200 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-500"
                     />
                   </div>
                 ) : (
                   <div className="space-y-3">
                     <div>
-                      <label className="text-xs font-semibold text-slate-600 block mb-1">Upload File (Image / Document)</label>
+                      <label className="text-xs font-semibold text-slate-600 block mb-1">{t.tester.mediaFile}</label>
                       <input
                         type="file"
                         onChange={e => setTesterMediaFile(e.target.files?.[0] || null)}
@@ -4025,12 +4679,12 @@ export default function App() {
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-semibold text-slate-600 block mb-1">Caption (Optional)</label>
+                      <label className="text-xs font-semibold text-slate-600 block mb-1">{t.tester.mediaCaption}</label>
                       <input
                         type="text"
                         value={testerMediaCaption}
                         onChange={e => setTesterMediaCaption(e.target.value)}
-                        placeholder="Image / document caption..."
+                        placeholder={lang === 'id' ? 'Keterangan media / caption...' : 'Image / document caption...'}
                         className="w-full border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:border-emerald-500"
                       />
                     </div>
@@ -4043,14 +4697,14 @@ export default function App() {
                   className="btn-primary w-full"
                 >
                   <Send size={16} />
-                  <span>{testerLoading ? 'Sending...' : 'Send Test Message'}</span>
+                  <span>{testerLoading ? t.tester.sending : t.tester.sendTest}</span>
                 </button>
               </div>
 
               {/* Right Column: Live API Response Viewer */}
               <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-bold text-slate-900 text-sm">Response Outcome</h3>
+                  <h3 className="font-bold text-slate-900 text-sm">{t.tester.responseLog}</h3>
                   {testerResponse && (
                     <span className={`status-pill ${testerResponse.status === 200 ? 'ready' : 'failed'}`}>
                       HTTP {testerResponse.status}
@@ -4068,7 +4722,7 @@ export default function App() {
                 ) : (
                   <div className="py-20 text-center text-slate-400 text-xs space-y-2">
                     <Activity size={32} className="mx-auto text-slate-300" />
-                    <p>No response yet. Fill out the tester form and click <b>"Send Test Message"</b>.</p>
+                    <p>{t.tester.noResponse}</p>
                   </div>
                 )}
               </div>
@@ -4081,7 +4735,7 @@ export default function App() {
           <div className="contacts-page space-y-6">
             <header className="page-header">
               <div className="page-header__title-group">
-                <h1>Contacts</h1>
+                <h1>{t.contacts.title}</h1>
                 <span className="status-badge connected">{contacts.length} Total</span>
               </div>
               <div className="page-header__actions">
@@ -4104,24 +4758,24 @@ export default function App() {
                     }
                   }}
                   className="btn-secondary btn-sm"
-                  title="Sinkronkan kontak dari riwayat obrolan & Baileys LID"
+                  title={lang === 'id' ? 'Sinkronkan kontak dari WhatsApp' : 'Sync contacts from WhatsApp'}
                 >
                   <RefreshCw size={14} />
-                  <span>Sync Contacts</span>
+                  <span>{t.contacts.syncFromWa}</span>
                 </button>
 
                 <button
                   onClick={() => setActiveTab('groups')}
                   className="btn-secondary btn-sm"
-                  title="Extract members from WhatsApp Groups"
+                  title={lang === 'id' ? 'Ekstrak anggota dari grup WhatsApp' : 'Extract members from WhatsApp Groups'}
                 >
                   <Layers size={14} />
-                  <span>Extract from Groups</span>
+                  <span>{lang === 'id' ? 'Ekstrak dari Grup' : 'Extract from Groups'}</span>
                 </button>
 
                 <label className="btn-secondary btn-sm cursor-pointer">
                   <Upload size={14} />
-                  <span>Import Excel</span>
+                  <span>{t.contacts.importExcel}</span>
                   <input
                     type="file"
                     accept=".xlsx,.csv"
@@ -4148,15 +4802,15 @@ export default function App() {
                   className="btn-secondary btn-sm"
                 >
                   <Download size={14} />
-                  <span>Export Excel</span>
+                  <span>{t.contacts.exportExcel}</span>
                 </a>
 
                 <button onClick={() => setIsAddContactModal(true)} className="btn-primary">
                   <Plus size={16} />
-                  <span>Add Contact</span>
+                  <span>{lang === 'id' ? 'Tambah Kontak' : 'Add Contact'}</span>
                 </button>
               </div>
-              <p className="page-header__subtitle">Manage customer directory, broadcast audience segmentation, and opt-out filters</p>
+              <p className="page-header__subtitle">{t.contacts.subtitle}</p>
             </header>
 
             <div className="filters-bar">
@@ -4164,7 +4818,7 @@ export default function App() {
                 <Search size={16} />
                 <input
                   type="text"
-                  placeholder="Search contacts by phone, name, or tags..."
+                  placeholder={t.contacts.searchContacts}
                   value={contactSearchQuery}
                   onChange={e => setContactSearchQuery(e.target.value)}
                 />
@@ -4173,14 +4827,14 @@ export default function App() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <Tag size={13} className="text-slate-400" />
-                  <span className="text-xs text-slate-500 font-medium">Group:</span>
+                  <span className="text-xs text-slate-500 font-medium">{lang === 'id' ? 'Group:' : 'Group:'}</span>
                   <select
                     value={selectedTagFilter}
                     onChange={e => setSelectedTagFilter(e.target.value)}
                     className="session-selector text-xs py-1.5 px-3 bg-white border border-slate-200 rounded-lg text-slate-800"
                     style={{ width: 'auto' }}
                   >
-                    <option value="ALL">Semua Group ({contacts.length})</option>
+                    <option value="ALL">{lang === 'id' ? 'Semua Group' : 'All Groups'} ({contacts.length})</option>
                     {availableTags.map(t => (
                       <option key={t.tag} value={t.tag}>
                         {t.tag} ({t.count})
@@ -4190,7 +4844,7 @@ export default function App() {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <span className="text-xs text-slate-500 font-medium">Session:</span>
+                  <span className="text-xs text-slate-500 font-medium">{t.common.session}:</span>
                   <select
                     value={selectedSessionId}
                     onChange={e => setSelectedSessionId(e.target.value)}
@@ -4211,13 +4865,13 @@ export default function App() {
               <table className="keys-table">
                 <thead>
                   <tr className="table-row header">
-                    <th>KONTAK & AVATAR</th>
-                    <th>NAMA</th>
-                    <th>PUSH NAME (WA)</th>
-                    <th>PIPELINE STAGE</th>
-                    <th>GROUP / TAGS</th>
-                    <th>OPT-OUT STATUS</th>
-                    <th style={{ textAlign: 'right' }}>ACTIONS</th>
+                    <th>{lang === 'id' ? 'KONTAK & AVATAR' : 'CONTACT & AVATAR'}</th>
+                    <th>{t.contacts.colName}</th>
+                    <th>{lang === 'id' ? 'PUSH NAME (WA)' : 'PUSH NAME (WA)'}</th>
+                    <th>{t.contacts.colStage}</th>
+                    <th>{lang === 'id' ? 'GROUP / TAGS' : 'GROUP / TAGS'}</th>
+                    <th>{lang === 'id' ? 'STATUS OPT-OUT' : 'OPT-OUT STATUS'}</th>
+                    <th style={{ textAlign: 'right' }}>{t.contacts.colActions}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -4226,8 +4880,8 @@ export default function App() {
                       <td colSpan={7}>
                         <div className="empty-table-state">
                           <Users size={40} />
-                          <h3>No contacts registered</h3>
-                          <p>Click "Add Contact" or "Import Excel" to build your contact directory for this session.</p>
+                          <h3>{t.contacts.noContacts}</h3>
+                          <p>{lang === 'id' ? 'Klik "Tambah Kontak" atau "Import Excel" untuk membangun kontak sesi ini.' : 'Click "Add Contact" or "Import Excel" to build your directory.'}</p>
                         </div>
                       </td>
                     </tr>
@@ -4283,16 +4937,16 @@ export default function App() {
                                   : 'bg-sky-50 text-sky-800 border-sky-300'
                               }`}
                             >
-                              <option value="lead">🔵 Lead</option>
-                              <option value="prospect">🟡 Prospect</option>
-                              <option value="customer">💰 Customer</option>
-                              <option value="churned">❌ Churned</option>
+                              <option value="lead">🔵 {t.crm.lead}</option>
+                              <option value="prospect">🟡 {t.crm.prospect}</option>
+                              <option value="customer">💰 {t.crm.customer}</option>
+                              <option value="churned">❌ {t.crm.churned}</option>
                             </select>
                           </td>
                           <td>
                             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' }}>
                               {c.tags.length === 0 ? (
-                                <span className="text-[11px] text-slate-400 italic">Tanpa Group</span>
+                                <span className="text-[11px] text-slate-400 italic">{lang === 'id' ? 'Tanpa Group' : 'No Group'}</span>
                               ) : (
                                 c.tags.map(t => (
                                   <span
@@ -4307,7 +4961,7 @@ export default function App() {
                               <button
                                 onClick={() => openEditTagsModal(c)}
                                 className="text-slate-400 hover:text-blue-600 p-1 rounded hover:bg-slate-100 transition-colors"
-                                title="Edit / Atur Group Kontak Ini"
+                                title={lang === 'id' ? 'Edit / Atur Group Kontak Ini' : 'Edit tags for this contact'}
                                 style={{ display: 'inline-flex', alignItems: 'center', marginLeft: '2px' }}
                               >
                                 <Edit3 size={12} />
@@ -4318,9 +4972,9 @@ export default function App() {
                             <button
                               onClick={() => handleToggleOptOut(c.phone, c.opt_out)}
                               className={`status-pill cursor-pointer ${c.opt_out ? 'error' : 'ready'}`}
-                              title="Click to toggle opt-out status"
+                              title={lang === 'id' ? 'Klik untuk ubah status opt-out' : 'Click to toggle opt-out status'}
                             >
-                              {c.opt_out ? 'Opted-Out' : 'Opt-In Active'}
+                              {c.opt_out ? (lang === 'id' ? 'Opt-Out (Blokir)' : 'Opted-Out') : (lang === 'id' ? 'Opt-In Aktif' : 'Opt-In Active')}
                             </button>
                           </td>
                           <td style={{ textAlign: 'right' }}>
@@ -4328,7 +4982,7 @@ export default function App() {
                               <button
                                 onClick={() => handleOpenChatWithContact(c.phone, c.name)}
                                 className="btn-secondary btn-sm"
-                                title="Chat with this contact"
+                                title={lang === 'id' ? 'Chat kontak ini' : 'Chat with this contact'}
                                 style={{ padding: '0.35rem 0.65rem', gap: '4px', fontSize: '0.75rem' }}
                               >
                                 <MessageSquare size={13} />
@@ -4337,7 +4991,7 @@ export default function App() {
                               <button
                                 onClick={() => handleDeleteContact(c.phone)}
                                 className="btn-icon"
-                                title="Delete Contact"
+                                title={t.common.delete}
                                 style={{ color: 'var(--text-muted)' }}
                               >
                                 <Trash2 size={15} />
@@ -4358,23 +5012,23 @@ export default function App() {
           <div className="space-y-6">
             <header className="page-header">
               <div className="page-header__title-group">
-                <h1>Groups</h1>
-                <span className="status-badge connected">{groups.length} Detected</span>
+                <h1>{t.groups.title}</h1>
+                <span className="status-badge connected">{groups.length} {t.groups.totalGroups}</span>
               </div>
               <div className="page-header__actions">
                 <button onClick={() => fetchGroups(selectedSessionId)} className="btn-secondary">
                   <RefreshCw size={15} />
-                  <span>Refresh Groups</span>
+                  <span>{t.common.refresh}</span>
                 </button>
               </div>
-              <p className="page-header__subtitle">Extract members from WhatsApp groups and build segmented target lists</p>
+              <p className="page-header__subtitle">{t.groups.subtitle}</p>
             </header>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {groups.length === 0 ? (
                 <div className="col-span-full bg-white rounded-xl border border-slate-200 p-12 text-center text-slate-400 space-y-2">
                   <Layers size={36} className="mx-auto text-slate-300" />
-                  <p>No groups found for this session. Click <b>"Refresh Groups"</b> to discover joined groups.</p>
+                  <p>{t.groups.noGroups}</p>
                 </div>
               ) : (
                 groups.map(g => (
@@ -4382,7 +5036,7 @@ export default function App() {
                     <div>
                       <h4 className="font-bold text-slate-900 text-sm truncate">{g.name}</h4>
                       <p className="text-xs text-slate-500 mt-1">
-                        Participants: <span className="font-bold text-slate-800">{g.memberCount} members</span>
+                        {t.groups.participants}: <span className="font-bold text-slate-800">{g.memberCount}</span>
                       </p>
                       <p className="text-[11px] text-slate-400 mono truncate mt-0.5">{g.jid}</p>
                     </div>
@@ -4394,7 +5048,7 @@ export default function App() {
                         style={{ padding: '0.5rem' }}
                       >
                         <Users size={14} />
-                        <span>Import Members to Contacts</span>
+                        <span>{t.groups.importMembers}</span>
                       </button>
 
                       <a
@@ -4404,7 +5058,7 @@ export default function App() {
                         style={{ padding: '0.5rem' }}
                       >
                         <Download size={14} />
-                        <span>Export Excel (.xlsx)</span>
+                        <span>{t.groups.exportExcel}</span>
                       </a>
                     </div>
                   </div>
@@ -4419,17 +5073,17 @@ export default function App() {
           <div className="space-y-6">
             <header className="page-header">
               <div className="page-header__title-group">
-                <h1>Broadcast Campaigns</h1>
+                <h1>{t.campaigns.title}</h1>
                 <span className="status-badge connected">{campaigns.length} Total</span>
               </div>
               <div className="page-header__actions">
                 <button onClick={() => setIsNewCampaignModal(true)} className="btn-primary">
                   <Plus size={16} />
-                  <span>New Broadcast</span>
+                  <span>{t.campaigns.newBroadcast}</span>
                 </button>
               </div>
               <p className="page-header__subtitle">
-                Scheduled automated message blast with humanized delays, variable spintax, and opt-out filters
+                {t.campaigns.subtitle}
               </p>
             </header>
 
@@ -4437,7 +5091,7 @@ export default function App() {
               {campaigns.length === 0 ? (
                 <div className="bg-white rounded-xl border border-slate-200 p-12 text-center text-slate-400 space-y-2">
                   <Radio size={36} className="mx-auto text-slate-300" />
-                  <p>No broadcast campaigns created yet. Click <b>"New Broadcast"</b> to start a targeted campaign.</p>
+                  <p>{t.campaigns.noCampaigns}</p>
                 </div>
               ) : (
                 campaigns.map(c => (
@@ -4454,9 +5108,9 @@ export default function App() {
                     <div>
                       <div className="flex justify-between text-xs text-slate-500 mb-1 font-medium">
                         <span>
-                          Progress: {c.sent_count} / {c.total_recipients} Dispatched
+                          {t.campaigns.progress}: {c.sent_count} / {c.total_recipients} {t.campaigns.sent}
                         </span>
-                        <span>Failed: {c.failed_count}</span>
+                        <span>{t.campaigns.failed}: {c.failed_count}</span>
                       </div>
                       <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                         <div
@@ -4474,28 +5128,28 @@ export default function App() {
                         <button
                           onClick={() => handleViewRecipients(c.id, c.name)}
                           className="btn-secondary btn-sm"
-                          title="View Recipient Log"
+                          title={lang === 'id' ? 'Lihat Log Penerima' : 'View Recipient Log'}
                         >
                           <Eye size={14} />
-                          <span>Recipients</span>
+                          <span>{lang === 'id' ? 'Penerima' : 'Recipients'}</span>
                         </button>
 
                         {c.status === 'RUNNING' ? (
                           <button onClick={() => handlePauseCampaign(c.id)} className="btn-sm" style={{ color: 'var(--warning-text)' }}>
                             <Pause size={14} />
-                            <span>Pause</span>
+                            <span>{t.campaigns.pauseCampaign}</span>
                           </button>
                         ) : (
                           <button onClick={() => handleStartCampaign(c.id)} className="btn-primary btn-sm">
                             <Play size={14} />
-                            <span>Run</span>
+                            <span>{t.campaigns.startCampaign}</span>
                           </button>
                         )}
 
                         <button
                           onClick={() => handleDeleteCampaign(c.id)}
                           className="btn-sm danger"
-                          title="Delete Campaign"
+                          title={t.common.delete}
                         >
                           <Trash2 size={14} />
                         </button>
@@ -4513,17 +5167,17 @@ export default function App() {
           <div className="space-y-6">
             <header className="page-header">
               <div className="page-header__title-group">
-                <h1>Templates & Automation</h1>
-                <span className="status-badge connected">{rules.length} Rules</span>
+                <h1>{t.automation.title}</h1>
+                <span className="status-badge connected">{rules.length} {lang === 'id' ? 'Aturan' : 'Rules'}</span>
               </div>
               <div className="page-header__actions">
                 <button onClick={() => setIsNewRuleModal(true)} className="btn-primary">
                   <Plus size={16} />
-                  <span>New Rule</span>
+                  <span>{t.automation.newRule}</span>
                 </button>
               </div>
               <p className="page-header__subtitle">
-                Configure 24/7 intelligent keyword auto-responder bots and message templates
+                {t.automation.subtitle}
               </p>
             </header>
 
@@ -4537,14 +5191,14 @@ export default function App() {
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
-                        Jadwal Jam Kerja Bisnis & Pengaturan Auto-Reply Pintar
+                        {t.automation.workingHours}
                       </h3>
                       <span className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full">
                         WhatsAman Pro Engine
                       </span>
                     </div>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Atur jam operasional layanan, auto-reply saat offline, proteksi anti-spam per kontak, dan simulasi pengetikan manusia.
+                      {t.automation.workingHoursDesc}
                     </p>
                   </div>
                 </div>
@@ -4554,7 +5208,7 @@ export default function App() {
                   className="btn-primary flex items-center gap-2 flex-shrink-0 text-xs py-2 px-4 shadow-sm"
                 >
                   <Check size={14} />
-                  <span>Simpan Pengaturan Bot</span>
+                  <span>{lang === 'id' ? 'Simpan Pengaturan Bot' : 'Save Bot Settings'}</span>
                 </button>
               </div>
 
@@ -4564,10 +5218,10 @@ export default function App() {
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                        Jam Operasional Bisnis (Business Hours)
+                        {lang === 'id' ? 'Jam Operasional Bisnis (Business Hours)' : 'Business Operating Hours'}
                       </label>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                        Batasi operasional bot pada hari & jam tertentu
+                        {lang === 'id' ? 'Batasi operasional bot pada hari & jam tertentu' : 'Restrict automated bot responses to specific days & hours'}
                       </p>
                     </div>
                     <label className="toggle-switch">
@@ -4585,7 +5239,7 @@ export default function App() {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 block mb-1">
-                            Jam Buka (WIB)
+                            {lang === 'id' ? 'Jam Buka (WIB)' : 'Opening Time'}
                           </label>
                           <input
                             type="time"
@@ -4596,7 +5250,7 @@ export default function App() {
                         </div>
                         <div>
                           <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 block mb-1">
-                            Jam Tutup (WIB)
+                            {lang === 'id' ? 'Jam Tutup (WIB)' : 'Closing Time'}
                           </label>
                           <input
                             type="time"
@@ -4609,17 +5263,17 @@ export default function App() {
 
                       <div>
                         <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 block mb-1.5">
-                          Hari Kerja Aktif:
+                          {lang === 'id' ? 'Hari Kerja Aktif:' : 'Active Working Days:'}
                         </label>
                         <div className="flex items-center gap-1.5 flex-wrap">
                           {[
-                            { day: 1, label: 'Senin' },
-                            { day: 2, label: 'Selasa' },
-                            { day: 3, label: 'Rabu' },
-                            { day: 4, label: 'Kamis' },
-                            { day: 5, label: 'Jumat' },
-                            { day: 6, label: 'Sabtu' },
-                            { day: 0, label: 'Minggu' }
+                            { day: 1, label: lang === 'id' ? 'Senin' : 'Mon' },
+                            { day: 2, label: lang === 'id' ? 'Selasa' : 'Tue' },
+                            { day: 3, label: lang === 'id' ? 'Rabu' : 'Wed' },
+                            { day: 4, label: lang === 'id' ? 'Kamis' : 'Thu' },
+                            { day: 5, label: lang === 'id' ? 'Jumat' : 'Fri' },
+                            { day: 6, label: lang === 'id' ? 'Sabtu' : 'Sat' },
+                            { day: 0, label: lang === 'id' ? 'Minggu' : 'Sun' }
                           ].map(d => {
                             const isChecked = botConfig.businessDays.includes(d.day);
                             return (
@@ -4654,10 +5308,10 @@ export default function App() {
                     <div className="flex items-center justify-between">
                       <div>
                         <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                          Balasan Otomatis Luar Jam Kerja (Offline Reply)
+                          {lang === 'id' ? 'Balasan Otomatis Luar Jam Kerja (Offline Reply)' : 'After-Hours / Away Auto-Reply'}
                         </label>
                         <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                          Kirim pesan ramah otomatis saat pelanggan chat di luar jam operasional
+                          {lang === 'id' ? 'Kirim pesan ramah otomatis saat pelanggan chat di luar jam operasional' : 'Send friendly automated notice when customers chat outside business hours'}
                         </p>
                       </div>
                       <label className="toggle-switch">
@@ -4676,11 +5330,11 @@ export default function App() {
                           rows={3}
                           value={botConfig.offlineReplyText}
                           onChange={e => setBotConfig(prev => ({ ...prev, offlineReplyText: e.target.value }))}
-                          placeholder="Pesan di luar jam kerja..."
+                          placeholder={lang === 'id' ? 'Pesan di luar jam kerja...' : 'Away message outside operating hours...'}
                           className="w-full border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-xs bg-white dark:bg-slate-800 focus:outline-none focus:border-emerald-500"
                         />
                         <p className="text-[10px] text-slate-400">
-                          Mendukung Spintax <code>{`{Halo|Hai}`}</code> & Variabel <code>{`{{name}}`}</code>, <code>{`{{time}}`}</code>
+                          {t.automation.supportsSpintax}
                         </p>
                       </div>
                     )}
@@ -4693,10 +5347,10 @@ export default function App() {
                   <div className="flex items-center justify-between">
                     <div>
                       <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                        Simulasi Mengetik (Human Composing Presence)
+                        {lang === 'id' ? 'Simulasi Mengetik (Human Composing Presence)' : 'Human Typing Simulation'}
                       </label>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                        Kirim status <i>'sedang mengetik...'</i> 1.2 detik sebelum membalas agar terlihat alami & aman dari banned
+                        {lang === 'id' ? "Kirim status 'sedang mengetik...' 1.2 detik sebelum membalas agar alami & aman dari banned" : "Send 'typing...' status 1.2s before replying to emulate human response"}
                       </p>
                     </div>
                     <label className="toggle-switch">
@@ -4712,21 +5366,24 @@ export default function App() {
                   {/* Cooldown */}
                   <div className="pt-3 border-t border-slate-200 dark:border-slate-700/60 space-y-1">
                     <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                      Jeda Anti-Spam / Cooldown per Kontak
+                      {lang === 'id' ? 'Jeda Anti-Spam / Cooldown per Kontak' : 'Anti-Spam Cooldown per Contact'}
                     </label>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-1">
-                      Mencegah bot mengirim pesan otomatis berulang kali ke kontak yang sama dalam rentang menit ini:
+                      {lang === 'id' ? 'Mencegah bot mengirim pesan otomatis berulang kali ke kontak yang sama (isi 0 untuk membalas setiap pesan):' : 'Prevent repeated automated replies to the same contact within (set 0 to reply every message):'}
                     </p>
                     <div className="flex items-center gap-2">
                       <input
                         type="number"
-                        min={1}
+                        min={0}
                         max={120}
                         value={botConfig.cooldownMinutes}
-                        onChange={e => setBotConfig(prev => ({ ...prev, cooldownMinutes: Number(e.target.value) || 5 }))}
+                        onChange={e => {
+                          const val = e.target.value === '' ? 0 : Number(e.target.value);
+                          setBotConfig(prev => ({ ...prev, cooldownMinutes: isNaN(val) ? 0 : val }));
+                        }}
                         className="w-24 text-xs p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 font-mono text-center font-bold"
                       />
-                      <span className="text-xs text-slate-600 dark:text-slate-300 font-medium">Menit jeda</span>
+                      <span className="text-xs text-slate-600 dark:text-slate-300 font-medium">{lang === 'id' ? 'Menit jeda (0 = Tanpa Jeda)' : 'Minutes (0 = No Cooldown)'}</span>
                     </div>
                   </div>
 
@@ -4735,10 +5392,10 @@ export default function App() {
                     <div className="flex items-center justify-between">
                       <div>
                         <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                          Balasan Standar (Fallback Default Reply)
+                          {lang === 'id' ? 'Balasan Standar (Fallback Default Reply)' : 'Default Fallback Auto-Reply'}
                         </label>
                         <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                          Kirim balasan jika chat pelanggan tidak cocok dengan satupun kata kunci aturan bot
+                          {lang === 'id' ? 'Kirim balasan jika chat pelanggan tidak cocok dengan satupun kata kunci aturan bot' : 'Send reply when no defined keywords match incoming message'}
                         </p>
                       </div>
                       <label className="toggle-switch">
@@ -4757,11 +5414,11 @@ export default function App() {
                           rows={3}
                           value={botConfig.fallbackReplyText}
                           onChange={e => setBotConfig(prev => ({ ...prev, fallbackReplyText: e.target.value }))}
-                          placeholder="Balasan standar jika tidak ada kata kunci cocok..."
+                          placeholder={lang === 'id' ? 'Balasan standar jika tidak ada kata kunci cocok...' : 'Default message when no keyword matches...'}
                           className="w-full border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-xs bg-white dark:bg-slate-800 focus:outline-none focus:border-emerald-500"
                         />
                         <p className="text-[10px] text-slate-400">
-                          Mendukung Spintax <code>{`{Halo|Hai}`}</code> & Variabel <code>{`{{name}}`}</code>
+                          {t.automation.supportsSpintax}
                         </p>
                       </div>
                     )}
@@ -4775,17 +5432,19 @@ export default function App() {
               <div className="flex items-center justify-between">
                 <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                   <Bot size={16} className="text-emerald-600" />
-                  <span>Rule Matching Simulator</span>
+                  <span>{t.automation.botSimulator}</span>
                 </h3>
-                <span className="text-[11px] text-slate-400">Test incoming customer messages</span>
+                <span className="text-[11px] text-slate-400">{t.automation.botSimulatorDesc}</span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1">Customer Input Text</label>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">
+                    {lang === 'id' ? 'Teks Pesan Masuk (Simulasi)' : 'Simulated Customer Message'}
+                  </label>
                   <input
                     type="text"
-                    placeholder="e.g. Halo mau tanya harga promo..."
+                    placeholder={t.automation.testInputPlaceholder}
                     value={simTestInput}
                     onChange={e => setSimTestInput(e.target.value)}
                     className="w-full border border-slate-200 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-500"
@@ -4794,14 +5453,14 @@ export default function App() {
 
                 <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs space-y-1">
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-slate-700">Matched Rule:</span>
+                    <span className="font-semibold text-slate-700">{t.automation.matchedRule}</span>
                     <span className={`status-pill ${simMatchedRule ? 'ready' : 'disconnected'}`}>
-                      {simMatchedRule ? simMatchedRule.name : 'No Match'}
+                      {simMatchedRule ? simMatchedRule.name : t.automation.noMatch}
                     </span>
                   </div>
                   {simEvaluatedReply && (
                     <div className="mt-2 pt-2 border-t border-slate-200 text-slate-800">
-                      <span className="font-semibold text-[11px] text-slate-500 block mb-0.5">Automated Reply Preview:</span>
+                      <span className="font-semibold text-[11px] text-slate-500 block mb-0.5">{t.automation.replyPreview}</span>
                       <p className="italic text-emerald-800 bg-emerald-50 p-2 rounded border border-emerald-100">
                         "{simEvaluatedReply}"
                       </p>
@@ -4813,25 +5472,25 @@ export default function App() {
 
             {/* Rules Table */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
-              <h3 className="font-bold text-slate-900 text-sm">Configured Automation Rules</h3>
+              <h3 className="font-bold text-slate-900 text-sm">{t.automation.configuredRules}</h3>
 
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs text-slate-600">
                   <thead className="table-header" style={{ display: 'table-header-group' }}>
                     <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase">
-                      <th className="py-2.5 px-4">RULE NAME</th>
-                      <th className="py-2.5 px-4">TRIGGER CONDITION</th>
-                      <th className="py-2.5 px-4">REPLY & AKSI OTOMATIS</th>
-                      <th className="py-2.5 px-4">HIT COUNT</th>
-                      <th className="py-2.5 px-4">STATUS</th>
-                      <th className="py-2.5 px-4 text-right">ACTIONS</th>
+                      <th className="py-2.5 px-4">{t.automation.ruleName}</th>
+                      <th className="py-2.5 px-4">{t.automation.triggerCondition}</th>
+                      <th className="py-2.5 px-4">{t.automation.replyAction}</th>
+                      <th className="py-2.5 px-4">{t.automation.hitCount}</th>
+                      <th className="py-2.5 px-4">{t.automation.status}</th>
+                      <th className="py-2.5 px-4 text-right">{t.automation.actions}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {rules.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="py-8 text-center text-slate-400">
-                          No auto-responder rules defined. Click <b>"New Rule"</b> to automate replies.
+                          {t.automation.noRules}
                         </td>
                       </tr>
                     ) : (
@@ -4898,14 +5557,14 @@ export default function App() {
                                     setIsEditRuleModal(true);
                                   }}
                                   className="text-slate-400 hover:text-slate-700 p-1"
-                                  title="Edit Rule"
+                                  title={lang === 'id' ? 'Edit Aturan' : 'Edit Rule'}
                                 >
                                   <Edit3 size={15} />
                                 </button>
                                 <button
                                   onClick={() => handleDeleteRule(r.id)}
                                   className="text-slate-400 hover:text-rose-600 p-1"
-                                  title="Delete Rule"
+                                  title={t.common.delete}
                                 >
                                   <Trash2 size={15} />
                                 </button>
@@ -4922,22 +5581,830 @@ export default function App() {
           </div>
         )}
 
+        {/* ==================== 8.5. WEBHOOKS & 3RD-PARTY INTEGRATIONS ==================== */}
+        {activeTab === 'integrations' && (
+          <div className="space-y-6">
+            <header className="page-header">
+              <div className="page-header__title-group">
+                <div className="flex items-center gap-2">
+                  <Webhook className="text-blue-600" size={24} />
+                  <h1>{t.integrations.title}</h1>
+                </div>
+                <span className="status-badge connected">{lang === 'id' ? 'API Ingestion Siap' : 'API Ingestion Ready'}</span>
+              </div>
+              <div className="page-header__actions" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    fetchIntegrationConfigs();
+                    fetchOutgoingWebhooks();
+                    fetchIntegrationLogs();
+                  }}
+                  className="btn-secondary"
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                  title={t.common.refresh}
+                >
+                  <RefreshCw size={15} />
+                  <span>{t.common.refresh}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsTestIntegrationModal(true)}
+                  className="btn-secondary"
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', borderColor: '#93c5fd', color: '#1d4ed8' }}
+                >
+                  <Send size={15} />
+                  <span>{t.integrations.testTrigger}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsAddOutgoingWebhookModal(true)}
+                  className="btn-primary"
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Plus size={15} />
+                  <span>{t.integrations.addOutgoing}</span>
+                </button>
+              </div>
+              <p className="page-header__subtitle">
+                {t.integrations.subtitle}
+              </p>
+            </header>
+
+            {/* Integration Stats Cards */}
+            <div className="stats-grid">
+              <div className="stat-card">
+                <Code2 className="stat-watermark" />
+                <div className="stat-header">
+                  <span className="stat-label">Google Apps Script</span>
+                  <Code2 size={18} className="stat-icon text-blue-600" />
+                </div>
+                <div className="stat-value text-lg text-emerald-600 font-bold">{lang === 'id' ? 'Siap Digunakan' : 'Ready to Ingest'}</div>
+                <div className="stat-detail">{lang === 'id' ? 'Trigger Google Forms & Sheets' : 'Trigger Google Forms & Sheets'}</div>
+              </div>
+
+              <div className="stat-card">
+                <Webhook className="stat-watermark" />
+                <div className="stat-header">
+                  <span className="stat-label">{lang === 'id' ? 'Integrasi Masuk' : 'Provider Ingestions'}</span>
+                  <Webhook size={18} className="stat-icon text-indigo-600" />
+                </div>
+                <div className="stat-value">{integrationConfigs.filter(c => c.isActive).length} {t.common.active}</div>
+                <div className="stat-detail">{lang === 'id' ? `Dari ${integrationConfigs.length || 6} template` : `From ${integrationConfigs.length || 6} templates`}</div>
+              </div>
+
+              <div className="stat-card">
+                <Share2 className="stat-watermark" />
+                <div className="stat-header">
+                  <span className="stat-label">Outgoing Webhooks</span>
+                  <Share2 size={18} className="stat-icon text-amber-600" />
+                </div>
+                <div className="stat-value">{outgoingWebhooks.filter(w => w.isActive).length} {lang === 'id' ? 'Aktif' : 'Active'}</div>
+                <div className="stat-detail">{lang === 'id' ? 'Event push ke server Anda' : 'Real-time event push'}</div>
+              </div>
+
+              <div className="stat-card">
+                <Activity className="stat-watermark" />
+                <div className="stat-header">
+                  <span className="stat-label">{lang === 'id' ? 'Riwayat Ingestion' : 'Ingestion History'}</span>
+                  <Activity size={18} className="stat-icon text-slate-600" />
+                </div>
+                <div className="stat-value">{integrationLogs.length} {lang === 'id' ? 'Log' : 'Logs'}</div>
+                <div className="stat-detail">{lang === 'id' ? 'Tercatat di sistem database' : 'Recorded in database'}</div>
+              </div>
+            </div>
+
+            {/* Provider Selector Tabs */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="flex border-b border-slate-200 bg-slate-50 overflow-x-auto text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setSelectedIntegrationTab('google_form')}
+                  className={`py-3 px-5 border-b-2 flex items-center gap-2 transition ${
+                    selectedIntegrationTab === 'google_form'
+                      ? 'border-blue-600 text-blue-600 bg-white font-bold'
+                      : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <span>{t.integrations.tabGoogleForm}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedIntegrationTab('woocommerce')}
+                  className={`py-3 px-5 border-b-2 flex items-center gap-2 transition ${
+                    selectedIntegrationTab === 'woocommerce'
+                      ? 'border-blue-600 text-blue-600 bg-white font-bold'
+                      : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>{t.integrations.tabWooCommerce}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedIntegrationTab('cf7')}
+                  className={`py-3 px-5 border-b-2 flex items-center gap-2 transition ${
+                    selectedIntegrationTab === 'cf7'
+                      ? 'border-blue-600 text-blue-600 bg-white font-bold'
+                      : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>{t.integrations.tabCf7}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedIntegrationTab('elementor')}
+                  className={`py-3 px-5 border-b-2 flex items-center gap-2 transition ${
+                    selectedIntegrationTab === 'elementor'
+                      ? 'border-blue-600 text-blue-600 bg-white font-bold'
+                      : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>{t.integrations.tabElementor}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedIntegrationTab('outgoing')}
+                  className={`py-3 px-5 border-b-2 flex items-center gap-2 transition ${
+                    selectedIntegrationTab === 'outgoing'
+                      ? 'border-blue-600 text-blue-600 bg-white font-bold'
+                      : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                >
+                  <Share2 size={14} />
+                  <span>{t.integrations.tabOutgoing}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedIntegrationTab('logs')}
+                  className={`py-3 px-5 border-b-2 flex items-center gap-2 transition ${
+                    selectedIntegrationTab === 'logs'
+                      ? 'border-blue-600 text-blue-600 bg-white font-bold'
+                      : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                >
+                  <FileText size={14} />
+                  <span>{t.integrations.tabLogs}</span>
+                </button>
+              </div>
+
+              {/* TAB 1: GOOGLE FORMS & APPS SCRIPT */}
+              {selectedIntegrationTab === 'google_form' && (
+                <div className="p-6 space-y-6">
+                  {/* Webhook Endpoint Box */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="bg-emerald-600 text-white text-[11px] font-bold px-2 py-0.5 rounded font-mono">POST</span>
+                        <h3 className="font-bold text-slate-900 text-sm">{t.integrations.webhookUrlTitle}</h3>
+                      </div>
+                      <span className="text-xs text-slate-500 font-medium">{t.sessions.title}: <strong>{selectedSessionId || 'default'}</strong></span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={`http://localhost:3000/api/v1/integrations/webhook/google_form/${selectedSessionId || 'default'}`}
+                        className="font-mono text-xs text-slate-800 bg-white border border-slate-300 rounded-lg p-2.5 flex-1 select-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const url = `http://localhost:3000/api/v1/integrations/webhook/google_form/${selectedSessionId || 'default'}`;
+                          navigator.clipboard.writeText(url);
+                          setCopiedWebhookUrl(true);
+                          setTimeout(() => setCopiedWebhookUrl(false), 2000);
+                        }}
+                        className="btn-primary"
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0.6rem 1rem' }}
+                      >
+                        {copiedWebhookUrl ? <Check size={16} /> : <Copy size={16} />}
+                        <span>{copiedWebhookUrl ? t.integrations.copiedUrl : t.integrations.copyUrl}</span>
+                      </button>
+                    </div>
+
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      💡 <strong>{lang === 'id' ? 'Petunjuk URL:' : 'URL Hint:'}</strong> {t.integrations.urlHint}
+                    </p>
+                  </div>
+
+                  {/* Template & Form Configuration */}
+                  {(() => {
+                    const gfConfig = integrationConfigs.find(c => c.provider === 'google_form') || {
+                      id: 'default_google_form',
+                      provider: 'google_form' as const,
+                      name: 'Google Forms Auto-Notification',
+                      templateText: 'Halo *{name}*, terima kasih telah mengisi formulir *{form_name}*! ✨\n\nData respon Anda telah berhasil kami terima. Tim kami akan segera meninjau dan menghubungi Anda kembali.',
+                      adminPhone: '',
+                      adminTemplateText: '🔔 *Notifikasi Respon Formulir Baru*\n\n• Form: {form_name}\n• Pengirim: {name} ({phone})\n\nRespon baru berhasil tercatat di sistem.',
+                      isActive: true,
+                      createdAt: Date.now(),
+                      updatedAt: Date.now()
+                    };
+
+                    return (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* Template Editor Card */}
+                        <div className="border border-slate-200 rounded-xl p-5 bg-white space-y-4">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-bold text-slate-900 text-sm">{t.integrations.templateConfigTitle}</h4>
+                            <span className="status-pill ready">{lang === 'id' ? 'Penerima: Pengisi Form' : 'Recipient: Form Submitter'}</span>
+                          </div>
+
+                          <div className="space-y-2">
+                            <label className="text-xs font-semibold text-slate-700 block">{t.integrations.templateTextLabel}</label>
+                            <textarea
+                              rows={5}
+                              className="w-full text-xs border border-slate-300 rounded-lg p-3 font-sans leading-relaxed focus:border-blue-500 outline-none"
+                              defaultValue={gfConfig.templateText}
+                              id="gf-template-textarea"
+                            />
+                            <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-slate-500">
+                              <span>{t.integrations.supportedVars}</span>
+                              <code className="bg-slate-100 text-blue-700 px-1.5 py-0.5 rounded font-mono">{'{name}'}</code>
+                              <code className="bg-slate-100 text-blue-700 px-1.5 py-0.5 rounded font-mono">{'{form_name}'}</code>
+                              <code className="bg-slate-100 text-blue-700 px-1.5 py-0.5 rounded font-mono">{'{phone}'}</code>
+                              <code className="bg-slate-100 text-blue-700 px-1.5 py-0.5 rounded font-mono">{'{data.Pertanyaan}'}</code>
+                            </div>
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-100 space-y-2">
+                            <label className="text-xs font-semibold text-slate-700 block">{t.integrations.adminPhoneLabel}</label>
+                            <input
+                              type="text"
+                              placeholder={lang === 'id' ? 'Contoh: 08123456789 (Kosongkan jika tidak perlu salinan)' : 'e.g. 628123456789 (Optional admin copy)'}
+                              defaultValue={gfConfig.adminPhone || ''}
+                              id="gf-admin-phone-input"
+                              className="w-full text-xs border border-slate-300 rounded-lg p-2.5 focus:border-blue-500 outline-none"
+                            />
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const templateText = (document.getElementById('gf-template-textarea') as HTMLTextAreaElement)?.value || gfConfig.templateText;
+                              const adminPhone = (document.getElementById('gf-admin-phone-input') as HTMLInputElement)?.value;
+                              handleSaveIntegrationConfig({
+                                id: gfConfig.id,
+                                sessionId: selectedSessionId || undefined,
+                                provider: 'google_form',
+                                name: gfConfig.name,
+                                templateText,
+                                adminPhone: adminPhone || undefined,
+                                isActive: true
+                              });
+                            }}
+                            className="btn-primary w-full text-xs"
+                            style={{ padding: '0.65rem' }}
+                          >
+                            <Check size={15} />
+                            <span>{t.integrations.saveConfig}</span>
+                          </button>
+                        </div>
+
+                        {/* Apps Script Guide & Code Card */}
+                        <div className="border border-slate-200 rounded-xl p-5 bg-white space-y-4">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                              <Code2 size={17} className="text-emerald-600" />
+                              <span>{t.integrations.appsScriptCodeTitle}</span>
+                            </h4>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const code = `/**
+ * WhatsAman — Google Apps Script WhatsApp Auto-Notification
+ * Pasang di Google Sheet (Ekstensi > Apps Script)
+ */
+function onFormSubmit(e) {
+  var webhookUrl = "http://localhost:3000/api/v1/integrations/webhook/google_form/${selectedSessionId || 'default'}";
+  
+  // Baca respon formulir dari Google Sheet
+  var itemResponses = e.response ? e.response.getItemResponses() : [];
+  var namedValues = e.namedValues || {};
+  var nama = "";
+  var noWhatsapp = "";
+  
+  if (itemResponses.length > 0) {
+    for (var i = 0; i < itemResponses.length; i++) {
+      var title = itemResponses[i].getItem().getTitle().toLowerCase();
+      var resp = itemResponses[i].getResponse();
+      if (title.indexOf("nama") !== -1 && !nama) nama = resp;
+      if ((title.indexOf("wa") !== -1 || title.indexOf("whatsapp") !== -1 || title.indexOf("hp") !== -1 || title.indexOf("telepon") !== -1) && !noWhatsapp) noWhatsapp = resp;
+    }
+    if (!nama) nama = itemResponses[0].getResponse();
+    if (!noWhatsapp && itemResponses.length > 1) noWhatsapp = itemResponses[1].getResponse();
+  } else {
+    // Jika trigger dipasang di Google Sheets Spreadsheet
+    nama = (namedValues["Nama"] && namedValues["Nama"][0]) || (namedValues["Name"] && namedValues["Name"][0]) || (e.values && e.values[1]) || "Pelanggan";
+    noWhatsapp = (namedValues["No WhatsApp"] && namedValues["No WhatsApp"][0]) || (namedValues["WhatsApp"] && namedValues["WhatsApp"][0]) || (namedValues["No HP"] && namedValues["No HP"][0]) || (e.values && e.values[2]) || "";
+  }
+
+  var payload = {
+    form_name: e.source ? e.source.getTitle() : "Formulir Pendaftaran",
+    name: nama,
+    phone: noWhatsapp,
+    data: namedValues
+  };
+
+  var options = {
+    method: "post",
+    contentType: "application/json",
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  try {
+    var res = UrlFetchApp.fetch(webhookUrl, options);
+    Logger.log("WhatsAman Response: " + res.getContentText());
+  } catch (err) {
+    Logger.log("Error sending webhook: " + err.toString());
+  }
+}`;
+                                navigator.clipboard.writeText(code);
+                                setCopiedScriptCode(true);
+                                setTimeout(() => setCopiedScriptCode(false), 2000);
+                              }}
+                              className="btn-secondary text-xs"
+                              style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '0.35rem 0.75rem' }}
+                            >
+                              {copiedScriptCode ? <Check size={14} /> : <Copy size={14} />}
+                              <span>{copiedScriptCode ? t.integrations.copiedScriptCode : t.integrations.copyScriptCode}</span>
+                            </button>
+                          </div>
+
+                          <div className="bg-slate-900 text-slate-100 rounded-lg p-3 font-mono text-[11px] overflow-x-auto max-h-64 leading-relaxed">
+                            <pre>{`function onFormSubmit(e) {
+  var webhookUrl = "http://localhost:3000/api/v1/integrations/webhook/google_form/${selectedSessionId || 'default'}";
+  
+  var nama = (e.namedValues && e.namedValues["Nama"] && e.namedValues["Nama"][0]) || e.values[1];
+  var phone = (e.namedValues && e.namedValues["No WhatsApp"] && e.namedValues["No WhatsApp"][0]) || e.values[2];
+
+  var payload = {
+    form_name: "Formulir Pendaftaran",
+    name: nama,
+    phone: phone,
+    data: e.namedValues
+  };
+
+  UrlFetchApp.fetch(webhookUrl, {
+    method: "post",
+    contentType: "application/json",
+    payload: JSON.stringify(payload)
+  });
+}`}</pre>
+                          </div>
+
+                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-900 space-y-1.5">
+                            <span className="font-bold block">{t.integrations.appsScriptGuideTitle}:</span>
+                            <ol className="list-decimal pl-4 space-y-1 text-slate-700">
+                              <li>{t.integrations.step1}</li>
+                              <li>{t.integrations.step2}</li>
+                              <li>{t.integrations.step3}</li>
+                              <li>{t.integrations.step4}</li>
+                            </ol>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* TAB 2: WOOCOMMERCE */}
+              {selectedIntegrationTab === 'woocommerce' && (
+                <div className="p-6 space-y-6">
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="bg-purple-600 text-white text-[11px] font-bold px-2 py-0.5 rounded font-mono">POST</span>
+                        <h3 className="font-bold text-slate-900 text-sm">{lang === 'id' ? 'URL Webhook WooCommerce Order' : 'WooCommerce Order Webhook URL'}</h3>
+                      </div>
+                      <span className="text-xs text-slate-500 font-medium">{t.sessions.title}: <strong>{selectedSessionId || 'default'}</strong></span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={`http://localhost:3000/api/v1/integrations/webhook/woocommerce/${selectedSessionId || 'default'}`}
+                        className="font-mono text-xs text-slate-800 bg-white border border-slate-300 rounded-lg p-2.5 flex-1 select-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const url = `http://localhost:3000/api/v1/integrations/webhook/woocommerce/${selectedSessionId || 'default'}`;
+                          navigator.clipboard.writeText(url);
+                          setCopiedWebhookUrl(true);
+                          setTimeout(() => setCopiedWebhookUrl(false), 2000);
+                        }}
+                        className="btn-primary"
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0.6rem 1rem' }}
+                      >
+                        {copiedWebhookUrl ? <Check size={16} /> : <Copy size={16} />}
+                        <span>{copiedWebhookUrl ? t.integrations.copiedUrl : t.integrations.copyUrl}</span>
+                      </button>
+                    </div>
+
+                    <p className="text-xs text-slate-500">
+                      {lang === 'id'
+                        ? 'Cara Pasang di WordPress: WooCommerce > Settings > Advanced > Webhooks > Add Webhook ➔ Topic: Order created / Order updated ➔ Delivery URL: masukkan URL di atas.'
+                        : 'Setup in WordPress: WooCommerce > Settings > Advanced > Webhooks > Add Webhook ➔ Topic: Order created / Order updated ➔ Delivery URL: paste the URL above.'}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: CONTACT FORM 7 */}
+              {selectedIntegrationTab === 'cf7' && (
+                <div className="p-6 space-y-6">
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="bg-blue-600 text-white text-[11px] font-bold px-2 py-0.5 rounded font-mono">POST</span>
+                        <h3 className="font-bold text-slate-900 text-sm">{lang === 'id' ? 'URL Webhook Contact Form 7 (WordPress)' : 'Contact Form 7 Webhook URL (WordPress)'}</h3>
+                      </div>
+                      <span className="text-xs text-slate-500 font-medium">{t.sessions.title}: <strong>{selectedSessionId || 'default'}</strong></span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={`http://localhost:3000/api/v1/integrations/webhook/cf7/${selectedSessionId || 'default'}`}
+                        className="font-mono text-xs text-slate-800 bg-white border border-slate-300 rounded-lg p-2.5 flex-1 select-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const url = `http://localhost:3000/api/v1/integrations/webhook/cf7/${selectedSessionId || 'default'}`;
+                          navigator.clipboard.writeText(url);
+                          setCopiedWebhookUrl(true);
+                          setTimeout(() => setCopiedWebhookUrl(false), 2000);
+                        }}
+                        className="btn-primary"
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0.6rem 1rem' }}
+                      >
+                        {copiedWebhookUrl ? <Check size={16} /> : <Copy size={16} />}
+                        <span>{copiedWebhookUrl ? t.integrations.copiedUrl : t.integrations.copyUrl}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 4: ELEMENTOR */}
+              {selectedIntegrationTab === 'elementor' && (
+                <div className="p-6 space-y-6">
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="bg-rose-600 text-white text-[11px] font-bold px-2 py-0.5 rounded font-mono">POST</span>
+                        <h3 className="font-bold text-slate-900 text-sm">{lang === 'id' ? 'URL Webhook Elementor Pro Form' : 'Elementor Pro Form Webhook URL'}</h3>
+                      </div>
+                      <span className="text-xs text-slate-500 font-medium">{t.sessions.title}: <strong>{selectedSessionId || 'default'}</strong></span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={`http://localhost:3000/api/v1/integrations/webhook/elementor/${selectedSessionId || 'default'}`}
+                        className="font-mono text-xs text-slate-800 bg-white border border-slate-300 rounded-lg p-2.5 flex-1 select-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const url = `http://localhost:3000/api/v1/integrations/webhook/elementor/${selectedSessionId || 'default'}`;
+                          navigator.clipboard.writeText(url);
+                          setCopiedWebhookUrl(true);
+                          setTimeout(() => setCopiedWebhookUrl(false), 2000);
+                        }}
+                        className="btn-primary"
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0.6rem 1rem' }}
+                      >
+                        {copiedWebhookUrl ? <Check size={16} /> : <Copy size={16} />}
+                        <span>{copiedWebhookUrl ? t.integrations.copiedUrl : t.integrations.copyUrl}</span>
+                      </button>
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      {lang === 'id'
+                        ? 'Cara Pasang di Elementor: Buka widget Form ➔ Actions After Submit ➔ Pilih Webhook ➔ Masukkan Webhook URL di atas.'
+                        : 'Setup in Elementor: Open Form widget ➔ Actions After Submit ➔ Choose Webhook ➔ Paste the Webhook URL above.'}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 5: OUTGOING WEBHOOKS */}
+              {selectedIntegrationTab === 'outgoing' && (
+                <div className="p-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-sm">{t.integrations.outgoingTableTitle}</h4>
+                      <p className="text-xs text-slate-500">{t.integrations.outgoingSubtitle}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsAddOutgoingWebhookModal(true)}
+                      className="btn-primary text-xs"
+                      style={{ padding: '0.5rem 0.85rem' }}
+                    >
+                      <Plus size={14} />
+                      <span>{t.integrations.addOutgoing}</span>
+                    </button>
+                  </div>
+
+                  <div className="overflow-x-auto border border-slate-200 rounded-lg">
+                    <table className="w-full text-left text-xs text-slate-600">
+                      <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase">
+                        <tr>
+                          <th className="py-2.5 px-4">{t.integrations.colName}</th>
+                          <th className="py-2.5 px-4">{t.integrations.colTargetUrl}</th>
+                          <th className="py-2.5 px-4">{t.integrations.colEvents}</th>
+                          <th className="py-2.5 px-4">{t.integrations.colStatus}</th>
+                          <th className="py-2.5 px-4 text-right">{t.integrations.colActions}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {outgoingWebhooks.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="py-8 text-center text-slate-400">
+                              {t.integrations.noOutgoing}
+                            </td>
+                          </tr>
+                        ) : (
+                          outgoingWebhooks.map(w => (
+                            <tr key={w.id} className="hover:bg-slate-50 transition">
+                              <td className="py-2.5 px-4 font-bold text-slate-900">{w.name}</td>
+                              <td className="py-2.5 px-4 font-mono text-[11px] text-blue-700 max-w-xs truncate">{w.targetUrl}</td>
+                              <td className="py-2.5 px-4">
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  {(w.events || ['all']).map((ev, i) => (
+                                    <span key={i} className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px] font-mono">
+                                      {ev}
+                                    </span>
+                                  ))}
+                                </div>
+                              </td>
+                              <td className="py-2.5 px-4">
+                                <span className={`status-pill ${w.isActive ? 'ready' : 'disconnected'}`}>
+                                  {w.isActive ? t.common.active : t.common.inactive}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-4 text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleTestOutgoingWebhook(w.id)}
+                                    className="btn-secondary btn-sm"
+                                    title={t.integrations.testPing}
+                                  >
+                                    <Send size={12} />
+                                    <span>{t.integrations.testPing}</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteOutgoingWebhook(w.id)}
+                                    className="btn-icon text-rose-500 hover:bg-rose-50"
+                                    title={t.common.delete}
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 6: LOGS */}
+              {selectedIntegrationTab === 'logs' && (
+                <div className="p-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-bold text-slate-900 text-sm">{t.integrations.logsTitle}</h4>
+                    <span className="text-xs text-slate-500">{lang === 'id' ? '50 catatan terakhir' : 'Last 50 records'}</span>
+                  </div>
+
+                  <div className="overflow-x-auto border border-slate-200 rounded-lg">
+                    <table className="w-full text-left text-xs text-slate-600">
+                      <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase">
+                        <tr>
+                          <th className="py-2.5 px-4">{t.integrations.colTime}</th>
+                          <th className="py-2.5 px-4">{t.integrations.colProvider}</th>
+                          <th className="py-2.5 px-4">{t.integrations.colTargetWa}</th>
+                          <th className="py-2.5 px-4">{t.integrations.colStatus}</th>
+                          <th className="py-2.5 px-4">{t.integrations.colPayload}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {integrationLogs.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="py-8 text-center text-slate-400">
+                              {t.integrations.noLogs}
+                            </td>
+                          </tr>
+                        ) : (
+                          integrationLogs.map(log => (
+                            <tr key={log.id} className="hover:bg-slate-50 transition">
+                              <td className="py-2.5 px-4 mono text-[11px] text-slate-500 whitespace-nowrap">
+                                {new Date(log.createdAt).toLocaleString(lang === 'id' ? 'id-ID' : 'en-US')}
+                              </td>
+                              <td className="py-2.5 px-4">
+                                <span className="bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase">
+                                  {log.provider}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-4 font-mono font-medium text-slate-800">
+                                {formatPhoneForDisplay(log.targetPhone) || log.targetPhone}
+                              </td>
+                              <td className="py-2.5 px-4">
+                                <span className={`status-pill ${log.status === 'SUCCESS' ? 'ready' : 'disconnected'}`}>
+                                  {log.status}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-4 max-w-xs truncate font-mono text-[11px] text-slate-700">
+                                {log.errorMessage ? (
+                                  <span className="text-rose-600 font-sans">{log.errorMessage}</span>
+                                ) : (
+                                  JSON.stringify(log.payload)
+                                )}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Test Trigger Modal */}
+            {isTestIntegrationModal && (
+              <div className="modal-backdrop">
+                <div className="modal-card max-w-md w-full p-6 space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
+                      <Send size={18} className="text-blue-600" />
+                      <span>{t.integrations.testModalTitle}</span>
+                    </h3>
+                    <button type="button" onClick={() => setIsTestIntegrationModal(false)} className="btn-icon">
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  <p className="text-xs text-slate-500">
+                    {t.integrations.testModalDesc}
+                  </p>
+
+                  <div className="space-y-3 text-xs">
+                    <div>
+                      <label className="font-semibold text-slate-700 block mb-1">{t.integrations.testSenderName}:</label>
+                      <input
+                        type="text"
+                        value={testIntegrationName}
+                        onChange={e => setTestIntegrationName(e.target.value)}
+                        className="w-full border border-slate-300 rounded-lg p-2.5 focus:border-blue-500 outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="font-semibold text-slate-700 block mb-1">{t.integrations.testTargetPhone}:</label>
+                      <input
+                        type="text"
+                        placeholder="Contoh: 08123456789 atau 628123456789"
+                        value={testIntegrationPhone}
+                        onChange={e => setTestIntegrationPhone(e.target.value)}
+                        className="w-full border border-slate-300 rounded-lg p-2.5 focus:border-blue-500 outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="font-semibold text-slate-700 block mb-1">{t.integrations.testFormName}:</label>
+                      <input
+                        type="text"
+                        value={testIntegrationFormName}
+                        onChange={e => setTestIntegrationFormName(e.target.value)}
+                        className="w-full border border-slate-300 rounded-lg p-2.5 focus:border-blue-500 outline-none"
+                      />
+                    </div>
+
+                    {testIntegrationResult && (
+                      <div className={`p-3 rounded-lg text-xs ${testIntegrationResult.success ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'}`}>
+                        <div className="font-bold">{testIntegrationResult.success ? '✅ Webhook Berhasil Diproses!' : '❌ Gagal Memproses Webhook'}</div>
+                        <div className="text-[11px] mt-1">{testIntegrationResult.message}</div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button type="button" onClick={() => setIsTestIntegrationModal(false)} className="btn-secondary text-xs">
+                      {t.common.close}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleTestIncomingWebhook}
+                      disabled={testIntegrationLoading}
+                      className="btn-primary text-xs"
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      {testIntegrationLoading && <RefreshCw size={13} className="animate-spin" />}
+                      <span>{testIntegrationLoading ? `${t.integrations.testSendButton}...` : t.integrations.testSendButton}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Add Outgoing Webhook Modal */}
+            {isAddOutgoingWebhookModal && (
+              <div className="modal-backdrop">
+                <div className="modal-card max-w-md w-full p-6 space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
+                      <Share2 size={18} className="text-blue-600" />
+                      <span>{t.integrations.addOutgoing}</span>
+                    </h3>
+                    <button type="button" onClick={() => setIsAddOutgoingWebhookModal(false)} className="btn-icon">
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  <div className="space-y-3 text-xs">
+                    <div>
+                      <label className="font-semibold text-slate-700 block mb-1">{t.integrations.colName}:</label>
+                      <input
+                        type="text"
+                        placeholder="Contoh: CRM Server Notifier"
+                        value={newWebhookName}
+                        onChange={e => setNewWebhookName(e.target.value)}
+                        className="w-full border border-slate-300 rounded-lg p-2.5 focus:border-blue-500 outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="font-semibold text-slate-700 block mb-1">{t.integrations.colTargetUrl} (HTTPS):</label>
+                      <input
+                        type="text"
+                        placeholder="https://api.yourdomain.com/whatsapp-event"
+                        value={newWebhookUrl}
+                        onChange={e => setNewWebhookUrl(e.target.value)}
+                        className="w-full border border-slate-300 rounded-lg p-2.5 focus:border-blue-500 outline-none font-mono text-[11px]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="font-semibold text-slate-700 block mb-1">Secret Key / Token ({lang === 'id' ? 'Opsional' : 'Optional'}):</label>
+                      <input
+                        type="password"
+                        placeholder="Untuk verifikasi signature X-Hub-Signature"
+                        value={newWebhookSecret}
+                        onChange={e => setNewWebhookSecret(e.target.value)}
+                        className="w-full border border-slate-300 rounded-lg p-2.5 focus:border-blue-500 outline-none font-mono text-[11px]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button type="button" onClick={() => setIsAddOutgoingWebhookModal(false)} className="btn-secondary text-xs">
+                      {t.common.cancel}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCreateOutgoingWebhook}
+                      className="btn-primary text-xs"
+                    >
+                      {t.integrations.addOutgoing}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ==================== 9. INFRASTRUCTURE & SYSTEM ==================== */}
         {activeTab === 'infrastructure' && (
           <div className="space-y-6">
             <header className="page-header">
               <div className="page-header__title-group">
-                <h1>Infrastructure</h1>
-                <span className="status-badge connected">Telemetry Active</span>
+                <h1>{t.infrastructure.title}</h1>
+                <span className="status-badge connected">{lang === 'id' ? 'Telemetri Aktif' : 'Telemetry Active'}</span>
               </div>
               <div className="page-header__actions">
                 <button onClick={handleCreateBackup} className="btn-primary">
                   <Download size={15} />
-                  <span>Create Backup</span>
+                  <span>{t.infrastructure.createBackup}</span>
                 </button>
               </div>
               <p className="page-header__subtitle">
-                Inspect local engine performance, RAM allocation, portable storage directory, and database backups
+                {t.infrastructure.subtitle}
               </p>
             </header>
 
@@ -4946,7 +6413,7 @@ export default function App() {
               <div className="stat-card">
                 <Server className="stat-watermark" />
                 <div className="stat-header">
-                  <span className="stat-label">RAM Heap Used</span>
+                  <span className="stat-label">{t.infrastructure.ramHeapUsed}</span>
                   <Server size={18} className="stat-icon" />
                 </div>
                 <div className="stat-value">{systemStatus ? `${systemStatus.memory.heapUsedMb} MB` : '—'}</div>
@@ -4956,11 +6423,11 @@ export default function App() {
               <div className="stat-card">
                 <ShieldCheck className="stat-watermark" />
                 <div className="stat-header">
-                  <span className="stat-label">Portable Storage</span>
+                  <span className="stat-label">{t.infrastructure.portableStorage}</span>
                   <ShieldCheck size={18} className="stat-icon" />
                 </div>
                 <div className="stat-value text-xl font-bold truncate">
-                  {systemStatus?.isPortable ? 'Portable Mode' : 'Standard'}
+                  {systemStatus?.isPortable ? (lang === 'id' ? 'Mode Portable' : 'Portable Mode') : 'Standard'}
                 </div>
                 <div className="stat-detail truncate mono">{systemStatus?.storageDir}</div>
               </div>
@@ -4968,11 +6435,11 @@ export default function App() {
               <div className="stat-card">
                 <Activity className="stat-watermark" />
                 <div className="stat-header">
-                  <span className="stat-label">Uptime</span>
+                  <span className="stat-label">{t.infrastructure.uptime}</span>
                   <Clock size={18} className="stat-icon" />
                 </div>
                 <div className="stat-value">
-                  {systemStatus ? `${Math.floor(systemStatus.uptimeSeconds / 60)} min` : '—'}
+                  {systemStatus ? `${Math.floor(systemStatus.uptimeSeconds / 60)} ${lang === 'id' ? 'menit' : 'min'}` : '—'}
                 </div>
                 <div className="stat-detail">Seconds: {systemStatus?.uptimeSeconds || 0}s</div>
               </div>
@@ -4980,32 +6447,32 @@ export default function App() {
               <div className="stat-card">
                 <Layers className="stat-watermark" />
                 <div className="stat-header">
-                  <span className="stat-label">Total Backups</span>
+                  <span className="stat-label">{t.infrastructure.totalBackups}</span>
                   <HardDrive size={18} className="stat-icon" />
                 </div>
                 <div className="stat-value">{backups.length}</div>
-                <div className="stat-detail">Local snapshot archives</div>
+                <div className="stat-detail">{lang === 'id' ? 'Arsip cadangan lokal' : 'Local snapshot archives'}</div>
               </div>
             </div>
 
             {/* Backups List */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
-              <h3 className="font-bold text-slate-900 text-sm">Portable Backup Archives</h3>
+              <h3 className="font-bold text-slate-900 text-sm">{t.infrastructure.backupsListTitle}</h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs text-slate-600">
                   <thead className="table-header" style={{ display: 'table-header-group' }}>
                     <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase">
-                      <th className="py-2.5 px-4">FILE NAME</th>
-                      <th className="py-2.5 px-4">SIZE</th>
-                      <th className="py-2.5 px-4">CREATED AT</th>
-                      <th className="py-2.5 px-4 text-right">ACTION</th>
+                      <th className="py-2.5 px-4">{t.infrastructure.colFileName}</th>
+                      <th className="py-2.5 px-4">{t.infrastructure.colSize}</th>
+                      <th className="py-2.5 px-4">{t.infrastructure.colCreatedAt}</th>
+                      <th className="py-2.5 px-4 text-right">{t.infrastructure.colAction}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {backups.length === 0 ? (
                       <tr>
                         <td colSpan={4} className="py-8 text-center text-slate-400">
-                          No backup archives created yet. Click <b>"Create Backup"</b> to generate an archive.
+                          {t.infrastructure.noBackups}
                         </td>
                       </tr>
                     ) : (
@@ -5013,11 +6480,11 @@ export default function App() {
                         <tr key={idx} className="hover:bg-slate-50 transition">
                           <td className="py-2.5 px-4 font-mono font-medium text-slate-900">{b.fileName}</td>
                           <td className="py-2.5 px-4 mono">{b.sizeKb} KB</td>
-                          <td className="py-2.5 px-4">{new Date(b.createdAt).toLocaleString()}</td>
+                          <td className="py-2.5 px-4">{new Date(b.createdAt).toLocaleString(lang === 'id' ? 'id-ID' : 'en-US')}</td>
                           <td className="py-2.5 px-4 text-right">
                             <a href={b.downloadUrl} download className="btn-secondary btn-sm">
                               <Download size={13} />
-                              <span>Download</span>
+                              <span>{t.infrastructure.downloadBackup}</span>
                             </a>
                           </td>
                         </tr>
@@ -5035,16 +6502,16 @@ export default function App() {
           <div className="space-y-6">
             <header className="page-header">
               <div className="page-header__title-group">
-                <h1>Audit & Live Logs</h1>
+                <h1>{t.logs.title}</h1>
                 <span className="status-badge connected">{auditLogs.length} Events</span>
               </div>
               <div className="page-header__actions">
                 <button onClick={fetchAuditLogs} className="btn-secondary">
                   <RefreshCw size={15} />
-                  <span>Refresh Trace</span>
+                  <span>{lang === 'id' ? 'Segarkan Log' : 'Refresh Trace'}</span>
                 </button>
               </div>
-              <p className="page-header__subtitle">Real-time system events, WebSocket status, and security audit log entries</p>
+              <p className="page-header__subtitle">{t.logs.subtitle}</p>
             </header>
 
             {/* Filter buttons */}
@@ -5055,7 +6522,7 @@ export default function App() {
                   onClick={() => setLogFilter(f)}
                   className={`btn-sm ${logFilter === f ? 'bg-emerald-500 text-slate-900 font-bold border-emerald-500' : 'btn-secondary'}`}
                 >
-                  {f === 'ALL' ? 'All Events' : `${f}*`}
+                  {f === 'ALL' ? (lang === 'id' ? 'Semua Event' : 'All Events') : `${f}*`}
                 </button>
               ))}
             </div>
@@ -5065,16 +6532,16 @@ export default function App() {
                 <table className="w-full text-left text-xs text-slate-600">
                   <thead className="table-header" style={{ display: 'table-header-group' }}>
                     <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase">
-                      <th className="py-2.5 px-4">TIMESTAMP</th>
-                      <th className="py-2.5 px-4">EVENT TYPE</th>
-                      <th className="py-2.5 px-4">PAYLOAD DETAILS</th>
+                      <th className="py-2.5 px-4">{t.logs.colTime}</th>
+                      <th className="py-2.5 px-4">{t.logs.colType}</th>
+                      <th className="py-2.5 px-4">{t.logs.colMessage}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {auditLogs.length === 0 ? (
                       <tr>
                         <td colSpan={3} className="py-8 text-center text-slate-400">
-                          No audit log entries recorded yet.
+                          {t.logs.noLogs}
                         </td>
                       </tr>
                     ) : (
@@ -5083,7 +6550,7 @@ export default function App() {
                         .map(l => (
                           <tr key={l.id} className="hover:bg-slate-50 transition">
                             <td className="py-2.5 px-4 font-mono text-slate-400 whitespace-nowrap">
-                              {new Date(l.created_at).toLocaleString()}
+                              {new Date(l.created_at).toLocaleString(lang === 'id' ? 'id-ID' : 'en-US')}
                             </td>
                             <td className="py-2.5 px-4">
                               <span className="status-pill ready font-mono text-[10px]">{l.event_type}</span>
@@ -5109,17 +6576,17 @@ export default function App() {
         <div className="modal-overlay">
           <div className="modal">
             <div className="modal-header">
-              <h2>New WhatsApp Session</h2>
+              <h2>{t.sessions.modalNewTitle}</h2>
               <button onClick={() => setIsAddSessionModal(false)} className="btn-icon">
                 <X size={18} />
               </button>
             </div>
             <div className="modal-body space-y-4">
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">Session ID (Unique Key)</label>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">{t.sessions.modalSessionId}</label>
                 <input
                   type="text"
-                  placeholder="e.g. support-1 or sales-wa"
+                  placeholder={lang === 'id' ? 'contoh: support-1 atau sales-wa' : 'e.g. support-1 or sales-wa'}
                   value={newSessionId}
                   onChange={e => setNewSessionId(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
                   className="w-full border border-slate-200 rounded-lg p-2.5 text-xs font-mono"
@@ -5127,10 +6594,10 @@ export default function App() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">Friendly Display Name</label>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">{t.sessions.modalSessionName}</label>
                 <input
                   type="text"
-                  placeholder="e.g. Customer Support Hotline"
+                  placeholder={lang === 'id' ? 'contoh: Layanan Pelanggan Pusat' : 'e.g. Customer Support Hotline'}
                   value={newSessionName}
                   onChange={e => setNewSessionName(e.target.value)}
                   className="w-full border border-slate-200 rounded-lg p-2.5 text-xs"
@@ -5138,19 +6605,19 @@ export default function App() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">Pairing Method</label>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">{t.sessions.loginMethod}</label>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setLoginMethod('qr')}
                     className={`btn-sm flex-1 ${loginMethod === 'qr' ? 'bg-emerald-500 text-slate-900 font-bold border-emerald-500' : 'btn-secondary'}`}
                   >
-                    Scan QR Code
+                    {t.sessions.qrMethod}
                   </button>
                   <button
                     onClick={() => setLoginMethod('pairing')}
                     className={`btn-sm flex-1 ${loginMethod === 'pairing' ? 'bg-emerald-500 text-slate-900 font-bold border-emerald-500' : 'btn-secondary'}`}
                   >
-                    8-Digit Pairing Code
+                    {t.sessions.pairingMethod}
                   </button>
                 </div>
               </div>
@@ -5158,7 +6625,7 @@ export default function App() {
               {loginMethod === 'pairing' && (
                 <div>
                   <label className="text-xs font-semibold text-slate-700 block mb-1">
-                    WhatsApp Phone Number (with Country Code)
+                    {t.sessions.phoneNumberInput}
                   </label>
                   <input
                     type="text"
@@ -5167,16 +6634,16 @@ export default function App() {
                     onChange={e => setPairingPhone(e.target.value)}
                     className="w-full border border-slate-200 rounded-lg p-2.5 text-xs font-mono"
                   />
-                  <p className="text-[11px] text-slate-400 mt-1">An 8-digit verification code will be displayed for pairing.</p>
+                  <p className="text-[11px] text-slate-400 mt-1">{lang === 'id' ? 'Kode verifikasi 8 digit akan ditampilkan untuk dipasangkan.' : 'An 8-digit verification code will be displayed for pairing.'}</p>
                 </div>
               )}
             </div>
             <div className="modal-footer">
               <button onClick={() => setIsAddSessionModal(false)} className="btn-secondary">
-                Cancel
+                {t.common.cancel}
               </button>
               <button onClick={handleCreateSession} disabled={!newSessionId.trim()} className="btn-primary">
-                Create & Connect
+                {t.sessions.startConnecting}
               </button>
             </div>
           </div>
@@ -5197,7 +6664,7 @@ export default function App() {
               {activeQrModal.session.status === 'CONNECTED' ? (
                 <div className="py-8 space-y-2">
                   <CheckCircle size={48} className="mx-auto text-emerald-500" />
-                  <h3 className="font-bold text-slate-800 text-base">Session Already Connected</h3>
+                  <h3 className="font-bold text-slate-800 text-base">{lang === 'id' ? 'Sesi Sudah Terhubung' : 'Session Already Connected'}</h3>
                   <p className="text-xs text-slate-500">
                     Phone: +{activeQrModal.session.phoneNumber || 'Linked'}
                   </p>
@@ -5209,29 +6676,29 @@ export default function App() {
                     alt="Scan QR"
                     className="w-56 h-56 mx-auto rounded-xl shadow-sm border border-slate-200"
                   />
-                  <p className="text-xs font-semibold text-slate-700">Scan this QR Code with WhatsApp</p>
-                  <p className="text-[11px] text-slate-400">Open WhatsApp → Settings → Linked Devices → Link a Device</p>
+                  <p className="text-xs font-semibold text-slate-700">{t.sessions.scanQrTitle}</p>
+                  <p className="text-[11px] text-slate-400">{t.sessions.scanQrDesc}</p>
                 </div>
               ) : activeQrModal.session.pairingCode ? (
                 <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5 space-y-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
-                    8-Digit WhatsApp Pairing Code
+                    {t.sessions.pairingCodeTitle}
                   </span>
                   <div className="text-3xl font-black mono text-emerald-900 tracking-widest my-2 select-all">
                     {activeQrModal.session.pairingCode}
                   </div>
-                  <p className="text-xs text-emerald-700">Enter this code on your phone when prompted by WhatsApp.</p>
+                  <p className="text-xs text-emerald-700">{t.sessions.pairingCodeDesc}</p>
                 </div>
               ) : (
                 <div className="py-8 space-y-3 text-slate-400">
                   <RefreshCw size={36} className="mx-auto animate-spin text-slate-300" />
-                  <p className="text-xs">Preparing connection socket... please wait.</p>
+                  <p className="text-xs">{lang === 'id' ? 'Menyiapkan soket koneksi... harap tunggu.' : 'Preparing connection socket... please wait.'}</p>
                 </div>
               )}
             </div>
             <div className="modal-footer">
               <button onClick={() => setActiveQrModal({ open: false, session: null })} className="btn-secondary">
-                Close
+                {t.common.close}
               </button>
             </div>
           </div>
@@ -5243,33 +6710,33 @@ export default function App() {
         <div className="modal-overlay">
           <div className="modal">
             <div className="modal-header">
-              <h2>Connect Session: {connectOptionModal.sessionId}</h2>
+              <h2>{lang === 'id' ? 'Hubungkan Sesi' : 'Connect Session'}: {connectOptionModal.sessionId}</h2>
               <button onClick={() => setConnectOptionModal(prev => ({ ...prev, open: false }))} className="btn-icon">
                 <X size={18} />
               </button>
             </div>
             <div className="modal-body space-y-4">
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">Connection Method</label>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">{t.sessions.loginMethod}</label>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setConnectOptionModal(prev => ({ ...prev, method: 'qr' }))}
                     className={`btn-sm flex-1 ${connectOptionModal.method === 'qr' ? 'bg-emerald-500 text-slate-900 font-bold border-emerald-500' : 'btn-secondary'}`}
                   >
-                    Scan QR Code
+                    {t.sessions.qrMethod}
                   </button>
                   <button
                     onClick={() => setConnectOptionModal(prev => ({ ...prev, method: 'pairing' }))}
                     className={`btn-sm flex-1 ${connectOptionModal.method === 'pairing' ? 'bg-emerald-500 text-slate-900 font-bold border-emerald-500' : 'btn-secondary'}`}
                   >
-                    Pairing Code
+                    {t.sessions.pairingMethod}
                   </button>
                 </div>
               </div>
 
               {connectOptionModal.method === 'pairing' && (
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">Phone Number (with Country Code)</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">{t.sessions.phoneNumberInput}</label>
                   <input
                     type="text"
                     placeholder="e.g. 628123456789"
@@ -5282,7 +6749,7 @@ export default function App() {
             </div>
             <div className="modal-footer">
               <button onClick={() => setConnectOptionModal(prev => ({ ...prev, open: false }))} className="btn-secondary">
-                Cancel
+                {t.common.cancel}
               </button>
               <button
                 onClick={async () => {
@@ -5312,7 +6779,7 @@ export default function App() {
                 }}
                 className="btn-primary"
               >
-                Start Connection
+                {t.sessions.startConnecting}
               </button>
             </div>
           </div>
@@ -5324,14 +6791,14 @@ export default function App() {
         <div className="modal-overlay">
           <div className="modal">
             <div className="modal-header">
-              <h2>Add Contact</h2>
+              <h2>{lang === 'id' ? 'Tambah Kontak Baru' : 'Add New Contact'}</h2>
               <button onClick={() => setIsAddContactModal(false)} className="btn-icon">
                 <X size={18} />
               </button>
             </div>
             <div className="modal-body space-y-4">
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">Phone Number (with Country Code)</label>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">{t.contacts.colPhone}</label>
                 <input
                   type="text"
                   placeholder="e.g. 628123456789"
@@ -5342,10 +6809,10 @@ export default function App() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">Contact Name</label>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">{t.contacts.colName}</label>
                 <input
                   type="text"
-                  placeholder="e.g. Budi Santoso"
+                  placeholder={lang === 'id' ? 'contoh: Budi Santoso' : 'e.g. Budi Santoso'}
                   value={newContactName}
                   onChange={e => setNewContactName(e.target.value)}
                   className="w-full border border-slate-200 rounded-lg p-2.5 text-xs"
@@ -5353,16 +6820,16 @@ export default function App() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">Tags / Group Kontak (Dipisahkan koma)</label>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">{lang === 'id' ? 'Tags / Group Kontak (Dipisahkan koma)' : 'Tags / Groups (Comma separated)'}</label>
                 <input
                   type="text"
-                  placeholder="Contoh: Produk A, VIP, Reseller"
+                  placeholder={lang === 'id' ? 'Contoh: Produk A, VIP, Reseller' : 'e.g. Product A, VIP, Reseller'}
                   value={newContactTags}
                   onChange={e => setNewContactTags(e.target.value)}
                   className="w-full border border-slate-200 rounded-lg p-2.5 text-xs"
                 />
                 <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                  <span className="text-[11px] text-slate-500 font-medium mr-1">Saran:</span>
+                  <span className="text-[11px] text-slate-500 font-medium mr-1">{lang === 'id' ? 'Saran:' : 'Suggestions:'}</span>
                   {['Produk A', 'Produk B', 'VIP', 'Reseller', 'Pelanggan']
                     .concat(availableTags.map(t => t.tag).filter(t => !['Produk A', 'Produk B', 'VIP', 'Reseller', 'Pelanggan'].includes(t)))
                     .slice(0, 6)
@@ -5394,10 +6861,10 @@ export default function App() {
             </div>
             <div className="modal-footer">
               <button onClick={() => setIsAddContactModal(false)} className="btn-secondary">
-                Cancel
+                {t.common.cancel}
               </button>
               <button onClick={handleAddContact} disabled={!newContactPhone.trim()} className="btn-primary">
-                Save Contact
+                {t.common.save}
               </button>
             </div>
           </div>
@@ -5409,14 +6876,14 @@ export default function App() {
         <div className="modal-overlay">
           <div className="modal">
             <div className="modal-header">
-              <h2>Atur Group Kontak</h2>
+              <h2>{lang === 'id' ? 'Atur Group Kontak' : 'Manage Contact Groups / Tags'}</h2>
               <button onClick={() => setIsEditContactTagsModal(false)} className="btn-icon">
                 <X size={18} />
               </button>
             </div>
             <div className="modal-body space-y-4">
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">Kontak Target</label>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">{lang === 'id' ? 'Kontak Target' : 'Target Contact'}</label>
                 <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
                   <div className="font-semibold text-slate-800">{editingContactName}</div>
                   <div className="font-mono text-slate-500 mt-0.5">+{editingContactPhone}</div>
@@ -5425,22 +6892,22 @@ export default function App() {
 
               <div>
                 <label className="text-xs font-semibold text-slate-700 block mb-1">
-                  Group / Kategori Kontak (Dipisahkan koma)
+                  {lang === 'id' ? 'Group / Kategori Kontak (Dipisahkan koma)' : 'Contact Groups / Tags (Comma separated)'}
                 </label>
                 <input
                   type="text"
-                  placeholder="Contoh: Produk A, Produk B, VIP"
+                  placeholder={lang === 'id' ? 'Contoh: Produk A, Produk B, VIP' : 'e.g. Product A, VIP, Reseller'}
                   value={editingContactTags}
                   onChange={e => setEditingContactTags(e.target.value)}
                   className="w-full border border-slate-200 rounded-lg p-2.5 text-xs"
                 />
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Kontak dapat dimasukkan ke satu atau beberapa grup sekaligus.
+                  {lang === 'id' ? 'Kontak dapat dimasukkan ke satu atau beberapa grup sekaligus.' : 'Contacts can be assigned to one or multiple groups simultaneously.'}
                 </p>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-600 block mb-1.5">Klik Cepat Group:</label>
+                <label className="text-xs font-semibold text-slate-600 block mb-1.5">{lang === 'id' ? 'Klik Cepat Group:' : 'Quick Tag Select:'}</label>
                 <div className="flex flex-wrap gap-1.5">
                   {['Produk A', 'Produk B', 'Produk C', 'VIP', 'Reseller', 'Member', 'Lead']
                     .concat(availableTags.map(t => t.tag).filter(t => !['Produk A', 'Produk B', 'Produk C', 'VIP', 'Reseller', 'Member', 'Lead'].includes(t)))
@@ -5474,10 +6941,10 @@ export default function App() {
             </div>
             <div className="modal-footer">
               <button onClick={() => setIsEditContactTagsModal(false)} className="btn-secondary">
-                Batal
+                {t.common.cancel}
               </button>
               <button onClick={handleSaveContactTags} className="btn-primary">
-                Simpan Group Kontak
+                {t.common.save}
               </button>
             </div>
           </div>
@@ -5491,7 +6958,7 @@ export default function App() {
             <div className="modal-header">
               <div className="flex items-center gap-2">
                 <Send size={18} className="text-sky-600" />
-                <h2 className="font-bold text-slate-800">Kirim Broadcast Pesan WhatsApp</h2>
+                <h2 className="font-bold text-slate-800">{lang === 'id' ? 'Kirim Broadcast Pesan WhatsApp' : 'Dispatch WhatsApp Broadcast'}</h2>
               </div>
               <button onClick={() => setIsChatBroadcastModal(false)} className="btn-icon">
                 <X size={18} />
@@ -5499,7 +6966,7 @@ export default function App() {
             </div>
             <div className="modal-body space-y-4 max-h-[75vh] overflow-y-auto p-4">
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">Pilih Sesi Pengirim</label>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">{t.common.selectSession}</label>
                 <select
                   value={chatBroadcastSessionId}
                   onChange={e => setChatBroadcastSessionId(e.target.value)}
@@ -5514,28 +6981,28 @@ export default function App() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">Target / Penerima Broadcast</label>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">{lang === 'id' ? 'Target / Penerima Broadcast' : 'Audience / Target Recipients'}</label>
                 <div className="grid grid-cols-3 gap-2 mb-3">
                   <button
                     type="button"
                     onClick={() => setChatBroadcastMode('manual')}
                     className={`py-1.5 px-3 text-xs font-medium rounded-lg border text-center transition ${chatBroadcastMode === 'manual' ? 'bg-sky-50 border-sky-500 text-sky-700 font-bold' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                   >
-                    Input Manual / Paste
+                    {lang === 'id' ? 'Input Manual / Paste' : 'Manual Input / Paste'}
                   </button>
                   <button
                     type="button"
                     onClick={() => setChatBroadcastMode('select')}
                     className={`py-1.5 px-3 text-xs font-medium rounded-lg border text-center transition ${chatBroadcastMode === 'select' ? 'bg-sky-50 border-sky-500 text-sky-700 font-bold' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                   >
-                    Pilih Dari Chat ({chats.length})
+                    {lang === 'id' ? `Pilih Dari Chat (${chats.length})` : `Select From Chats (${chats.length})`}
                   </button>
                   <button
                     type="button"
                     onClick={() => setChatBroadcastMode('tag')}
                     className={`py-1.5 px-3 text-xs font-medium rounded-lg border text-center transition ${chatBroadcastMode === 'tag' ? 'bg-sky-50 border-sky-500 text-sky-700 font-bold' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                   >
-                    Berdasarkan Tag / Group
+                    {lang === 'id' ? 'Berdasarkan Tag / Group' : 'By Tag / Contact Group'}
                   </button>
                 </div>
 
@@ -5543,33 +7010,33 @@ export default function App() {
                   <div>
                     <textarea
                       rows={4}
-                      placeholder={`Masukkan nomor telepon (dipisah koma atau baris baru):\n628123456789\n08987654321, Pak Budi\n628567890123`}
+                      placeholder={lang === 'id' ? `Masukkan nomor telepon (dipisah koma atau baris baru):\n628123456789\n08987654321, Pak Budi\n628567890123` : `Enter phone numbers (separated by comma or newline):\n628123456789\n08987654321, John Doe\n628567890123`}
                       value={chatBroadcastManualNumbers}
                       onChange={e => setChatBroadcastManualNumbers(e.target.value)}
                       className="w-full border border-slate-200 rounded-lg p-2.5 text-xs font-mono"
                     />
-                    <p className="text-[11px] text-slate-400 mt-1">Format: <code>628xxx</code> atau <code>08xxx</code>. Anda dapat memasukkan nama setelah koma.</p>
+                    <p className="text-[11px] text-slate-400 mt-1">{lang === 'id' ? 'Format: 628xxx atau 08xxx. Anda dapat memasukkan nama setelah koma.' : 'Format: 628xxx or 08xxx. You can append recipient name after comma.'}</p>
                   </div>
                 )}
 
                 {chatBroadcastMode === 'select' && (
                   <div className="border border-slate-200 rounded-lg p-3 max-h-48 overflow-y-auto space-y-1 bg-slate-50">
                     <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-200">
-                      <span className="text-xs text-slate-500 font-medium">Terpilih: {chatBroadcastSelectedPhones.length} nomor</span>
+                      <span className="text-xs text-slate-500 font-medium">{lang === 'id' ? `Terpilih: ${chatBroadcastSelectedPhones.length} nomor` : `Selected: ${chatBroadcastSelectedPhones.length} numbers`}</span>
                       <div className="flex gap-2">
                         <button
                           type="button"
                           onClick={() => setChatBroadcastSelectedPhones(chats.map(c => c.chat_jid.replace(/[^0-9]/g, '')).filter(Boolean))}
                           className="text-[11px] text-sky-600 hover:underline font-medium"
                         >
-                          Pilih Semua
+                          {lang === 'id' ? 'Pilih Semua' : 'Select All'}
                         </button>
                         <button
                           type="button"
                           onClick={() => setChatBroadcastSelectedPhones([])}
                           className="text-[11px] text-slate-500 hover:underline"
                         >
-                          Batal Semua
+                          {lang === 'id' ? 'Batal Semua' : 'Clear All'}
                         </button>
                       </div>
                     </div>
@@ -5600,13 +7067,13 @@ export default function App() {
 
                 {chatBroadcastMode === 'tag' && (
                   <div>
-                    <label className="text-xs text-slate-600 block mb-1">Pilih Tag / Group Kontak</label>
+                    <label className="text-xs text-slate-600 block mb-1">{lang === 'id' ? 'Pilih Tag / Group Kontak' : 'Select Tag / Contact Group'}</label>
                     <select
                       value={chatBroadcastTag}
                       onChange={e => setChatBroadcastTag(e.target.value)}
                       className="w-full border border-slate-200 rounded-lg p-2 text-xs"
                     >
-                      <option value="ALL">Semua Kontak (Aktif)</option>
+                      <option value="ALL">{lang === 'id' ? 'Semua Kontak (Aktif)' : 'All Contacts (Active)'}</option>
                       {availableTags.map(t => (
                         <option key={t.tag} value={t.tag}>{t.tag} ({t.count})</option>
                       ))}
@@ -5616,23 +7083,23 @@ export default function App() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">Isi Pesan Broadcast</label>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">{lang === 'id' ? 'Isi Pesan Broadcast' : 'Broadcast Message Content'}</label>
                 <textarea
                   rows={4}
-                  placeholder="Ketik pesan broadcast... Gunakan {{name}} untuk nama & {Halo|Hi} untuk acak spintax."
+                  placeholder={lang === 'id' ? 'Ketik pesan broadcast... Gunakan {{name}} untuk nama & {Halo|Hi} untuk acak spintax.' : 'Type broadcast message... Use {{name}} for name & {Hello|Hi} for spintax.'}
                   value={chatBroadcastMessage}
                   onChange={e => setChatBroadcastMessage(e.target.value)}
                   className="w-full border border-slate-200 rounded-lg p-2.5 text-xs"
                 />
                 <div className="flex justify-between text-[11px] text-slate-400 mt-1">
-                  <span>Mendukung variabel <code>{'{{name}}'}</code> dan Spintax <code>{'{opsi1|opsi2}'}</code></span>
-                  <span>{chatBroadcastMessage.length} Karakter</span>
+                  <span>{lang === 'id' ? 'Mendukung variabel {{name}} dan Spintax {opsi1|opsi2}' : 'Supports variables {{name}} and Spintax {option1|option2}'}</span>
+                  <span>{chatBroadcastMessage.length} {lang === 'id' ? 'Karakter' : 'Characters'}</span>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">Delay Minimal (detik)</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">{lang === 'id' ? 'Delay Minimal (detik)' : 'Min Delay (seconds)'}</label>
                   <input
                     type="number"
                     min={1}
@@ -5643,7 +7110,7 @@ export default function App() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">Delay Maksimal (detik)</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">{lang === 'id' ? 'Delay Maksimal (detik)' : 'Max Delay (seconds)'}</label>
                   <input
                     type="number"
                     min={2}
@@ -5658,10 +7125,10 @@ export default function App() {
 
             <div className="modal-footer">
               <button onClick={() => setIsChatBroadcastModal(false)} className="btn-secondary" disabled={chatBroadcastSending}>
-                Batal
+                {t.common.cancel}
               </button>
               <button onClick={handleSendChatBroadcast} disabled={chatBroadcastSending} className="btn-primary bg-sky-600 hover:bg-sky-700">
-                {chatBroadcastSending ? 'Memproses...' : '🚀 Mulai Kirim Broadcast'}
+                {chatBroadcastSending ? (lang === 'id' ? 'Memproses...' : 'Processing...') : (lang === 'id' ? '🚀 Mulai Kirim Broadcast' : '🚀 Launch Broadcast')}
               </button>
             </div>
           </div>
@@ -5675,7 +7142,7 @@ export default function App() {
             <div className="modal-header">
               <div className="flex items-center gap-2">
                 <Bot size={18} className="text-emerald-600" />
-                <h2 className="font-bold text-slate-800">Pengaturan Quick Auto Reply</h2>
+                <h2 className="font-bold text-slate-800">{lang === 'id' ? 'Pengaturan Quick Auto Reply' : 'Quick Auto Reply Settings'}</h2>
               </div>
               <button onClick={() => setIsChatAutoReplyModal(false)} className="btn-icon">
                 <X size={18} />
@@ -5687,10 +7154,10 @@ export default function App() {
                 <div>
                   <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                     <Zap size={14} className={botConfig.autoReplyEnabled !== false ? 'text-emerald-600' : 'text-slate-400'} />
-                    Status Balas Otomatis Sesi
+                    {lang === 'id' ? 'Status Balas Otomatis Sesi' : 'Session Auto-Reply Status'}
                   </h4>
                   <p className="text-[11px] text-slate-500">
-                    {botConfig.autoReplyEnabled !== false ? 'Bot aktif menjawab pesan masuk secara otomatis' : 'Auto-reply mati. Semua pesan masuk harus dibalas manual.'}
+                    {botConfig.autoReplyEnabled !== false ? (lang === 'id' ? 'Bot aktif menjawab pesan masuk secara otomatis' : 'Bot actively replies to incoming messages') : (lang === 'id' ? 'Auto-reply mati. Semua pesan masuk harus dibalas manual.' : 'Auto-reply disabled. Reply manually.')}
                   </p>
                 </div>
                 <button
@@ -5699,14 +7166,14 @@ export default function App() {
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 text-white transition ${botConfig.autoReplyEnabled !== false ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-500 hover:bg-slate-600'}`}
                 >
                   {botConfig.autoReplyEnabled !== false ? <Check size={14} /> : <X size={14} />}
-                  <span>{botConfig.autoReplyEnabled !== false ? 'AKTIF' : 'OFF'}</span>
+                  <span>{botConfig.autoReplyEnabled !== false ? (lang === 'id' ? 'AKTIF' : 'ACTIVE') : 'OFF'}</span>
                 </button>
               </div>
 
               {/* Rules List Preview */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-xs font-bold text-slate-700">Aturan Keyword / Kata Kunci ({rules.length})</h4>
+                  <h4 className="text-xs font-bold text-slate-700">{lang === 'id' ? `Aturan Keyword / Kata Kunci (${rules.length})` : `Keyword Rules (${rules.length})`}</h4>
                   <button
                     type="button"
                     onClick={() => {
@@ -5715,26 +7182,26 @@ export default function App() {
                     }}
                     className="text-[11px] text-sky-600 hover:underline font-semibold"
                   >
-                    Kelola Semua Aturan &rarr;
+                    {lang === 'id' ? 'Kelola Semua Aturan →' : 'Manage All Rules →'}
                   </button>
                 </div>
 
                 <div className="space-y-1.5 max-h-40 overflow-y-auto border border-slate-200 rounded-lg p-2 bg-slate-50">
                   {rules.length === 0 ? (
-                    <p className="text-[11px] text-slate-400 text-center py-3">Belum ada aturan kata kunci. Klik tombol kelola untuk membuat aturan baru.</p>
+                    <p className="text-[11px] text-slate-400 text-center py-3">{lang === 'id' ? 'Belum ada aturan kata kunci. Klik tombol kelola untuk membuat aturan baru.' : 'No keyword rules created yet. Click manage to create rules.'}</p>
                   ) : (
                     rules.map(rule => (
                       <div key={rule.id} className="flex items-center justify-between p-2 bg-white rounded border border-slate-200 text-xs">
                         <div>
                           <span className="font-semibold text-slate-800">{rule.name}</span>
-                          <div className="text-[10px] text-slate-500">Hits: {rule.hit_count}x</div>
+                          <div className="text-[10px] text-slate-500">{t.automation.hitCount}: {rule.hit_count}x</div>
                         </div>
                         <button
                           type="button"
                           onClick={() => handleToggleRule(rule.id, rule.is_active)}
                           className={`px-2 py-1 rounded text-[11px] font-bold ${rule.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}
                         >
-                          {rule.is_active ? 'Aktif' : 'Nonaktif'}
+                          {rule.is_active ? t.common.active : t.common.inactive}
                         </button>
                       </div>
                     ))
@@ -5744,7 +7211,7 @@ export default function App() {
 
               {/* Offline & Business Hours Config */}
               <div className="space-y-3 border-t border-slate-200 pt-3">
-                <h4 className="text-xs font-bold text-slate-700">Balasan Otomatis Luar Jam Kerja</h4>
+                <h4 className="text-xs font-bold text-slate-700">{t.automation.workingHours}</h4>
 
                 <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700">
                   <input
@@ -5753,13 +7220,13 @@ export default function App() {
                     onChange={e => setBotConfig({ ...botConfig, businessHoursEnabled: e.target.checked })}
                     className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                   />
-                  <span>Aktifkan Batasan Jam Operasional (08:00 - 17:00)</span>
+                  <span>{lang === 'id' ? 'Aktifkan Batasan Jam Operasional (08:00 - 17:00)' : 'Enable Business Hours Constraint (08:00 - 17:00)'}</span>
                 </label>
 
                 {botConfig.businessHoursEnabled && (
                   <div className="grid grid-cols-2 gap-2 pl-5">
                     <div>
-                      <label className="text-[11px] text-slate-500 block mb-1">Jam Buka</label>
+                      <label className="text-[11px] text-slate-500 block mb-1">{lang === 'id' ? 'Jam Buka' : 'Start Time'}</label>
                       <input
                         type="time"
                         value={botConfig.businessHoursStart}
@@ -5768,7 +7235,7 @@ export default function App() {
                       />
                     </div>
                     <div>
-                      <label className="text-[11px] text-slate-500 block mb-1">Jam Tutup</label>
+                      <label className="text-[11px] text-slate-500 block mb-1">{lang === 'id' ? 'Jam Tutup' : 'End Time'}</label>
                       <input
                         type="time"
                         value={botConfig.businessHoursEnd}
@@ -5786,7 +7253,7 @@ export default function App() {
                     onChange={e => setBotConfig({ ...botConfig, offlineReplyEnabled: e.target.checked })}
                     className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                   />
-                  <span>Kirim Pesan Otomatis Saat Luar Jam Operasional</span>
+                  <span>{lang === 'id' ? 'Kirim Pesan Otomatis Saat Luar Jam Operasional' : 'Send Automatic Offline Reply Outside Business Hours'}</span>
                 </label>
 
                 {botConfig.offlineReplyEnabled && (
@@ -5796,7 +7263,7 @@ export default function App() {
                       value={botConfig.offlineReplyText}
                       onChange={e => setBotConfig({ ...botConfig, offlineReplyText: e.target.value })}
                       className="w-full border border-slate-200 rounded-lg p-2 text-xs"
-                      placeholder="Pesan balasan di luar jam kerja..."
+                      placeholder={lang === 'id' ? 'Pesan balasan di luar jam kerja...' : 'Away auto-reply message...'}
                     />
                   </div>
                 )}
@@ -5805,7 +7272,7 @@ export default function App() {
 
             <div className="modal-footer">
               <button onClick={() => setIsChatAutoReplyModal(false)} className="btn-secondary">
-                Tutup
+                {t.common.close}
               </button>
               <button
                 onClick={() => {
@@ -5814,7 +7281,7 @@ export default function App() {
                 }}
                 className="btn-primary bg-emerald-600 hover:bg-emerald-700"
               >
-                Simpan Konfigurasi
+                {t.common.save}
               </button>
             </div>
           </div>
@@ -5826,30 +7293,30 @@ export default function App() {
         <div className="modal-overlay">
           <div className="modal">
             <div className="modal-header">
-              <h2>Start New WhatsApp Chat</h2>
+              <h2>{t.chats.newChatModalTitle}</h2>
               <button onClick={() => setIsNewChatModal(false)} className="btn-icon">
                 <X size={18} />
               </button>
             </div>
             <div className="modal-body space-y-4">
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">Phone Number (with Country Code)</label>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">{t.tester.recipientPhone}</label>
                 <input
                   type="text"
-                  placeholder="e.g. 628123456789 or 08123456789"
+                  placeholder={t.chats.newChatPhonePlaceholder}
                   value={newChatPhone}
                   onChange={e => setNewChatPhone(e.target.value)}
                   className="w-full border border-slate-200 rounded-lg p-2.5 text-xs font-mono"
                 />
-                <p className="text-[11px] text-slate-400 mt-1">Chat history will open directly in the chat panel.</p>
+                <p className="text-[11px] text-slate-400 mt-1">{lang === 'id' ? 'Riwayat obrolan akan langsung terbuka di panel chat.' : 'Chat thread will open directly in the inbox panel.'}</p>
               </div>
             </div>
             <div className="modal-footer">
               <button onClick={() => setIsNewChatModal(false)} className="btn-secondary">
-                Cancel
+                {t.common.cancel}
               </button>
               <button onClick={handleStartNewChat} disabled={!newChatPhone.trim()} className="btn-primary">
-                Open Chat
+                {t.chats.newChatStartButton}
               </button>
             </div>
           </div>
@@ -5861,14 +7328,14 @@ export default function App() {
         <div className="modal-overlay">
           <div className="modal">
             <div className="modal-header">
-              <h2>Send Media / Document</h2>
+              <h2>{t.tester.mediaFile || 'Kirim Berkas Media'}</h2>
               <button onClick={() => setIsSendMediaModal(false)} className="btn-icon">
                 <X size={18} />
               </button>
             </div>
             <div className="modal-body space-y-4">
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">Select File</label>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">{t.tester.mediaFile}</label>
                 <input
                   type="file"
                   onChange={e => setChatMediaFile(e.target.files?.[0] || null)}
@@ -5877,10 +7344,10 @@ export default function App() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">Caption (Optional)</label>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">{t.tester.mediaCaption}</label>
                 <input
                   type="text"
-                  placeholder="Add a caption..."
+                  placeholder={lang === 'id' ? 'Tambahkan keterangan teks...' : 'Add a caption...'}
                   value={chatMediaCaption}
                   onChange={e => setChatMediaCaption(e.target.value)}
                   className="w-full border border-slate-200 rounded-lg p-2.5 text-xs"
@@ -5889,10 +7356,10 @@ export default function App() {
             </div>
             <div className="modal-footer">
               <button onClick={() => setIsSendMediaModal(false)} className="btn-secondary">
-                Cancel
+                {t.common.cancel}
               </button>
               <button onClick={handleSendChatMedia} disabled={!chatMediaFile} className="btn-primary">
-                Send Media
+                {t.chats.send}
               </button>
             </div>
           </div>
@@ -5904,17 +7371,19 @@ export default function App() {
         <div className="modal-overlay">
           <div className="modal modal-lg">
             <div className="modal-header">
-              <h2>New Broadcast Campaign</h2>
+              <h2>{lang === 'id' ? 'Buat Broadcast Baru' : 'New Broadcast Campaign'}</h2>
               <button onClick={() => setIsNewCampaignModal(false)} className="btn-icon">
                 <X size={18} />
               </button>
             </div>
             <div className="modal-body space-y-4">
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">Campaign Title</label>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  {lang === 'id' ? 'Judul Broadcast' : 'Campaign Title'}
+                </label>
                 <input
                   type="text"
-                  placeholder="e.g. Promo Produk A - Weekend Special"
+                  placeholder={lang === 'id' ? 'misal: Promo Produk A - Weekend Special' : 'e.g. Product Promo A - Weekend Special'}
                   value={campName}
                   onChange={e => setCampName(e.target.value)}
                   className="w-full border border-slate-200 rounded-lg p-2.5 text-xs"
@@ -5924,7 +7393,7 @@ export default function App() {
               {/* Audience Source Selector: Group vs Manual */}
               <div>
                 <label className="text-xs font-semibold text-slate-700 block mb-1.5">
-                  Target Penerima Pesan (Audience Source)
+                  {lang === 'id' ? 'Target Penerima Pesan (Sumber Kontak)' : 'Audience Source (Target Recipients)'}
                 </label>
                 <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-lg">
                   <button
@@ -5937,7 +7406,7 @@ export default function App() {
                     }`}
                   >
                     <Tag size={14} />
-                    <span>Pilih dari Group Kontak</span>
+                    <span>{lang === 'id' ? 'Pilih dari Group Kontak' : 'Select from Contact Group'}</span>
                   </button>
                   <button
                     type="button"
@@ -5949,7 +7418,7 @@ export default function App() {
                     }`}
                   >
                     <FileText size={14} />
-                    <span>Input Nomor Manual / Paste</span>
+                    <span>{lang === 'id' ? 'Input Nomor Manual / Tempel' : 'Manual Phone Input / Paste'}</span>
                   </button>
                 </div>
               </div>
@@ -5958,7 +7427,7 @@ export default function App() {
                 <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-lg space-y-3">
                   <div>
                     <label className="text-xs font-semibold text-blue-950 block mb-1">
-                      Pilih Group Kontak Sasaran:
+                      {lang === 'id' ? 'Pilih Group Kontak Sasaran:' : 'Select Target Contact Group:'}
                     </label>
                     <select
                       value={campSelectedTag}
@@ -5966,11 +7435,13 @@ export default function App() {
                       className="w-full border border-blue-300 rounded-lg p-2.5 text-xs bg-white text-slate-800 font-medium focus:outline-none focus:border-blue-500"
                     >
                       <option value="ALL">
-                        Semua Kontak ({contacts.filter(c => !c.opt_out).length} Kontak Aktif)
+                        {lang === 'id'
+                          ? `Semua Kontak (${contacts.filter(c => !c.opt_out).length} Kontak Aktif)`
+                          : `All Contacts (${contacts.filter(c => !c.opt_out).length} Active Contacts)`}
                       </option>
                       {availableTags.map(t => (
                         <option key={t.tag} value={t.tag}>
-                          Group: {t.tag} ({t.count} Kontak)
+                          {lang === 'id' ? `Group: ${t.tag} (${t.count} Kontak)` : `Group: ${t.tag} (${t.count} Contacts)`}
                         </option>
                       ))}
                     </select>
@@ -5980,22 +7451,24 @@ export default function App() {
                     <span className="flex items-center gap-1.5 font-medium text-blue-900">
                       <CheckCircle size={14} className="text-blue-600" />
                       <span>
-                        Target Penerima:{' '}
+                        {lang === 'id' ? 'Target Penerima: ' : 'Target Recipients: '}
                         <strong className="text-blue-700 font-bold">
                           {campSelectedTag === 'ALL'
                             ? contacts.filter(c => !c.opt_out).length
                             : contacts.filter(c => c.tags.includes(campSelectedTag) && !c.opt_out).length}
                         </strong>{' '}
-                        kontak (Nomor Opt-Out otomatis difilter)
+                        {lang === 'id'
+                          ? 'kontak (Nomor Opt-Out otomatis difilter)'
+                          : 'contacts (Opt-out numbers automatically filtered)'}
                       </span>
                     </span>
                     <button
                       type="button"
                       onClick={handleFillRecipientsFromGroup}
                       className="text-xs text-blue-700 hover:underline font-semibold"
-                      title="Salin nomor dari group ini ke editor teks manual"
+                      title={lang === 'id' ? 'Salin nomor dari group ini ke editor teks manual' : 'Copy numbers from this group to manual editor'}
                     >
-                      Salin ke Manual Text &rarr;
+                      {lang === 'id' ? 'Salin ke Teks Manual →' : 'Copy to Manual Text →'}
                     </button>
                   </div>
                 </div>
@@ -6003,7 +7476,9 @@ export default function App() {
                 <div>
                   <div className="flex justify-between items-center mb-1">
                     <label className="text-xs font-semibold text-slate-700 block">
-                      Recipients List (Format: Phone,Name per baris)
+                      {lang === 'id'
+                        ? 'Daftar Penerima (Format: Nomor,Nama per baris)'
+                        : 'Recipients List (Format: Phone,Name per line)'}
                     </label>
                     {availableTags.length > 0 && (
                       <button
@@ -6011,7 +7486,9 @@ export default function App() {
                         onClick={handleFillRecipientsFromGroup}
                         className="text-[11px] text-blue-600 hover:underline font-medium"
                       >
-                        + Salin dari group "{campSelectedTag === 'ALL' ? 'Semua Kontak' : campSelectedTag}"
+                        {lang === 'id'
+                          ? `+ Salin dari group "${campSelectedTag === 'ALL' ? 'Semua Kontak' : campSelectedTag}"`
+                          : `+ Copy from group "${campSelectedTag === 'ALL' ? 'All Contacts' : campSelectedTag}"`}
                       </button>
                     )}
                   </div>
@@ -6023,28 +7500,36 @@ export default function App() {
                     className="w-full border border-slate-200 rounded-lg p-2.5 text-xs font-mono"
                   />
                   <p className="text-[11px] text-slate-400 mt-1">
-                    Dapat menempelkan langsung ribuan nomor dari file Notepad / Excel.
+                    {lang === 'id'
+                      ? 'Dapat menempelkan langsung ribuan nomor dari file Notepad / Excel.'
+                      : 'You can paste thousands of phone numbers directly from Notepad / Excel.'}
                   </p>
                 </div>
               )}
 
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">Message Template (Spintax & Variables)</label>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  {lang === 'id' ? 'Template Pesan (Spintax & Variabel)' : 'Message Template (Spintax & Variables)'}
+                </label>
                 <textarea
                   rows={4}
                   value={campTemplate}
                   onChange={e => setCampTemplate(e.target.value)}
-                  placeholder="e.g. {Halo|Hai} {{name}}, penawaran spesial untuk nomor {{phone}}..."
+                  placeholder={lang === 'id' ? 'misal: {Halo|Hai} {{name}}, penawaran spesial untuk nomor {{phone}}...' : 'e.g. {Hello|Hi} {{name}}, special offer for phone {{phone}}...'}
                   className="w-full border border-slate-200 rounded-lg p-2.5 text-xs focus:outline-none focus:border-blue-500"
                 />
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Supports spintax <code>{`{Halo|Hai}`}</code> and variables <code>{`{{name}}`}</code>, <code>{`{{phone}}`}</code>
+                  {lang === 'id'
+                    ? <>Mendukung spintax <code>{`{Halo|Hai}`}</code> dan variabel <code>{`{{name}}`}</code>, <code>{`{{phone}}`}</code></>
+                    : <>Supports spintax <code>{`{Hello|Hi}`}</code> and variables <code>{`{{name}}`}</code>, <code>{`{{phone}}`}</code></>}
                 </p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">Random Delay Min (seconds)</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">
+                    {lang === 'id' ? 'Jeda Acak Minimum (detik)' : 'Random Delay Min (seconds)'}
+                  </label>
                   <input
                     type="number"
                     value={campRandomDelayMin}
@@ -6053,7 +7538,9 @@ export default function App() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">Random Delay Max (seconds)</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">
+                    {lang === 'id' ? 'Jeda Acak Maksimum (detik)' : 'Random Delay Max (seconds)'}
+                  </label>
                   <input
                     type="number"
                     value={campRandomDelayMax}
@@ -6065,7 +7552,7 @@ export default function App() {
             </div>
             <div className="modal-footer">
               <button onClick={() => setIsNewCampaignModal(false)} className="btn-secondary">
-                Cancel
+                {t.common.cancel}
               </button>
               <button
                 onClick={handleCreateCampaign}
@@ -6079,7 +7566,7 @@ export default function App() {
                 }
                 className="btn-primary"
               >
-                Schedule Broadcast
+                {lang === 'id' ? 'Jadwalkan Broadcast' : 'Schedule Broadcast'}
               </button>
             </div>
           </div>
@@ -6091,7 +7578,7 @@ export default function App() {
         <div className="modal-overlay">
           <div className="modal modal-lg">
             <div className="modal-header">
-              <h2>Recipients: {viewCampaignTitle}</h2>
+              <h2>{lang === 'id' ? 'Daftar Penerima:' : 'Recipients:'} {viewCampaignTitle}</h2>
               <button onClick={() => setIsViewRecipientsModal(false)} className="btn-icon">
                 <X size={18} />
               </button>
@@ -6101,18 +7588,18 @@ export default function App() {
                 <table className="w-full text-left text-xs text-slate-600">
                   <thead className="table-header" style={{ display: 'table-header-group' }}>
                     <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase">
-                      <th className="py-2 px-3">PHONE</th>
-                      <th className="py-2 px-3">NAME</th>
-                      <th className="py-2 px-3">STATUS</th>
-                      <th className="py-2 px-3">TIMESTAMP</th>
-                      <th className="py-2 px-3">NOTE</th>
+                      <th className="py-2 px-3">{lang === 'id' ? 'NOMOR HP' : 'PHONE'}</th>
+                      <th className="py-2 px-3">{lang === 'id' ? 'NAMA' : 'NAME'}</th>
+                      <th className="py-2 px-3">{lang === 'id' ? 'STATUS' : 'STATUS'}</th>
+                      <th className="py-2 px-3">{lang === 'id' ? 'WAKTU' : 'TIMESTAMP'}</th>
+                      <th className="py-2 px-3">{lang === 'id' ? 'CATATAN / ERROR' : 'NOTE / ERROR'}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {viewRecipientsList.length === 0 ? (
                       <tr>
                         <td colSpan={5} className="py-8 text-center text-slate-400">
-                          No recipient details recorded.
+                          {lang === 'id' ? 'Belum ada rincian penerima yang tercatat.' : 'No recipient details recorded.'}
                         </td>
                       </tr>
                     ) : (
@@ -6136,7 +7623,7 @@ export default function App() {
             </div>
             <div className="modal-footer">
               <button onClick={() => setIsViewRecipientsModal(false)} className="btn-secondary">
-                Close
+                {t.common.close}
               </button>
             </div>
           </div>
@@ -6148,17 +7635,19 @@ export default function App() {
         <div className="modal-overlay">
           <div className="modal">
             <div className="modal-header">
-              <h2>New Auto-Responder Rule</h2>
+              <h2>{lang === 'id' ? 'Tambah Aturan Auto-Reply Baru' : 'New Auto-Responder Rule'}</h2>
               <button onClick={() => setIsNewRuleModal(false)} className="btn-icon">
                 <X size={18} />
               </button>
             </div>
             <div className="modal-body space-y-4">
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">Rule Name</label>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  {lang === 'id' ? 'Nama Aturan' : 'Rule Name'}
+                </label>
                 <input
                   type="text"
-                  placeholder="e.g. Price Inquiry Bot"
+                  placeholder={lang === 'id' ? 'misal: Bot Tanya Harga' : 'e.g. Price Inquiry Bot'}
                   value={ruleName}
                   onChange={e => setRuleName(e.target.value)}
                   className="w-full border border-slate-200 rounded-lg p-2.5 text-xs"
@@ -6167,23 +7656,27 @@ export default function App() {
 
               <div className="grid grid-cols-3 gap-2">
                 <div className="col-span-1">
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">Match Type</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">
+                    {lang === 'id' ? 'Tipe Pencocokan' : 'Match Type'}
+                  </label>
                   <select
                     value={ruleOperator}
                     onChange={e => setRuleOperator(e.target.value as any)}
                     className="w-full text-xs font-semibold py-2 px-2 border border-slate-200 rounded-lg bg-white"
                   >
-                    <option value="contains">Contains</option>
-                    <option value="equals">Exact Equals</option>
-                    <option value="starts_with">Starts With</option>
+                    <option value="contains">{lang === 'id' ? 'Mengandung (Contains)' : 'Contains'}</option>
+                    <option value="equals">{lang === 'id' ? 'Sama Persis (Exact Equals)' : 'Exact Equals'}</option>
+                    <option value="starts_with">{lang === 'id' ? 'Diawali Dengan (Starts With)' : 'Starts With'}</option>
                     <option value="regex">Regex</option>
                   </select>
                 </div>
                 <div className="col-span-2">
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">Keyword Trigger</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">
+                    {lang === 'id' ? 'Kata Kunci Pemicu' : 'Keyword Trigger'}
+                  </label>
                   <input
                     type="text"
-                    placeholder="e.g. harga or katalog"
+                    placeholder={lang === 'id' ? 'misal: harga atau katalog' : 'e.g. price or catalog'}
                     value={ruleTriggerText}
                     onChange={e => setRuleTriggerText(e.target.value)}
                     className="w-full border border-slate-200 rounded-lg p-2 text-xs font-mono"
@@ -6192,12 +7685,14 @@ export default function App() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Reply Template</label>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                  {lang === 'id' ? 'Template Pesan Balasan' : 'Reply Template'}
+                </label>
                 <textarea
                   rows={4}
                   value={ruleReplyText}
                   onChange={e => setRuleReplyText(e.target.value)}
-                  placeholder="e.g. {Halo|Hai} {{name}}, terima kasih telah menghubungi kami!"
+                  placeholder={lang === 'id' ? 'misal: {Halo|Hai} {{name}}, terima kasih telah menghubungi kami!' : 'e.g. {Hello|Hi} {{name}}, thank you for reaching out!'}
                   className="w-full border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-500 bg-white dark:bg-slate-900"
                 />
               </div>
@@ -6205,7 +7700,7 @@ export default function App() {
               {/* AMAN CHAT Pro: Multi-Actions (Auto-tagging & Pipeline Stage) */}
               <div className="border-t border-slate-100 dark:border-slate-800 pt-3 space-y-3">
                 <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                  Aksi Tambahan Otomatis (WhatsAman Pro):
+                  {lang === 'id' ? 'Aksi Tambahan Otomatis (WhatsAman Pro):' : 'Automated Multi-Actions (WhatsAman Pro):'}
                 </span>
 
                 <div className="space-y-2">
@@ -6218,7 +7713,7 @@ export default function App() {
                       className="rounded text-emerald-600"
                     />
                     <label htmlFor="newRuleAddTagCheck" className="text-xs text-slate-700 dark:text-slate-300 font-medium cursor-pointer">
-                      Pasang Tag Kontak Otomatis (Auto-Tagging)
+                      {lang === 'id' ? 'Pasang Tag Kontak Otomatis (Auto-Tagging)' : 'Auto-Assign Contact Tag (Auto-Tagging)'}
                     </label>
                   </div>
 
@@ -6230,12 +7725,12 @@ export default function App() {
                         className="w-full text-xs p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 font-medium"
                       >
                         <option value="🔥 Hot Lead">🔥 Hot Lead</option>
-                        <option value="💰 Sudah Membeli">💰 Sudah Membeli</option>
+                        <option value="💰 Sudah Membeli">{lang === 'id' ? '💰 Sudah Membeli' : '💰 Purchased'}</option>
                         <option value="🟡 Warm Lead">🟡 Warm Lead</option>
                         <option value="❄️ Cold Lead">❄️ Cold Lead</option>
                         <option value="📦 Repeat Order">📦 Repeat Order</option>
                         <option value="⭐ VIP Customer">⭐ VIP Customer</option>
-                        <option value="⏳ Menunggu Pembayaran">⏳ Menunggu Pembayaran</option>
+                        <option value="⏳ Menunggu Pembayaran">{lang === 'id' ? '⏳ Menunggu Pembayaran' : '⏳ Awaiting Payment'}</option>
                       </select>
                     </div>
                   )}
@@ -6251,7 +7746,7 @@ export default function App() {
                       className="rounded text-emerald-600"
                     />
                     <label htmlFor="newRuleSetStageCheck" className="text-xs text-slate-700 dark:text-slate-300 font-medium cursor-pointer">
-                      Pindahkan Pipeline Stage (Sales Funnel)
+                      {lang === 'id' ? 'Pindahkan Pipeline Stage (Sales Funnel)' : 'Move CRM Pipeline Stage (Sales Funnel)'}
                     </label>
                   </div>
 
@@ -6262,10 +7757,10 @@ export default function App() {
                         onChange={e => setRuleActionStage(e.target.value as any)}
                         className="w-full text-xs p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 font-medium"
                       >
-                        <option value="lead">🔵 Lead (Lead Baru)</option>
-                        <option value="prospect">🟡 Prospect (Tertarik / Follow Up)</option>
-                        <option value="customer">💰 Customer (Closing / Selesai)</option>
-                        <option value="churned">❌ Churned (Tidak Tertarik)</option>
+                        <option value="lead">{lang === 'id' ? '🔵 Lead (Lead Baru)' : '🔵 Lead (New Lead)'}</option>
+                        <option value="prospect">{lang === 'id' ? '🟡 Prospect (Tertarik / Follow Up)' : '🟡 Prospect (Interested / Follow Up)'}</option>
+                        <option value="customer">{lang === 'id' ? '💰 Customer (Closing / Selesai)' : '💰 Customer (Closed / Won)'}</option>
+                        <option value="churned">{lang === 'id' ? '❌ Churned (Batal / Tidak Tertarik)' : '❌ Churned (Lost / Uninterested)'}</option>
                       </select>
                     </div>
                   )}
@@ -6274,10 +7769,10 @@ export default function App() {
             </div>
             <div className="modal-footer">
               <button onClick={() => setIsNewRuleModal(false)} className="btn-secondary">
-                Cancel
+                {t.common.cancel}
               </button>
               <button onClick={handleCreateRule} disabled={!ruleName.trim() || !ruleTriggerText.trim()} className="btn-primary">
-                Save Rule
+                {lang === 'id' ? 'Simpan Aturan' : 'Save Rule'}
               </button>
             </div>
           </div>
@@ -6289,14 +7784,16 @@ export default function App() {
         <div className="modal-overlay">
           <div className="modal">
             <div className="modal-header">
-              <h2>Edit Rule</h2>
+              <h2>{lang === 'id' ? 'Edit Aturan Auto-Reply' : 'Edit Automation Rule'}</h2>
               <button onClick={() => setIsEditRuleModal(false)} className="btn-icon">
                 <X size={18} />
               </button>
             </div>
             <div className="modal-body space-y-4">
               <div>
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Rule Name</label>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                  {lang === 'id' ? 'Nama Aturan' : 'Rule Name'}
+                </label>
                 <input
                   type="text"
                   value={editRuleName}
@@ -6307,20 +7804,24 @@ export default function App() {
 
               <div className="grid grid-cols-3 gap-2">
                 <div className="col-span-1">
-                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Match Type</label>
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                    {lang === 'id' ? 'Tipe Pencocokan' : 'Match Type'}
+                  </label>
                   <select
                     value={editRuleOperator}
                     onChange={e => setEditRuleOperator(e.target.value as any)}
                     className="w-full text-xs font-semibold py-2 px-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900"
                   >
-                    <option value="contains">Contains</option>
-                    <option value="equals">Exact Equals</option>
-                    <option value="starts_with">Starts With</option>
+                    <option value="contains">{lang === 'id' ? 'Mengandung (Contains)' : 'Contains'}</option>
+                    <option value="equals">{lang === 'id' ? 'Sama Persis (Exact Equals)' : 'Exact Equals'}</option>
+                    <option value="starts_with">{lang === 'id' ? 'Diawali Dengan (Starts With)' : 'Starts With'}</option>
                     <option value="regex">Regex</option>
                   </select>
                 </div>
                 <div className="col-span-2">
-                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Keyword Trigger</label>
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                    {lang === 'id' ? 'Kata Kunci Pemicu' : 'Keyword Trigger'}
+                  </label>
                   <input
                     type="text"
                     value={editRuleTriggerText}
@@ -6331,7 +7832,9 @@ export default function App() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Reply Template</label>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                  {lang === 'id' ? 'Template Pesan Balasan' : 'Reply Template'}
+                </label>
                 <textarea
                   rows={4}
                   value={editRuleReplyText}
@@ -6343,7 +7846,7 @@ export default function App() {
               {/* AMAN CHAT Pro: Multi-Actions (Auto-tagging & Pipeline Stage) */}
               <div className="border-t border-slate-100 dark:border-slate-800 pt-3 space-y-3">
                 <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                  Aksi Tambahan Otomatis (WhatsAman Pro):
+                  {lang === 'id' ? 'Aksi Tambahan Otomatis (WhatsAman Pro):' : 'Automated Multi-Actions (WhatsAman Pro):'}
                 </span>
 
                 <div className="space-y-2">
@@ -6356,7 +7859,7 @@ export default function App() {
                       className="rounded text-emerald-600"
                     />
                     <label htmlFor="editRuleAddTagCheck" className="text-xs text-slate-700 dark:text-slate-300 font-medium cursor-pointer">
-                      Pasang Tag Kontak Otomatis (Auto-Tagging)
+                      {lang === 'id' ? 'Pasang Tag Kontak Otomatis (Auto-Tagging)' : 'Auto-Assign Contact Tag (Auto-Tagging)'}
                     </label>
                   </div>
 
@@ -6368,12 +7871,12 @@ export default function App() {
                         className="w-full text-xs p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 font-medium"
                       >
                         <option value="🔥 Hot Lead">🔥 Hot Lead</option>
-                        <option value="💰 Sudah Membeli">💰 Sudah Membeli</option>
+                        <option value="💰 Sudah Membeli">{lang === 'id' ? '💰 Sudah Membeli' : '💰 Purchased'}</option>
                         <option value="🟡 Warm Lead">🟡 Warm Lead</option>
                         <option value="❄️ Cold Lead">❄️ Cold Lead</option>
                         <option value="📦 Repeat Order">📦 Repeat Order</option>
                         <option value="⭐ VIP Customer">⭐ VIP Customer</option>
-                        <option value="⏳ Menunggu Pembayaran">⏳ Menunggu Pembayaran</option>
+                        <option value="⏳ Menunggu Pembayaran">{lang === 'id' ? '⏳ Menunggu Pembayaran' : '⏳ Awaiting Payment'}</option>
                       </select>
                     </div>
                   )}
@@ -6389,7 +7892,7 @@ export default function App() {
                       className="rounded text-emerald-600"
                     />
                     <label htmlFor="editRuleSetStageCheck" className="text-xs text-slate-700 dark:text-slate-300 font-medium cursor-pointer">
-                      Pindahkan Pipeline Stage (Sales Funnel)
+                      {lang === 'id' ? 'Pindahkan Pipeline Stage (Sales Funnel)' : 'Move CRM Pipeline Stage (Sales Funnel)'}
                     </label>
                   </div>
 
@@ -6400,10 +7903,10 @@ export default function App() {
                         onChange={e => setEditRuleActionStage(e.target.value as any)}
                         className="w-full text-xs p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 font-medium"
                       >
-                        <option value="lead">🔵 Lead (Lead Baru)</option>
-                        <option value="prospect">🟡 Prospect (Tertarik / Follow Up)</option>
-                        <option value="customer">💰 Customer (Closing / Selesai)</option>
-                        <option value="churned">❌ Churned (Tidak Tertarik)</option>
+                        <option value="lead">{lang === 'id' ? '🔵 Lead (Lead Baru)' : '🔵 Lead (New Lead)'}</option>
+                        <option value="prospect">{lang === 'id' ? '🟡 Prospect (Tertarik / Follow Up)' : '🟡 Prospect (Interested / Follow Up)'}</option>
+                        <option value="customer">{lang === 'id' ? '💰 Customer (Closing / Selesai)' : '💰 Customer (Closed / Won)'}</option>
+                        <option value="churned">{lang === 'id' ? '❌ Churned (Batal / Tidak Tertarik)' : '❌ Churned (Lost / Uninterested)'}</option>
                       </select>
                     </div>
                   )}
@@ -6412,10 +7915,10 @@ export default function App() {
             </div>
             <div className="modal-footer">
               <button onClick={() => setIsEditRuleModal(false)} className="btn-secondary">
-                Cancel
+                {t.common.cancel}
               </button>
               <button onClick={handleSaveEditRule} className="btn-primary">
-                Update Rule
+                {lang === 'id' ? 'Perbarui Aturan' : 'Update Rule'}
               </button>
             </div>
           </div>
@@ -6429,7 +7932,7 @@ export default function App() {
             <div className="modal-header">
               <div className="flex items-center gap-2">
                 <Clock size={18} className="text-emerald-600" />
-                <h2>Jadwalkan Follow-up Task Baru</h2>
+                <h2>{lang === 'id' ? 'Jadwalkan Follow-up Task Baru' : 'Schedule New Follow-up Task'}</h2>
               </div>
               <button onClick={() => setIsNewTaskModal(false)} className="btn-icon">
                 <X size={18} />
@@ -6437,12 +7940,16 @@ export default function App() {
             </div>
             <div className="modal-body space-y-4">
               <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg p-3 text-xs text-emerald-800 dark:text-emerald-300">
-                💡 <b>Auto-Stop Sequencer:</b> Jika pelanggan membalas pesan WhatsApp sebelum tugas dikirim, sistem akan otomatis membatalkan follow-up ini agar pelanggan tidak terganggu.
+                {lang === 'id'
+                  ? <>💡 <b>Auto-Stop Sequencer:</b> Jika pelanggan membalas pesan WhatsApp sebelum tugas dikirim, sistem akan otomatis membatalkan follow-up ini agar pelanggan tidak terganggu.</>
+                  : <>💡 <b>Auto-Stop Sequencer:</b> If the customer replies via WhatsApp before this task is sent, the system will automatically cancel this follow-up so the customer is not spammed.</>}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Nomor WhatsApp *</label>
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                    {lang === 'id' ? 'Nomor WhatsApp *' : 'WhatsApp Phone Number *'}
+                  </label>
                   <input
                     type="text"
                     placeholder="628123456789"
@@ -6452,7 +7959,9 @@ export default function App() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Nama Pelanggan</label>
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                    {lang === 'id' ? 'Nama Pelanggan' : 'Customer Name'}
+                  </label>
                   <input
                     type="text"
                     placeholder="e.g. Budi Santoso"
@@ -6464,10 +7973,12 @@ export default function App() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Judul / Topik Follow-up *</label>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                  {lang === 'id' ? 'Judul / Topik Follow-up *' : 'Follow-up Subject / Title *'}
+                </label>
                 <input
                   type="text"
-                  placeholder="e.g. Follow-up Penawaran Spesial"
+                  placeholder={lang === 'id' ? 'misal: Follow-up Penawaran Spesial' : 'e.g. Special Offer Follow-up'}
                   value={newTaskTitle}
                   onChange={e => setNewTaskTitle(e.target.value)}
                   className="w-full border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-xs bg-white dark:bg-slate-900"
@@ -6475,24 +7986,28 @@ export default function App() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Jadwal Pengiriman (Waktu Jatuh Tempo)</label>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                  {lang === 'id' ? 'Jadwal Pengiriman (Waktu Jatuh Tempo)' : 'Scheduled Dispatch (Due Time)'}
+                </label>
                 <select
                   value={newTaskDueHours}
                   onChange={e => setNewTaskDueHours(Number(e.target.value))}
                   className="w-full text-xs font-semibold py-2 px-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900"
                 >
-                  <option value={1}>1 Jam dari sekarang (Follow-up Cepat)</option>
-                  <option value={6}>6 Jam dari sekarang</option>
-                  <option value={12}>12 Jam dari sekarang</option>
-                  <option value={24}>24 Jam (Besok di jam yang sama)</option>
-                  <option value={48}>2 Hari (48 Jam)</option>
-                  <option value={72}>3 Hari (72 Jam)</option>
-                  <option value={168}>7 Hari (1 Minggu)</option>
+                  <option value={1}>{lang === 'id' ? '1 Jam dari sekarang (Follow-up Cepat)' : '1 Hour from now (Quick Follow-up)'}</option>
+                  <option value={6}>{lang === 'id' ? '6 Jam dari sekarang' : '6 Hours from now'}</option>
+                  <option value={12}>{lang === 'id' ? '12 Jam dari sekarang' : '12 Hours from now'}</option>
+                  <option value={24}>{lang === 'id' ? '24 Jam (Besok di jam yang sama)' : '24 Hours (Tomorrow same time)'}</option>
+                  <option value={48}>{lang === 'id' ? '2 Hari (48 Jam)' : '2 Days (48 Hours)'}</option>
+                  <option value={72}>{lang === 'id' ? '3 Hari (72 Jam)' : '3 Days (72 Hours)'}</option>
+                  <option value={168}>{lang === 'id' ? '7 Hari (1 Minggu)' : '7 Days (1 Week)'}</option>
                 </select>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Template Pesan WhatsApp *</label>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                  {lang === 'id' ? 'Template Pesan WhatsApp *' : 'WhatsApp Message Template *'}
+                </label>
                 <textarea
                   rows={4}
                   value={newTaskTemplate}
@@ -6501,20 +8016,22 @@ export default function App() {
                   className="w-full border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-xs bg-white dark:bg-slate-900 focus:outline-none focus:border-emerald-500"
                 />
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Mendukung Spintax <code>{`{Halo|Hai}`}</code> dan variabel <code>{`{{name}}`}</code>, <code>{`{{phone}}`}</code>
+                  {lang === 'id'
+                    ? <>Mendukung Spintax <code>{`{Halo|Hai}`}</code> dan variabel <code>{`{{name}}`}</code>, <code>{`{{phone}}`}</code></>
+                    : <>Supports Spintax <code>{`{Hello|Hi}`}</code> and variables <code>{`{{name}}`}</code>, <code>{`{{phone}}`}</code></>}
                 </p>
               </div>
             </div>
             <div className="modal-footer">
               <button onClick={() => setIsNewTaskModal(false)} className="btn-secondary">
-                Batal
+                {t.common.cancel}
               </button>
               <button
                 onClick={handleCreateFollowUpTask}
                 disabled={!newTaskPhone.trim() || !newTaskTitle.trim() || !newTaskTemplate.trim()}
                 className="btn-primary"
               >
-                Jadwalkan Follow-up
+                {lang === 'id' ? 'Jadwalkan Follow-up' : 'Schedule Follow-up'}
               </button>
             </div>
           </div>
@@ -6528,7 +8045,7 @@ export default function App() {
             <div className="modal-header">
               <div className="flex items-center gap-2">
                 <Zap size={18} className="text-amber-500" />
-                <h2>Terapkan Drip Sequence Otomatis</h2>
+                <h2>{lang === 'id' ? 'Terapkan Drip Sequence Otomatis' : 'Apply Automated Drip Sequence'}</h2>
               </div>
               <button onClick={() => setIsApplySeqModal(false)} className="btn-icon">
                 <X size={18} />
@@ -6536,27 +8053,33 @@ export default function App() {
             </div>
             <div className="modal-body space-y-4">
               <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-xs space-y-1">
-                <div className="font-semibold text-slate-800 dark:text-slate-200">Kontak Sasaran:</div>
+                <div className="font-semibold text-slate-800 dark:text-slate-200">
+                  {lang === 'id' ? 'Kontak Sasaran:' : 'Target Contact:'}
+                </div>
                 <div className="text-emerald-700 dark:text-emerald-400 font-bold font-mono">
-                  {applySeqContact?.name || 'Pelanggan'} (+{applySeqContact?.phone})
+                  {applySeqContact?.name || (lang === 'id' ? 'Pelanggan' : 'Customer')} (+{applySeqContact?.phone})
                 </div>
               </div>
 
               <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-xs text-amber-900 dark:text-amber-300">
-                🛡️ <b>WhatsAman Sequencer Protection:</b> Setiap step follow-up dijadwalkan bertahap. Jika pelanggan membalas chat kapan saja, sistem akan <b>menghentikan seluruh sisa step</b> secara otomatis.
+                {lang === 'id'
+                  ? <>🛡️ <b>WhatsAman Sequencer Protection:</b> Setiap step follow-up dijadwalkan bertahap. Jika pelanggan membalas chat kapan saja, sistem akan <b>menghentikan seluruh sisa step</b> secara otomatis.</>
+                  : <>🛡️ <b>WhatsAman Sequencer Protection:</b> Each follow-up step is scheduled incrementally. If the customer replies at any time, the system will <b>automatically abort all remaining steps</b>.</>}
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Pilih Alur Sequence</label>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                  {lang === 'id' ? 'Pilih Alur Sequence' : 'Select Sequence Flow'}
+                </label>
                 <select
                   value={selectedSeqId}
                   onChange={e => setSelectedSeqId(e.target.value)}
                   className="w-full text-xs font-semibold py-2.5 px-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900"
                 >
-                  <option value="">-- Pilih Sequence --</option>
+                  <option value="">{lang === 'id' ? '-- Pilih Sequence --' : '-- Select Sequence --'}</option>
                   {crmSequences.map(seq => (
                     <option key={seq.id} value={seq.id}>
-                      {seq.name} ({seq.steps.length} Step Follow-up)
+                      {seq.name} ({seq.steps.length} {lang === 'id' ? 'Step Follow-up' : 'Follow-up Steps'})
                     </option>
                   ))}
                 </select>
@@ -6565,13 +8088,13 @@ export default function App() {
               {selectedSeqId && (
                 <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                   <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 block">
-                    Tahapan Follow-up yang Akan Dibuat:
+                    {lang === 'id' ? 'Tahapan Follow-up yang Akan Dibuat:' : 'Follow-up Steps to be Scheduled:'}
                   </span>
                   {crmSequences.find(s => s.id === selectedSeqId)?.steps.map(st => (
                     <div key={st.stepNumber} className="bg-slate-50 dark:bg-slate-900 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 text-xs space-y-1">
                       <div className="flex items-center justify-between font-bold text-slate-800 dark:text-slate-200">
                         <span>Step {st.stepNumber}: {st.title}</span>
-                        <span className="text-[11px] text-emerald-600 font-mono">+{st.delayHours} Jam</span>
+                        <span className="text-[11px] text-emerald-600 font-mono">+{st.delayHours} {lang === 'id' ? 'Jam' : 'Hours'}</span>
                       </div>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 italic truncate">
                         "{st.template}"
@@ -6583,14 +8106,14 @@ export default function App() {
             </div>
             <div className="modal-footer">
               <button onClick={() => setIsApplySeqModal(false)} className="btn-secondary">
-                Batal
+                {t.common.cancel}
               </button>
               <button
                 onClick={handleApplySequence}
                 disabled={!selectedSeqId}
                 className="btn-primary"
               >
-                Mulai Sequence
+                {lang === 'id' ? 'Mulai Sequence' : 'Start Sequence'}
               </button>
             </div>
           </div>
@@ -6604,7 +8127,7 @@ export default function App() {
             <div className="modal-header">
               <div className="flex items-center gap-2">
                 <FileText size={18} className="text-emerald-600" />
-                <h2>Catatan Kontak CRM</h2>
+                <h2>{lang === 'id' ? 'Catatan Kontak CRM' : 'Contact CRM Notes'}</h2>
               </div>
               <button onClick={() => setIsNotesModal(false)} className="btn-icon">
                 <X size={18} />
@@ -6612,31 +8135,31 @@ export default function App() {
             </div>
             <div className="modal-body space-y-4">
               <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-xs">
-                <span className="text-slate-500 block text-[11px]">Kontak:</span>
+                <span className="text-slate-500 block text-[11px]">{lang === 'id' ? 'Kontak:' : 'Contact:'}</span>
                 <span className="font-bold text-slate-900 dark:text-slate-100">
-                  {selectedContactForNotes?.name || 'Pelanggan'} (+{selectedContactForNotes?.phone})
+                  {selectedContactForNotes?.name || (lang === 'id' ? 'Pelanggan' : 'Customer')} (+{selectedContactForNotes?.phone})
                 </span>
               </div>
 
               <div>
                 <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                  Catatan Transaksi & Kebutuhan Pelanggan:
+                  {lang === 'id' ? 'Catatan Transaksi & Kebutuhan Pelanggan:' : 'Customer Notes & Requirements:'}
                 </label>
                 <textarea
                   rows={6}
                   value={contactNotesText}
                   onChange={e => setContactNotesText(e.target.value)}
-                  placeholder="e.g. Tertarik paket pro 3 bulan, minta dihubungi lagi hari Senin setelah jam makan siang..."
+                  placeholder={lang === 'id' ? 'misal: Tertarik paket pro 3 bulan, minta dihubungi lagi hari Senin setelah jam makan siang...' : 'e.g. Interested in 3-month pro plan, requested follow-up on Monday after lunch...'}
                   className="w-full border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-xs bg-white dark:bg-slate-900 focus:outline-none focus:border-emerald-500"
                 />
               </div>
             </div>
             <div className="modal-footer">
               <button onClick={() => setIsNotesModal(false)} className="btn-secondary">
-                Batal
+                {t.common.cancel}
               </button>
               <button onClick={handleSaveContactNotes} className="btn-primary">
-                Simpan Catatan
+                {lang === 'id' ? 'Simpan Catatan' : 'Save Notes'}
               </button>
             </div>
           </div>

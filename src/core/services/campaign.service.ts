@@ -294,9 +294,13 @@ export class CampaignService {
           try {
             // Human typing simulation
             if (session.sendPresence) {
-              await session.sendPresence(item.phone, 'composing');
-              const typingDelay = this.getRandomInt(1200, 2200);
-              await this.delay(typingDelay);
+              try {
+                await session.sendPresence(item.phone, 'composing');
+                const typingDelay = this.getRandomInt(1200, 2200);
+                await this.delay(typingDelay);
+              } catch {
+                // ignore presence error
+              }
             }
 
             const messageText = this.interpolate(camp.template_text, item.name || '', item.phone, item.variables);

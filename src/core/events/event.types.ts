@@ -12,6 +12,7 @@ export interface NormalizedMessage {
   caption?: string;
   quotedMessageId?: string;
   timestamp: number;
+  resolvedPhone?: string;
 }
 
 export type ConnectionStatus = 'DISCONNECTED' | 'QR_READY' | 'PAIRING_READY' | 'CONNECTING' | 'CONNECTED';
@@ -23,10 +24,12 @@ export interface AppEvents {
   'session.pairing_code': { sessionId: string; code: string };
   'session.connected': { sessionId: string; phone?: string; pushName?: string };
   'session.disconnected': { sessionId: string; reason?: string };
+  'session.history_synced': { sessionId: string; chatsCount?: number; msgsCount?: number };
 
   // Message events
   'message.received': { sessionId: string; message: NormalizedMessage };
   'message.sent': { sessionId: string; message: NormalizedMessage };
+  'message.updated': { sessionId: string; message: NormalizedMessage };
   'message.ack': { sessionId: string; messageId: string; chatJid: string; status: 'SENT' | 'DELIVERED' | 'READ' | 'FAILED' };
 
   // Contact & Group events

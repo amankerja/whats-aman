@@ -1,4 +1,6 @@
-use std::process::{Child, Command};
+use std::process::Child;
+#[cfg(not(debug_assertions))]
+use std::process::Command;
 use std::sync::Mutex;
 use tauri::{
     menu::{Menu, MenuItem},
@@ -6,7 +8,7 @@ use tauri::{
     Manager, WindowEvent,
 };
 
-#[cfg(target_os = "windows")]
+#[cfg(all(target_os = "windows", not(debug_assertions)))]
 use std::os::windows::process::CommandExt;
 
 struct AppState {
@@ -31,26 +33,52 @@ pub fn run() {
                 )?;
             }
 
-            // 2. Start the local background engine silently
-            #[cfg(target_os = "windows")]
+            // 2. Start the local background engine silently in release mode
+            // In debug mode, beforeDevCommand already starts the backend server.
+            #[cfg(not(debug_assertions))]
             {
-                const CREATE_NO_WINDOW: u32 = 0x08000000;
-                let mut cmd = Command::new("node");
-                cmd.arg("dist/index.js");
-                cmd.creation_flags(CREATE_NO_WINDOW);
+                #[cfg(target_os = "windows")]
+                {
+                    const CREATE_NO_WINDOW: u32 = 0x08000000;
+                    let mut cmd = Command::new("node");
+                    cmd.arg("dist/index.js");
+                    cmd.creation_flags(CREATE_NO_WINDOW);
 
-                match cmd.spawn() {
-                    Ok(child) => {
-                        let state = app.state::<AppState>();
-                        if let Ok(mut lock) = state.child_process.lock() {
-                            *lock = Some(child);
+                    match cmd.spawn() {
+                        Ok(child) => {
+                            let state = app.state::<AppState>();
+                            if let Ok(mut lock) = state.child_process.lock() {
+                                *lock = Some(child);
+                            }
+                            log::info!("WhatsApp Local Core engine started silently in background");
                         }
-                        log::info!("WhatsApp Local Core engine started silently in background");
-                    }
-                    Err(e) => {
-                        log::warn!("Could not auto-start node backend: {}. (If already running or compiled, ignore).", e);
+                        Err(e) => {
+                            log::warn!("Could not auto-start node backend: {}. (If already running or compiled, ignore).", e);
+                        }
                     }
                 }
+                #[cfg(not(target_os = "windows"))]
+                {
+                    let mut cmd = Command::new("node");
+                    cmd.arg("dist/index.js");
+                    match cmd.spawn() {
+                        Ok(child) => {
+                            let state = app.state::<AppState>();
+                            if let Ok(mut lock) = state.child_process.lock() {
+                                *lock = Some(child);
+                            }
+                            log::info!("WhatsApp Local Core engine started in background");
+                        }
+                        Err(e) => {
+                            log::warn!("Could not auto-start node backend: {}.", e);
+                        }
+                    }
+                }
+            }
+
+            #[cfg(debug_assertions)]
+            {
+                log::info!("WhatsApp Local Core engine running via beforeDevCommand in debug mode");
             }
 
             // 3. Create System Tray Menu (PRD requirement for persistent background automation)

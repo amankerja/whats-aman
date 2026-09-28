@@ -67,33 +67,54 @@ export class MessageService {
 
     // Automatically persist all incoming messages to SQLite
     eventBus.on('message.received', ({ sessionId, message }) => {
-      messageRepository.save(message, 'DELIVERED');
+      try {
+        messageRepository.save(message, 'DELIVERED');
 
-      // Auto-save/update contact in SQLite for 1-on-1 personal contacts (standard or LID)
-      if (!message.fromMe && message.chatJid) {
-        const session = sessionManager.getSession(sessionId);
-        let phone: string | undefined = undefined;
+        // Auto-save/update contact in SQLite for 1-on-1 personal contacts (standard or LID)
+        if (!message.fromMe && message.chatJid) {
+          const session = sessionManager.findSession(sessionId);
+          let phone: string | undefined = message.resolvedPhone;
 
-        if (message.chatJid.endsWith('@s.whatsapp.net') || message.chatJid.endsWith('@c.us')) {
-          phone = message.chatJid.split('@')[0];
-        } else if (message.chatJid.endsWith('@lid') && session) {
-          phone = session.resolveLidToPhone?.(message.chatJid);
+          if (!phone) {
+            if (message.chatJid.endsWith('@s.whatsapp.net') || message.chatJid.endsWith('@c.us')) {
+              phone = message.chatJid.split('@')[0];
+            } else if (message.chatJid.endsWith('@lid') && session) {
+              phone = session.resolveLidToPhone?.(message.chatJid);
+            }
+          }
+
+          if (phone && /^\d{7,16}$/.test(phone)) {
+            contactRepository.upsert({
+              sessionId,
+              jid: message.chatJid,
+              phone,
+              pushName: message.pushName
+            });
+          }
         }
+      } catch (err) {
+        logger.error({ sessionId, msgId: message.id, err }, 'Failed to persist incoming message');
+      }
+    });
 
-        if (phone && /^\d{7,16}$/.test(phone)) {
-          contactRepository.upsert({
-            sessionId,
-            jid: message.chatJid,
-            phone,
-            pushName: message.pushName
-          });
+    // Automatically update message media URL when background download completes
+    eventBus.on('message.updated', ({ sessionId, message }) => {
+      try {
+        if (message.mediaUrl) {
+          messageRepository.updateMediaUrl(sessionId, message.id, message.mediaUrl);
         }
+      } catch (err) {
+        logger.error({ sessionId, msgId: message.id, err }, 'Failed to update message media url');
       }
     });
 
     // Automatically update message status on receipts (SENT, DELIVERED, READ)
     eventBus.on('message.ack', ({ sessionId, messageId, status }) => {
-      messageRepository.updateStatus(sessionId, messageId, status);
+      try {
+        messageRepository.updateStatus(sessionId, messageId, status);
+      } catch (err) {
+        logger.error({ sessionId, messageId, status, err }, 'Failed to update message status ack');
+      }
     });
 
     this.isInitialized = true;
@@ -249,10 +270,25 @@ export class MessageService {
     return messageRepository.findByChat(sessionId, Array.from(jidSet), limit, offset);
   }
 
-  public getRecentChats(sessionId: string, limit = 1000) {
-    const chats = messageRepository.findRecentChats(sessionId, Math.max(limit * 2, 1000));
-    const session = sessionManager.getSession(sessionId);
+  public getRecentChats(sessionId: string, limit = 100) {
+    const fetchLimit = Math.min(Math.max(limit * 2, 100), 500);
+    const chats = messageRepository.findRecentChats(sessionId, fetchLimit);
+    const session = sessionManager.findSession(sessionId);
     const sessionPhone = session?.getMetadata()?.phoneNumber;
+
+    // Single batch-load of all contacts for this session (Eliminates N+1 synchronous queries!)
+    let allContacts: any[] = [];
+    const contactByPhoneMap = new Map<string, any>();
+    try {
+      allContacts = contactRepository.findAll(sessionId, 5000, 0);
+      for (const contact of allContacts) {
+        if (contact.phone) {
+          contactByPhoneMap.set(contact.phone, contact);
+        }
+      }
+    } catch {
+      // ignore
+    }
 
     const canonicalMap = new Map<string, any>();
 
@@ -267,8 +303,8 @@ export class MessageService {
       let finalName = c.name;
       let finalPushName = c.push_name;
 
-      if (resolvedPhone) {
-        const contactByPhone = contactRepository.findByPhone(sessionId, resolvedPhone);
+      if (resolvedPhone && contactByPhoneMap.has(resolvedPhone)) {
+        const contactByPhone = contactByPhoneMap.get(resolvedPhone);
         if (contactByPhone) {
           if (contactByPhone.name) {
             finalName = contactByPhone.name;
@@ -317,30 +353,25 @@ export class MessageService {
       }
     }
 
-    // Merge contacts from contacts repository if not present in messages yet
-    try {
-      const knownContacts = contactRepository.findAll(sessionId, 2000, 0);
-      for (const c of knownContacts) {
-        if (!c.phone) continue;
-        const isSelf = Boolean(sessionPhone && c.phone === sessionPhone);
-        const dedupeKey = isSelf ? `self:${sessionPhone}` : `phone:${c.phone}`;
+    // Merge contacts from already batch-loaded contacts if not present in messages yet (no second query!)
+    for (const c of allContacts) {
+      if (!c.phone) continue;
+      const isSelf = Boolean(sessionPhone && c.phone === sessionPhone);
+      const dedupeKey = isSelf ? `self:${sessionPhone}` : `phone:${c.phone}`;
 
-        if (!canonicalMap.has(dedupeKey)) {
-          canonicalMap.set(dedupeKey, {
-            chat_jid: c.jid || `${c.phone}@s.whatsapp.net`,
-            last_message: 'Mulai percakapan',
-            last_from_me: 0,
-            last_status: 'READ',
-            timestamp: c.updated_at || c.created_at || 0,
-            name: c.name || c.push_name || undefined,
-            push_name: c.push_name || undefined,
-            unread_count: 0,
-            resolved_phone: c.phone
-          });
-        }
+      if (!canonicalMap.has(dedupeKey)) {
+        canonicalMap.set(dedupeKey, {
+          chat_jid: c.jid || `${c.phone}@s.whatsapp.net`,
+          last_message: 'Mulai percakapan',
+          last_from_me: 0,
+          last_status: 'READ',
+          timestamp: c.updated_at || c.created_at || 0,
+          name: c.name || c.push_name || undefined,
+          push_name: c.push_name || undefined,
+          unread_count: 0,
+          resolved_phone: c.phone
+        });
       }
-    } catch {
-      // ignore
     }
 
     return Array.from(canonicalMap.values())

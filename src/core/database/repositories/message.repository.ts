@@ -19,12 +19,23 @@ export interface MessageRecord {
 }
 
 export class MessageRepository {
+  private stmtCache = new Map<string, any>();
+
   private get db() {
     return getDatabase();
   }
 
+  private getStatement(key: string, sql: string) {
+    let stmt = this.stmtCache.get(key);
+    if (!stmt) {
+      stmt = this.db.prepare(sql);
+      this.stmtCache.set(key, stmt);
+    }
+    return stmt;
+  }
+
   public save(msg: NormalizedMessage, status: MessageRecord['status'] = 'SENT'): void {
-    const stmt = this.db.prepare(`
+    const stmt = this.getStatement('save_msg', `
       INSERT OR REPLACE INTO messages (
         id, session_id, message_id, chat_jid, sender_jid, from_me, push_name,
         content_text, media_type, media_url, caption, status, timestamp, created_at
@@ -53,21 +64,29 @@ export class MessageRepository {
   }
 
   public updateStatus(sessionId: string, messageId: string, status: MessageRecord['status']): void {
-    const stmt = this.db.prepare(`
+    const stmt = this.getStatement('update_status', `
       UPDATE messages SET status = ? WHERE session_id = ? AND message_id = ?
     `);
     stmt.run(status, sessionId, messageId);
   }
 
+  public updateMediaUrl(sessionId: string, messageId: string, mediaUrl: string): void {
+    const stmt = this.getStatement('update_media', `
+      UPDATE messages SET media_url = ? WHERE session_id = ? AND message_id = ?
+    `);
+    stmt.run(mediaUrl, sessionId, messageId);
+  }
+
   public findByMessageId(sessionId: string, messageId: string): MessageRecord | undefined {
-    const stmt = this.db.prepare('SELECT * FROM messages WHERE session_id = ? AND message_id = ?');
+    const stmt = this.getStatement('find_by_msg_id', 'SELECT * FROM messages WHERE session_id = ? AND message_id = ?');
     return stmt.get(sessionId, messageId) as MessageRecord | undefined;
   }
 
   public findByChat(sessionId: string, chatJid: string | string[], limit = 100, offset = 0): MessageRecord[] {
     const jids = Array.isArray(chatJid) ? chatJid : [chatJid];
     const placeholders = jids.map(() => '?').join(',');
-    const stmt = this.db.prepare(`
+    const cacheKey = `find_by_chat_${jids.length}`;
+    const stmt = this.getStatement(cacheKey, `
       SELECT * FROM (
         SELECT * FROM messages
         WHERE session_id = ? AND chat_jid IN (${placeholders})
@@ -88,7 +107,7 @@ export class MessageRepository {
     push_name?: string;
     unread_count?: number;
   }> {
-    const stmt = this.db.prepare(`
+    const stmt = this.getStatement('find_recent_chats', `
       WITH RankedMessages AS (
         SELECT 
           m.*,

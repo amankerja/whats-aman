@@ -3,7 +3,7 @@ import { groupService } from '../../core/services/group.service';
 
 export const groupRouter = Router();
 
-// GET /api/v1/groups - List all groups for session
+// GET /api/v1/groups - List all groups for session with admin & auto-reply toggle state
 groupRouter.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { sessionId } = req.query;
@@ -12,7 +12,18 @@ groupRouter.get('/', async (req: Request, res: Response, next: NextFunction) => 
       return;
     }
     const groups = await groupService.getGroups(String(sessionId));
-    res.json({ success: true, data: groups });
+    const cached = groupService.getCachedGroups(String(sessionId));
+
+    const enriched = groups.map((g) => {
+      const dbGroup = cached.find((c) => c.jid === g.jid);
+      return {
+        ...g,
+        isAdmin: dbGroup?.isAdmin ?? false,
+        autoReplyEnabled: dbGroup?.autoReplyEnabled ?? false
+      };
+    });
+
+    res.json({ success: true, data: enriched });
   } catch (err) {
     next(err);
   }
@@ -48,6 +59,25 @@ groupRouter.get('/:jid/export', async (req: Request, res: Response, next: NextFu
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="group_${safeName}_members.xlsx"`);
     res.send(buffer);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/v1/groups/:jid/auto-reply - Enable or disable auto reply for specific group
+groupRouter.post('/:jid/auto-reply', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { sessionId, enabled } = req.body;
+    if (!sessionId) {
+      res.status(400).json({ success: false, message: 'sessionId is required' });
+      return;
+    }
+    const jid = String(req.params.jid);
+    groupService.setGroupAutoReply(String(sessionId), jid, Boolean(enabled));
+    res.json({
+      success: true,
+      message: `Auto-reply untuk grup ini berhasil ${enabled ? 'diaktifkan' : 'dinonaktifkan'}`
+    });
   } catch (err) {
     next(err);
   }

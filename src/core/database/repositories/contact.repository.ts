@@ -19,8 +19,19 @@ export interface ContactRecord {
 }
 
 export class ContactRepository {
+  private stmtCache = new Map<string, any>();
+
   private get db() {
     return getDatabase();
+  }
+
+  private getStatement(key: string, sql: string) {
+    let stmt = this.stmtCache.get(key);
+    if (!stmt) {
+      stmt = this.db.prepare(sql);
+      this.stmtCache.set(key, stmt);
+    }
+    return stmt;
   }
 
   public upsert(contact: {
@@ -43,7 +54,7 @@ export class ContactRepository {
     const now = Date.now();
     const finalName = (contact.name && contact.name.trim() !== '-' ? contact.name.trim() : '') || contact.pushName?.trim() || null;
 
-    const stmt = this.db.prepare(`
+    const stmt = this.getStatement('upsert_contact', `
       INSERT INTO contacts (
         id, session_id, jid, name, push_name, phone, tags, custom_fields, pipeline_stage, notes, opt_out, created_at, updated_at
       ) VALUES (
@@ -84,7 +95,7 @@ export class ContactRepository {
   }
 
   public findAll(sessionId: string, limit = 100, offset = 0): ContactRecord[] {
-    const stmt = this.db.prepare(`
+    const stmt = this.getStatement('find_all_contacts', `
       SELECT * FROM contacts
       WHERE session_id = ?
       ORDER BY name ASC, phone ASC
@@ -104,13 +115,13 @@ export class ContactRepository {
   }
 
   public count(sessionId: string): number {
-    const stmt = this.db.prepare('SELECT COUNT(*) as count FROM contacts WHERE session_id = ?');
+    const stmt = this.getStatement('count_contacts', 'SELECT COUNT(*) as count FROM contacts WHERE session_id = ?');
     const res = stmt.get(sessionId) as { count: number };
     return res ? res.count : 0;
   }
 
   public findByJid(sessionId: string, jid: string): ContactRecord | undefined {
-    const stmt = this.db.prepare('SELECT * FROM contacts WHERE session_id = ? AND jid = ?');
+    const stmt = this.getStatement('find_by_jid_contact', 'SELECT * FROM contacts WHERE session_id = ? AND jid = ?');
     const row = stmt.get(sessionId, jid) as any;
     if (!row) return undefined;
     return {
@@ -127,7 +138,7 @@ export class ContactRepository {
 
   public findByPhone(sessionId: string, phone: string): ContactRecord | undefined {
     const cleanPhone = phone.replace(/[^0-9]/g, '');
-    const stmt = this.db.prepare('SELECT * FROM contacts WHERE session_id = ? AND phone = ?');
+    const stmt = this.getStatement('find_by_phone_contact', 'SELECT * FROM contacts WHERE session_id = ? AND phone = ?');
     const row = stmt.get(sessionId, cleanPhone) as any;
     if (!row) return undefined;
     return {

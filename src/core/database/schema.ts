@@ -52,6 +52,8 @@ export function initializeDatabaseSchema(): void {
       topic TEXT,
       owner_jid TEXT,
       member_count INTEGER DEFAULT 0,
+      is_admin INTEGER DEFAULT 0,
+      auto_reply_enabled INTEGER DEFAULT 0,
       updated_at INTEGER NOT NULL,
       UNIQUE(session_id, jid)
     );
@@ -89,6 +91,8 @@ export function initializeDatabaseSchema(): void {
     CREATE INDEX IF NOT EXISTS idx_messages_session_chat ON messages(session_id, chat_jid);
     CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp DESC);
     CREATE INDEX IF NOT EXISTS idx_messages_analytics ON messages(session_id, from_me, timestamp);
+    CREATE INDEX IF NOT EXISTS idx_messages_chat_ts ON messages(session_id, chat_jid, timestamp DESC);
+    CREATE INDEX IF NOT EXISTS idx_messages_unread_fast ON messages(session_id, from_me, status, chat_jid);
 
     -- Campaigns Table
     CREATE TABLE IF NOT EXISTS campaigns (
@@ -373,6 +377,30 @@ export function initializeDatabaseSchema(): void {
     db.exec('ALTER TABLE campaigns ADD COLUMN runs_count INTEGER DEFAULT 0;');
   } catch {
     // Column already exists
+  }
+
+  try {
+    db.exec('ALTER TABLE groups ADD COLUMN is_admin INTEGER DEFAULT 0;');
+  } catch {
+    // Column already exists
+  }
+
+  try {
+    db.exec('ALTER TABLE groups ADD COLUMN auto_reply_enabled INTEGER DEFAULT 0;');
+  } catch {
+    // Column already exists
+  }
+
+  try {
+    db.exec('CREATE INDEX IF NOT EXISTS idx_messages_chat_ts ON messages(session_id, chat_jid, timestamp DESC);');
+  } catch {
+    // Index already exists
+  }
+
+  try {
+    db.exec('CREATE INDEX IF NOT EXISTS idx_messages_unread_fast ON messages(session_id, from_me, status, chat_jid);');
+  } catch {
+    // Index already exists
   }
 
   logger.info('Database schema initialized successfully with CRM, Sequencer, Webhooks & Recurring extensions.');

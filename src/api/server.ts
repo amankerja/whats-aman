@@ -123,11 +123,22 @@ export function createServer(): { app: express.Application; server: http.Server 
 
   // WebSocket Server for Real-Time UI updates
   const wss = new WebSocketServer({ server, path: '/ws' });
-  const clients = new Set<WebSocket>();
+  const clients = new Map<WebSocket, { isAlive: boolean }>();
 
   wss.on('connection', (ws) => {
-    clients.add(ws);
+    clients.set(ws, { isAlive: true });
     logger.debug('New WebSocket client connected for real-time events');
+
+    ws.on('pong', () => {
+      const state = clients.get(ws);
+      if (state) state.isAlive = true;
+    });
+
+    ws.on('error', (err) => {
+      logger.debug({ err: err.message }, 'WebSocket client error');
+      clients.delete(ws);
+      try { ws.terminate(); } catch { /* ignore */ }
+    });
 
     ws.on('close', () => {
       clients.delete(ws);
@@ -136,11 +147,32 @@ export function createServer(): { app: express.Application; server: http.Server 
     ws.send(JSON.stringify({ type: 'CONNECTED', timestamp: Date.now() }));
   });
 
+  // Heartbeat ping interval every 30s to detect & prune dead sockets
+  const heartbeatInterval = setInterval(() => {
+    for (const [ws, state] of clients.entries()) {
+      if (!state.isAlive) {
+        clients.delete(ws);
+        try { ws.terminate(); } catch { /* ignore */ }
+        continue;
+      }
+      state.isAlive = false;
+      try { ws.ping(); } catch { /* ignore */ }
+    }
+  }, 30000);
+
+  server.on('close', () => {
+    clearInterval(heartbeatInterval);
+  });
+
   const broadcastEvent = (event: string, payload: any) => {
     const message = JSON.stringify({ event, payload, timestamp: Date.now() });
-    for (const ws of clients) {
+    for (const ws of clients.keys()) {
       if (ws.readyState === WebSocket.OPEN) {
-        ws.send(message);
+        try {
+          ws.send(message);
+        } catch (err: any) {
+          logger.warn({ event, err: err?.message }, 'Failed to send WS message to client');
+        }
       }
     }
   };
@@ -151,8 +183,10 @@ export function createServer(): { app: express.Application; server: http.Server 
   eventBus.on('session.pairing_code', (data) => broadcastEvent('session.pairing_code', data));
   eventBus.on('session.connected', (data) => broadcastEvent('session.connected', data));
   eventBus.on('session.disconnected', (data) => broadcastEvent('session.disconnected', data));
+  eventBus.on('session.history_synced', (data) => broadcastEvent('session.history_synced', data));
   eventBus.on('message.received', (data) => broadcastEvent('message.received', data));
   eventBus.on('message.sent', (data) => broadcastEvent('message.sent', data));
+  eventBus.on('message.updated', (data) => broadcastEvent('message.updated', data));
   eventBus.on('message.ack', (data) => broadcastEvent('message.ack', data));
   eventBus.on('campaign.updated', (data) => broadcastEvent('campaign.updated', data));
   eventBus.on('automation.triggered', (data) => broadcastEvent('automation.triggered', data));

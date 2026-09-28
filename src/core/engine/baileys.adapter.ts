@@ -28,6 +28,7 @@ import { ConnectionStatus, NormalizedMessage } from '../events/event.types';
 import { eventBus } from '../events/event-bus';
 import { contactRepository } from '../database/repositories/contact.repository';
 import { sessionRepository } from '../database/repositories/session.repository';
+import { messageRepository } from '../database/repositories/message.repository';
 import { logger } from '../../utils/logger';
 import { config } from '../../config';
 import { EngineError, NotFoundError } from '../../utils/errors';
@@ -291,40 +292,55 @@ export class BaileysAdapter implements IWhatsAppEngine {
         logger.info({ sessionId: this.sessionId, chatsCount: history.chats?.length, msgsCount: history.messages?.length }, 'Syncing messaging history from WhatsApp');
         if (history.messages) {
           for (const msg of history.messages) {
-            if (!msg.message) continue;
-            const normalized = await this.normalizeMessage(msg);
-            if (normalized) {
-              eventBus.emit('message.received', { sessionId: this.sessionId, message: normalized });
+            try {
+              if (!msg.message) continue;
+              const normalized = await this.normalizeMessage(msg);
+              if (normalized) {
+                eventBus.emit('message.received', { sessionId: this.sessionId, message: normalized });
+              }
+            } catch (err) {
+              logger.warn({ sessionId: this.sessionId, msgId: msg.key?.id, err }, 'Failed to normalize history message');
             }
           }
         }
         if (history.contacts) {
           for (const c of history.contacts) {
-            if (!c.id) continue;
-            const phone = c.id.split('@')[0];
-            if (/^\d{7,16}$/.test(phone)) {
-              contactRepository.upsert({
-                sessionId: this.sessionId,
-                jid: c.id,
-                name: c.name || undefined,
-                pushName: c.notify || undefined,
-                phone
-              });
+            try {
+              if (!c.id) continue;
+              const phone = c.id.split('@')[0];
+              if (/^\d{7,16}$/.test(phone)) {
+                contactRepository.upsert({
+                  sessionId: this.sessionId,
+                  jid: c.id,
+                  name: c.name || undefined,
+                  pushName: c.notify || undefined,
+                  phone
+                });
+              }
+            } catch (err) {
+              logger.warn({ sessionId: this.sessionId, contactId: c.id, err }, 'Failed to upsert history contact');
             }
           }
         }
+        eventBus.emit('session.history_synced', {
+          sessionId: this.sessionId,
+          chatsCount: history.chats?.length,
+          msgsCount: history.messages?.length
+        });
       });
 
-      // Handle Incoming Messages
+      // Handle Incoming Messages (process both 'notify' live messages and 'append' sync/offline/multi-device messages)
       this.socket.ev.on('messages.upsert', async (m) => {
-        if (m.type !== 'notify') return;
-
         for (const msg of m.messages) {
           if (!msg.message) continue;
 
-          const normalized = await this.normalizeMessage(msg);
-          if (normalized) {
-            eventBus.emit('message.received', { sessionId: this.sessionId, message: normalized });
+          try {
+            const normalized = this.normalizeMessage(msg);
+            if (normalized) {
+              eventBus.emit('message.received', { sessionId: this.sessionId, message: normalized });
+            }
+          } catch (err) {
+            logger.warn({ sessionId: this.sessionId, msgId: msg.key?.id, err }, 'Failed to normalize upsert message');
           }
         }
       });
@@ -397,16 +413,19 @@ export class BaileysAdapter implements IWhatsAppEngine {
     }
 
     const jid = this.formatJid(to);
-    const sent = await this.socket.sendMessage(
-      jid,
-      {
-        text,
-        mentions: options?.mentions
-      },
-      {
-        quoted: options?.quotedMessageId ? ({ key: { id: options.quotedMessageId } } as any) : undefined
-      }
-    );
+    let sent: any;
+    try {
+      sent = await this.socket.sendMessage(
+        jid,
+        {
+          text,
+          mentions: options?.mentions
+        }
+      );
+    } catch (err: any) {
+      logger.error({ sessionId: this.sessionId, jid, err: err?.message || String(err) }, 'Failed to send text message via WhatsApp socket');
+      throw new EngineError(err?.message || 'Failed to send text message');
+    }
 
     if (!sent) {
       throw new EngineError('Failed to send text message');
@@ -472,9 +491,13 @@ export class BaileysAdapter implements IWhatsAppEngine {
         payload = { document: buffer, mimetype: 'application/octet-stream' };
     }
 
-    const sent = await this.socket.sendMessage(jid, payload, {
-      quoted: options.quotedMessageId ? ({ key: { id: options.quotedMessageId } } as any) : undefined
-    });
+    let sent: any;
+    try {
+      sent = await this.socket.sendMessage(jid, payload);
+    } catch (err: any) {
+      logger.error({ sessionId: this.sessionId, jid, err: err?.message || String(err) }, 'Failed to send media via socket');
+      throw new EngineError(err?.message || 'Failed to send media message');
+    }
 
     if (!sent) {
       throw new EngineError('Failed to send media message');
@@ -554,18 +577,18 @@ export class BaileysAdapter implements IWhatsAppEngine {
       `TEL;type=CELL;type=VOICE;waid=${cleanPhone}:${contact.phone}\n` +
       'END:VCARD';
 
-    const sent = await this.socket.sendMessage(
-      jid,
-      {
+    let sent: any;
+    try {
+      sent = await this.socket.sendMessage(jid, {
         contacts: {
           displayName: contact.name,
           contacts: [{ vcard }]
         }
-      },
-      {
-        quoted: options?.quotedMessageId ? ({ key: { id: options.quotedMessageId } } as any) : undefined
-      }
-    );
+      });
+    } catch (err: any) {
+      logger.error({ sessionId: this.sessionId, jid, err: err?.message || String(err) }, 'Failed to send contact vCard');
+      throw new EngineError(err?.message || 'Failed to send contact vCard');
+    }
 
     if (!sent) {
       throw new EngineError('Failed to send contact vCard');
@@ -591,19 +614,19 @@ export class BaileysAdapter implements IWhatsAppEngine {
     }
 
     const jid = this.formatJid(to);
-    const sent = await this.socket.sendMessage(
-      jid,
-      {
+    let sent: any;
+    try {
+      sent = await this.socket.sendMessage(jid, {
         poll: {
           name: poll.name,
           values: poll.values,
           selectableCount: poll.selectableCount || 1
         }
-      },
-      {
-        quoted: options?.quotedMessageId ? ({ key: { id: options.quotedMessageId } } as any) : undefined
-      }
-    );
+      });
+    } catch (err: any) {
+      logger.error({ sessionId: this.sessionId, jid, err: err?.message || String(err) }, 'Failed to send poll');
+      throw new EngineError(err?.message || 'Failed to send poll message');
+    }
 
     if (!sent) {
       throw new EngineError('Failed to send poll message');
@@ -632,25 +655,29 @@ export class BaileysAdapter implements IWhatsAppEngine {
 
   public async getGroups(): Promise<GroupInfo[]> {
     if (!this.socket || this.status !== 'CONNECTED') {
-      throw new EngineError(`Session ${this.sessionId} is not connected`);
+      return [];
     }
 
     try {
       const groups = await this.socket.groupFetchAllParticipating();
+      if (!groups || typeof groups !== 'object') {
+        return [];
+      }
       return Object.values(groups).map((g) => ({
         jid: g.id,
-        name: g.subject,
+        name: g.subject || g.id,
         topic: g.desc,
         ownerJid: g.owner,
-        memberCount: g.participants.length,
-        participants: g.participants.map((p) => ({
+        memberCount: Array.isArray(g.participants) ? g.participants.length : 0,
+        participants: Array.isArray(g.participants) ? g.participants.map((p) => ({
           jid: p.id,
           phone: p.id.split('@')[0],
           role: (p.admin as any) || 'member'
-        }))
+        })) : []
       }));
     } catch (err: any) {
-      throw new EngineError(`Failed to fetch groups: ${err.message}`);
+      logger.warn({ sessionId: this.sessionId, err: err?.message || String(err) }, 'Failed to fetch groups from WhatsApp socket (will retry when connection stabilizes)');
+      return [];
     }
   }
 
@@ -661,20 +688,23 @@ export class BaileysAdapter implements IWhatsAppEngine {
 
     try {
       const g = await this.socket.groupMetadata(groupJid);
+      if (!g) {
+        throw new EngineError(`Group metadata not found for ${groupJid}`);
+      }
       return {
         jid: g.id,
-        name: g.subject,
+        name: g.subject || g.id,
         topic: g.desc,
         ownerJid: g.owner,
-        memberCount: g.participants.length,
-        participants: g.participants.map((p) => ({
+        memberCount: Array.isArray(g.participants) ? g.participants.length : 0,
+        participants: Array.isArray(g.participants) ? g.participants.map((p) => ({
           jid: p.id,
           phone: p.id.split('@')[0],
           role: (p.admin as any) || 'member'
-        }))
+        })) : []
       };
     } catch (err: any) {
-      throw new EngineError(`Failed to fetch group metadata: ${err.message}`);
+      throw new EngineError(`Failed to fetch group metadata: ${err?.message || String(err)}`);
     }
   }
 
@@ -715,7 +745,7 @@ export class BaileysAdapter implements IWhatsAppEngine {
     return `${clean}@s.whatsapp.net`;
   }
 
-  private async normalizeMessage(msg: WAMessage): Promise<NormalizedMessage> {
+  private normalizeMessage(msg: WAMessage): NormalizedMessage {
     let content: any = msg.message;
 
     // Unwrap ephemeral, view-once, and wrapped messages
@@ -723,13 +753,17 @@ export class BaileysAdapter implements IWhatsAppEngine {
       content?.ephemeralMessage?.message ||
       content?.viewOnceMessage?.message ||
       content?.viewOnceMessageV2?.message ||
-      content?.documentWithCaptionMessage?.message
+      content?.viewOnceMessageV2Extension?.message ||
+      content?.documentWithCaptionMessage?.message ||
+      content?.editedMessage?.message?.protocolMessage?.editedMessage
     ) {
       content =
         content.ephemeralMessage?.message ||
         content.viewOnceMessage?.message ||
         content.viewOnceMessageV2?.message ||
-        content.documentWithCaptionMessage?.message;
+        content.viewOnceMessageV2Extension?.message ||
+        content.documentWithCaptionMessage?.message ||
+        content.editedMessage?.message?.protocolMessage?.editedMessage;
     }
 
     let text: string | undefined;
@@ -752,6 +786,7 @@ export class BaileysAdapter implements IWhatsAppEngine {
       ext = 'mp4';
     } else if (content?.audioMessage) {
       mediaType = 'audio';
+      caption = content.audioMessage.ptt ? 'Pesan suara' : undefined;
       ext = content.audioMessage.ptt ? 'ogg' : 'mp3';
     } else if (content?.documentMessage) {
       mediaType = 'document';
@@ -761,44 +796,39 @@ export class BaileysAdapter implements IWhatsAppEngine {
     } else if (content?.stickerMessage) {
       mediaType = 'sticker';
       ext = 'webp';
+    } else if (content?.interactiveResponseMessage?.body?.text) {
+      text = content.interactiveResponseMessage.body.text;
     } else if (content?.buttonsResponseMessage?.selectedDisplayText) {
       text = content.buttonsResponseMessage.selectedDisplayText;
     } else if (content?.templateButtonReplyMessage?.selectedDisplayText) {
       text = content.templateButtonReplyMessage.selectedDisplayText;
+    } else if (content?.listResponseMessage?.title || content?.listResponseMessage?.singleSelectReply?.selectedRowId) {
+      text = content.listResponseMessage.title || content.listResponseMessage.singleSelectReply?.selectedRowId;
     } else if (content?.locationMessage) {
       mediaType = 'location';
       const locName = [content.locationMessage.name, content.locationMessage.address].filter(Boolean).join(', ');
       text = locName ? `📍 Lokasi: ${locName}` : `📍 Lokasi (${content.locationMessage.degreesLatitude}, ${content.locationMessage.degreesLongitude})`;
     } else if (content?.contactMessage?.displayName) {
       text = `👤 Kontak: ${content.contactMessage.displayName}`;
+    } else if (content?.pollCreationMessage || content?.pollCreationMessageV3) {
+      text = `📊 Polling: ${content.pollCreationMessage?.name || content.pollCreationMessageV3?.name || ''}`;
+    } else if (content?.reactionMessage) {
+      text = content.reactionMessage.text ? `Bereaksi: ${content.reactionMessage.text}` : undefined;
+    } else if (content?.protocolMessage?.type === 0) {
+      text = '🚫 Pesan ini telah dihapus';
     }
 
     const msgId = msg.key.id || `${Date.now()}`;
 
-    // Download media buffer if media message and socket available
-    if (mediaType && this.socket) {
-      try {
-        const mediaFileName = `${msgId}.${ext}`;
-        const filePath = path.join(config.storage.mediaDir, mediaFileName);
-        if (!fs.existsSync(filePath)) {
-          const buffer = await downloadMediaMessage(
-            msg,
-            'buffer',
-            {},
-            {
-              logger: pino({ level: 'silent' }),
-              reuploadRequest: this.socket.updateMediaMessage
-            }
-          );
-          if (buffer && buffer.length > 0) {
-            fs.writeFileSync(filePath, buffer);
-            mediaUrl = `/media/${mediaFileName}`;
-          }
-        } else {
-          mediaUrl = `/media/${mediaFileName}`;
-        }
-      } catch (err: any) {
-        logger.warn({ sessionId: this.sessionId, msgId, err: err?.message || 'Download failed' }, 'Failed to download incoming media');
+    // Fast check for pre-existing media or queue background download non-blocking
+    if (mediaType) {
+      const mediaFileName = `${msgId}.${ext}`;
+      const filePath = path.join(config.storage.mediaDir, mediaFileName);
+      if (fs.existsSync(filePath)) {
+        mediaUrl = `/media/${mediaFileName}`;
+      } else if (this.socket) {
+        // Queue asynchronous background media download (non-blocking!)
+        this.queueMediaDownload(msg, msgId, ext);
       }
     }
 
@@ -806,19 +836,70 @@ export class BaileysAdapter implements IWhatsAppEngine {
       ? msg.messageTimestamp * 1000
       : Date.now();
 
+    // Fast LID resolution for normalized message
+    const rawChatJid = msg.key.remoteJid || '';
+    let resolvedPhone: string | undefined;
+    if (rawChatJid.endsWith('@s.whatsapp.net') || rawChatJid.endsWith('@c.us')) {
+      resolvedPhone = rawChatJid.split('@')[0].split(':')[0];
+    } else if (rawChatJid.endsWith('@lid')) {
+      resolvedPhone = this.resolveLidToPhone(rawChatJid);
+      if (!resolvedPhone) {
+        const cleanLid = rawChatJid.replace('@lid', '').trim();
+        const contact = contactRepository.findByJid(this.sessionId, rawChatJid) || contactRepository.findByPhone(this.sessionId, cleanLid);
+        if (contact?.phone) {
+          resolvedPhone = contact.phone;
+        }
+      }
+    }
+
     return {
       id: msgId,
       sessionId: this.sessionId,
-      chatJid: msg.key.remoteJid || '',
-      senderJid: msg.key.participant || msg.key.remoteJid || '',
+      chatJid: rawChatJid,
+      senderJid: msg.key.participant || rawChatJid,
       fromMe: Boolean(msg.key.fromMe),
       pushName: msg.pushName || undefined,
       text,
       mediaType,
       mediaUrl,
       caption,
-      timestamp
+      timestamp,
+      resolvedPhone
     };
+  }
+
+  private queueMediaDownload(msg: WAMessage, msgId: string, ext: string): void {
+    const mediaFileName = `${msgId}.${ext}`;
+    const filePath = path.join(config.storage.mediaDir, mediaFileName);
+
+    setImmediate(async () => {
+      try {
+        if (!this.socket || fs.existsSync(filePath)) return;
+
+        const buffer = await downloadMediaMessage(
+          msg,
+          'buffer',
+          {},
+          {
+            logger: pino({ level: 'silent' }),
+            reuploadRequest: this.socket.updateMediaMessage
+          }
+        );
+
+        if (buffer && buffer.length > 0) {
+          await fs.promises.writeFile(filePath, buffer);
+          const mediaUrl = `/media/${mediaFileName}`;
+          messageRepository.updateMediaUrl(this.sessionId, msgId, mediaUrl);
+
+          const updatedMsg = this.normalizeMessage(msg);
+          updatedMsg.mediaUrl = mediaUrl;
+          eventBus.emit('message.updated', { sessionId: this.sessionId, message: updatedMsg });
+          logger.debug({ sessionId: this.sessionId, msgId, mediaUrl }, 'Background media download finished');
+        }
+      } catch (err: any) {
+        logger.warn({ sessionId: this.sessionId, msgId, err: err?.message || 'Download failed' }, 'Async media download failed');
+      }
+    });
   }
 
   public async getProfilePictureUrl(targetJid?: string, forceRefresh = false): Promise<string | null> {

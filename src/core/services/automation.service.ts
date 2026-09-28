@@ -5,6 +5,7 @@ import { automationRepository, AutomationRuleRecord, AutoReplyConfig, Automation
 import { contactRepository } from '../database/repositories/contact.repository';
 import { crmService } from './crm.service';
 import { chatFlowService } from './chatflow.service';
+import { groupService } from './group.service';
 import { sessionManager } from '../engine/session.manager';
 import { logger } from '../../utils/logger';
 import { renderMessageTemplate } from '../utils/message-parser.util';
@@ -13,6 +14,8 @@ export class AutomationService {
   private isInitialized = false;
   // Cooldown map: key = `${sessionId}:${phone}`, value = timestamp last replied
   private contactCooldowns: Map<string, number> = new Map();
+  // Duplicate message suppression map: key = `${sessionId}:${chatJid}`, value = last replied normalized text
+  private lastRepliedTextByChat: Map<string, string> = new Map();
 
   public initialize(): void {
     if (this.isInitialized) return;
@@ -123,6 +126,18 @@ export class AutomationService {
     const isGroup = message.chatJid.endsWith('@g.us');
     const senderPhone = (message.senderJid || message.chatJid).replace(/[^0-9]/g, '');
 
+    // Feature Guard: Group Auto-Reply permission check
+    if (isGroup) {
+      const isAllowed = groupService.isGroupAutoReplyAllowed(sessionId, message.chatJid);
+      if (!isAllowed) {
+        logger.debug(
+          { sessionId, chatJid: message.chatJid },
+          'Auto-reply suppressed in group: bot is not admin in this group and group auto-reply is not enabled'
+        );
+        return;
+      }
+    }
+
     // 1. AMAN CHAT Feature: Auto-Stop Sequencer when customer replies
     if (!isGroup && senderPhone) {
       try {
@@ -134,6 +149,19 @@ export class AutomationService {
 
     const text = (message.text || message.caption || '').trim();
     if (!text) return;
+
+    // Feature Guard 1: Duplicate Incoming Message Suppression in Same Chat
+    const duplicateChatKey = `${sessionId}:${message.chatJid}`;
+    const normalizedIncomingText = text.toLowerCase();
+    const lastAnsweredText = this.lastRepliedTextByChat.get(duplicateChatKey);
+
+    if (lastAnsweredText && lastAnsweredText === normalizedIncomingText) {
+      logger.info(
+        { sessionId, chatJid: message.chatJid, text },
+        'Auto-reply suppressed: Duplicate incoming message text previously answered in this chat'
+      );
+      return;
+    }
 
     // Sprint 6 Feature #12: Interactive Chatflow Interceptor (Priority over standard auto-reply)
     try {
@@ -153,7 +181,8 @@ export class AutomationService {
     const cooldownKey = `${sessionId}:${senderPhone}`;
     const lastReply = this.contactCooldowns.get(cooldownKey) || 0;
     const now = Date.now();
-    const cooldownMs = (config.cooldownMinutes || 5) * 60 * 1000;
+    const cooldownMins = typeof config.cooldownMinutes === 'number' ? config.cooldownMinutes : 5;
+    const cooldownMs = cooldownMins * 60 * 1000;
 
     // Prune stale contact cooldowns if cache grows large
     if (this.contactCooldowns.size > 2000) {
@@ -165,21 +194,16 @@ export class AutomationService {
       }
     }
 
-    // 2. AMAN CHAT Feature: Business Hours Check & Offline Reply
-    const isWithinHours = this.checkBusinessHours(config);
-    if (!isGroup && config.businessHoursEnabled && !isWithinHours) {
-      if (config.offlineReplyEnabled && config.offlineReplyText) {
-        if (now - lastReply >= cooldownMs) {
-          logger.info({ sessionId, senderPhone }, 'Sending offline auto-reply outside business hours');
-          await this.sendAutomatedResponse(sessionId, message, config.offlineReplyText, config.simulateTyping);
-          this.contactCooldowns.set(cooldownKey, now);
-        }
-      }
-      return; // Do not proceed to standard keyword rules outside business hours
-    }
-
-    // 3. Keyword Rules Matching
+    // 1. Keyword Rules Matching (Check active rules first; sort 'equals' operator rules first to prevent wrong triggers)
     const rules = automationRepository.findActiveRules(sessionId);
+    rules.sort((a, b) => {
+      const aEquals = a.conditions.some((c) => c.operator === 'equals');
+      const bEquals = b.conditions.some((c) => c.operator === 'equals');
+      if (aEquals && !bEquals) return -1;
+      if (!aEquals && bEquals) return 1;
+      return 0;
+    });
+
     let matched = false;
 
     for (const rule of rules) {
@@ -198,8 +222,11 @@ export class AutomationService {
         const hasReplyAction = rule.actions.some((a) => a.type === 'reply_text' || a.type === 'send_text' || a.type === 'reply_webhook');
         if (!hasReplyAction || isGroup || (now - lastReply >= cooldownMs)) {
           await this.executeActions(sessionId, message, rule, config.simulateTyping);
-          if (hasReplyAction && !isGroup) {
-            this.contactCooldowns.set(cooldownKey, now);
+          if (hasReplyAction) {
+            this.lastRepliedTextByChat.set(duplicateChatKey, normalizedIncomingText);
+            if (!isGroup) {
+              this.contactCooldowns.set(cooldownKey, now);
+            }
           }
         } else {
           logger.info({ ruleId: rule.id, senderPhone }, 'Rule matched but reply suppressed due to contact cooldown');
@@ -210,12 +237,31 @@ export class AutomationService {
       }
     }
 
-    // 4. AMAN CHAT Feature: Fallback Reply if no keyword matched
+    // 2. If no keyword rule matched, check Business Hours & Offline Reply
+    if (!matched && !isGroup && config.businessHoursEnabled) {
+      const isWithinHours = this.checkBusinessHours(config);
+      if (!isWithinHours && config.offlineReplyEnabled && config.offlineReplyText) {
+        if (now - lastReply >= cooldownMs) {
+          logger.info({ sessionId, senderPhone }, 'Sending offline auto-reply outside business hours');
+          const sent = await this.sendAutomatedResponse(sessionId, message, config.offlineReplyText, config.simulateTyping);
+          if (sent) {
+            this.lastRepliedTextByChat.set(duplicateChatKey, normalizedIncomingText);
+            this.contactCooldowns.set(cooldownKey, now);
+          }
+        }
+        return;
+      }
+    }
+
+    // 3. Fallback Reply if no keyword matched and within hours
     if (!matched && !isGroup && config.fallbackEnabled && config.fallbackReplyText) {
       if (now - lastReply >= cooldownMs) {
         logger.info({ sessionId, senderPhone }, 'No keyword matched. Sending fallback auto-reply');
-        await this.sendAutomatedResponse(sessionId, message, config.fallbackReplyText, config.simulateTyping);
-        this.contactCooldowns.set(cooldownKey, now);
+        const sent = await this.sendAutomatedResponse(sessionId, message, config.fallbackReplyText, config.simulateTyping);
+        if (sent) {
+          this.lastRepliedTextByChat.set(duplicateChatKey, normalizedIncomingText);
+          this.contactCooldowns.set(cooldownKey, now);
+        }
       }
     }
   }
@@ -241,6 +287,12 @@ export class AutomationService {
 
   private evaluateRule(rule: AutomationRuleRecord, msg: NormalizedMessage, text: string): boolean {
     const isGroup = msg.chatJid.endsWith('@g.us');
+    const hasGroupCondition = rule.conditions.some((c) => c.field === 'is_group');
+
+    // Group Safety Guard: Bot rules only apply to 1-on-1 personal chats unless 'is_group' condition is explicitly set to true
+    if (isGroup && !hasGroupCondition) {
+      return false;
+    }
 
     for (const cond of rule.conditions) {
       if (cond.field === 'is_group') {
@@ -303,13 +355,15 @@ export class AutomationService {
             continue;
           }
           if (simulateTyping && session.sendPresence) {
-            await session.sendPresence(msg.chatJid, 'composing');
-            await new Promise((r) => setTimeout(r, 1200));
+            try {
+              await session.sendPresence(msg.chatJid, 'composing');
+              await new Promise((r) => setTimeout(r, 1200));
+            } catch {
+              // ignore presence update errors
+            }
           }
           const processedText = this.interpolate(action.text, msg, sessionId);
-          await session.sendText(msg.chatJid, processedText, {
-            quotedMessageId: action.type === 'reply_text' ? msg.id : undefined
-          });
+          await session.sendText(msg.chatJid, processedText);
         } else if (action.type === 'send_media' && action.mediaPath) {
           if (!isSessionConnected) {
             logger.warn({ sessionId, ruleId: rule.id }, 'Skipping outgoing media: session not connected');
@@ -318,8 +372,7 @@ export class AutomationService {
           const caption = action.text ? this.interpolate(action.text, msg, sessionId) : undefined;
           await session.sendMedia(msg.chatJid, action.mediaPath, {
             type: action.mediaType || 'document',
-            caption,
-            quotedMessageId: msg.id
+            caption
           });
         } else if (action.type === 'add_tag' && action.tag && cleanPhone) {
           // AMAN CHAT Feature: Auto-tagging
@@ -352,7 +405,14 @@ export class AutomationService {
           }
         }
       } catch (err: any) {
-        logger.error({ ruleId: rule.id, err: err.message }, 'Failed executing automation action');
+        const errMsg = err?.message || String(err);
+        if (errMsg.includes('rate-overlimit')) {
+          logger.warn({ ruleId: rule.id, chatJid: msg.chatJid }, 'Auto-reply rate-limited by WhatsApp socket. Temporary pause applied.');
+        } else if (errMsg.includes('forbidden')) {
+          logger.warn({ ruleId: rule.id, chatJid: msg.chatJid }, 'Auto-reply forbidden by WhatsApp (no permission to speak in group or muted).');
+        } else {
+          logger.error({ ruleId: rule.id, err: errMsg }, 'Failed executing automation action');
+        }
       }
     }
   }
@@ -383,20 +443,26 @@ export class AutomationService {
     msg: NormalizedMessage,
     template: string,
     simulateTyping = true
-  ): Promise<void> {
+  ): Promise<boolean> {
     try {
       const session = sessionManager.getSession(sessionId);
-      if (session.getStatus() !== 'CONNECTED') return;
+      if (session.getStatus() !== 'CONNECTED') return false;
 
       if (simulateTyping && session.sendPresence) {
-        await session.sendPresence(msg.chatJid, 'composing');
-        await new Promise((r) => setTimeout(r, 1200));
+        try {
+          await session.sendPresence(msg.chatJid, 'composing');
+          await new Promise((r) => setTimeout(r, 1200));
+        } catch {
+          // ignore presence error
+        }
       }
 
       const text = this.interpolate(template, msg, sessionId);
-      await session.sendText(msg.chatJid, text, { quotedMessageId: msg.id });
+      await session.sendText(msg.chatJid, text);
+      return true;
     } catch (err: any) {
       logger.error({ sessionId, err: err.message }, 'Failed sending automated response');
+      return false;
     }
   }
 
@@ -478,21 +544,22 @@ export class AutomationService {
     }
 
     if (simulateTyping && session.sendPresence) {
-      await session.sendPresence(msg.chatJid, 'composing');
-      await new Promise((r) => setTimeout(r, 1000));
+      try {
+        await session.sendPresence(msg.chatJid, 'composing');
+        await new Promise((r) => setTimeout(r, 1000));
+      } catch {
+        // ignore presence update errors
+      }
     }
 
     if (mediaUrl) {
       await session.sendMedia(msg.chatJid, mediaUrl, {
         type: mediaType,
-        caption: replyText ? this.interpolate(replyText, msg, sessionId) : undefined,
-        quotedMessageId: msg.id
+        caption: replyText ? this.interpolate(replyText, msg, sessionId) : undefined
       });
     } else if (replyText) {
       const processedText = this.interpolate(replyText, msg, sessionId);
-      await session.sendText(msg.chatJid, processedText, {
-        quotedMessageId: msg.id
-      });
+      await session.sendText(msg.chatJid, processedText);
     }
   }
 

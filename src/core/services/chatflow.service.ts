@@ -258,8 +258,12 @@ export class ChatFlowService {
       const session = sessionManager.getSession(sessionId);
       if (session && session.getStatus() === 'CONNECTED') {
         if (session.sendPresence) {
-          await session.sendPresence(chatJid, 'composing');
-          await new Promise((r) => setTimeout(r, 800));
+          try {
+            await session.sendPresence(chatJid, 'composing');
+            await new Promise((r) => setTimeout(r, 800));
+          } catch {
+            // ignore presence error
+          }
         }
         await session.sendText(chatJid, text);
       } else {

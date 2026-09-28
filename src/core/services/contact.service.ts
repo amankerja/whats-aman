@@ -62,7 +62,12 @@ export class ContactService {
     notes?: string;
     optOut?: boolean;
   }): void {
-    const cleanPhone = data.phone.replace(/[^0-9]/g, '');
+    let cleanPhone = data.phone.replace(/[^0-9]/g, '');
+    if (cleanPhone.startsWith('0')) {
+      cleanPhone = '62' + cleanPhone.substring(1);
+    } else if (cleanPhone.startsWith('8')) {
+      cleanPhone = '62' + cleanPhone;
+    }
     const jid = `${cleanPhone}@s.whatsapp.net`;
 
     contactRepository.upsert({
@@ -133,8 +138,14 @@ export class ContactService {
       const rawPhone = row.phone || row.no_hp || row.nomor || row.telp || row.mobile || row.Phone || row.WhatsApp;
       if (!rawPhone) continue;
 
-      const phone = String(rawPhone).replace(/[^0-9]/g, '');
+      let phone = String(rawPhone).replace(/[^0-9]/g, '');
       if (phone.length < 7) continue;
+
+      if (phone.startsWith('0')) {
+        phone = '62' + phone.substring(1);
+      } else if (phone.startsWith('8')) {
+        phone = '62' + phone;
+      }
 
       const name = row.name || row.nama || row.Nama || row.Name || '';
       const tags = row.tag || row.tags ? String(row.tag || row.tags).split(',').map((t) => t.trim()) : [];
