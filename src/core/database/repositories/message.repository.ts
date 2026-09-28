@@ -77,6 +77,18 @@ export class MessageRepository {
     stmt.run(mediaUrl, sessionId, messageId);
   }
 
+  /** Mark all incoming (from_me = 0) non-READ messages of a chat as READ (bug fix: unread badge never cleared). */
+  public markChatAsRead(sessionId: string, chatJid: string | string[]): number {
+    const jids = Array.isArray(chatJid) ? chatJid : [chatJid];
+    const placeholders = jids.map(() => '?').join(',');
+    const stmt = this.getStatement('mark_chat_read', `
+      UPDATE messages SET status = 'READ'
+      WHERE session_id = ? AND chat_jid IN (${placeholders}) AND from_me = 0 AND status != 'READ'
+    `);
+    const res = stmt.run(sessionId, ...jids);
+    return res.changes;
+  }
+
   public findByMessageId(sessionId: string, messageId: string): MessageRecord | undefined {
     const stmt = this.getStatement('find_by_msg_id', 'SELECT * FROM messages WHERE session_id = ? AND message_id = ?');
     return stmt.get(sessionId, messageId) as MessageRecord | undefined;
@@ -107,21 +119,30 @@ export class MessageRepository {
     push_name?: string;
     unread_count?: number;
   }> {
+    // Perf fix: restrict the window-function scan to a bounded recent window (5000 msgs)
+    // instead of partitioning over the entire messages table. With idx_messages_chat_ts
+    // this stays fast even when history grows into the millions of rows.
+    const RECENT_WINDOW = 5000;
     const stmt = this.getStatement('find_recent_chats', `
-      WITH RankedMessages AS (
+      WITH RecentMessages AS (
+        SELECT * FROM messages
+        WHERE session_id = ? AND chat_jid != 'status@broadcast' AND chat_jid NOT LIKE '%@broadcast'
+        ORDER BY timestamp DESC
+        LIMIT ${RECENT_WINDOW}
+      ),
+      RankedMessages AS (
         SELECT 
           m.*,
           ROW_NUMBER() OVER(PARTITION BY m.chat_jid ORDER BY m.timestamp DESC) as rn
-        FROM messages m
-        WHERE m.session_id = ? AND m.chat_jid != 'status@broadcast' AND m.chat_jid NOT LIKE '%@broadcast'
+        FROM RecentMessages m
       ),
       ContactPushNames AS (
         SELECT 
           chat_jid,
           push_name as peer_push_name,
           ROW_NUMBER() OVER(PARTITION BY chat_jid ORDER BY timestamp DESC) as prn
-        FROM messages
-        WHERE session_id = ? AND from_me = 0 AND push_name IS NOT NULL AND TRIM(push_name) != ''
+        FROM RecentMessages
+        WHERE from_me = 0 AND push_name IS NOT NULL AND TRIM(push_name) != ''
       )
       SELECT 
         rm.chat_jid,
@@ -161,15 +182,15 @@ export class MessageRepository {
       ) cpn ON cpn.chat_jid = rm.chat_jid
       LEFT JOIN (
         SELECT chat_jid, COUNT(*) as unread_count
-        FROM messages
-        WHERE session_id = ? AND from_me = 0 AND status != 'READ'
+        FROM RecentMessages
+        WHERE from_me = 0 AND status != 'READ'
         GROUP BY chat_jid
       ) unreads ON unreads.chat_jid = rm.chat_jid
       WHERE rm.rn = 1
       ORDER BY rm.timestamp DESC
       LIMIT ?
     `);
-    return stmt.all(sessionId, sessionId, sessionId, limit) as any;
+    return stmt.all(sessionId, limit) as any;
   }
 }
 

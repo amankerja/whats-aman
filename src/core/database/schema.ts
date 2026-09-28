@@ -40,8 +40,9 @@ export function initializeDatabaseSchema(): void {
     CREATE INDEX IF NOT EXISTS idx_contacts_session ON contacts(session_id);
     CREATE INDEX IF NOT EXISTS idx_contacts_phone ON contacts(phone);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_contacts_session_phone ON contacts(session_id, phone);
-    CREATE INDEX IF NOT EXISTS idx_contacts_stage ON contacts(session_id, pipeline_stage);
     CREATE INDEX IF NOT EXISTS idx_contacts_optout ON contacts(session_id, opt_out);
+    -- NOTE: idx_contacts_stage dibuat SETELAH blok ALTER TABLE di bawah,
+    -- karena kolom pipeline_stage ditambahkan via ALTER TABLE (belum ada saat CREATE TABLE).
 
     -- Groups Table
     CREATE TABLE IF NOT EXISTS groups (
@@ -325,6 +326,14 @@ export function initializeDatabaseSchema(): void {
     // Column already exists
   }
 
+  // Index on pipeline_stage MUST be created after the ALTER TABLE above
+  // (bug fix: previously created before the column existed)
+  try {
+    db.exec('CREATE INDEX IF NOT EXISTS idx_contacts_stage ON contacts(session_id, pipeline_stage);');
+  } catch {
+    // Index already exists
+  }
+
   try {
     db.exec("ALTER TABLE contacts ADD COLUMN notes TEXT DEFAULT '';");
   } catch {
@@ -375,6 +384,12 @@ export function initializeDatabaseSchema(): void {
 
   try {
     db.exec('ALTER TABLE campaigns ADD COLUMN runs_count INTEGER DEFAULT 0;');
+  } catch {
+    // Column already exists
+  }
+
+  try {
+    db.exec('ALTER TABLE campaigns ADD COLUMN last_message TEXT;');
   } catch {
     // Column already exists
   }

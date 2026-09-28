@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { sessionManager } from '../../core/engine/session.manager';
 import { sessionRepository } from '../../core/database/repositories/session.repository';
+import { AuditService } from '../../core/services/audit.service';
 
 export const sessionRouter = Router();
 
@@ -20,6 +21,7 @@ sessionRouter.post('/', async (req: Request, res: Response, next: NextFunction) 
     }
     const session = await sessionManager.createSession(id, name);
     sessionRepository.upsert({ id, name: name || id, status: 'DISCONNECTED' });
+    AuditService.log('user', 'create', 'session', { sessionId: id, name: name || id });
     res.status(201).json({ success: true, data: session.getMetadata() });
   } catch (err) {
     next(err);
@@ -58,6 +60,7 @@ sessionRouter.post('/:id/disconnect', async (req: Request, res: Response, next: 
   try {
     const id = String(req.params.id);
     await sessionManager.stopSession(id);
+    AuditService.log('user', 'disconnect', 'session', { sessionId: id });
     res.json({ success: true, message: 'Session disconnected' });
   } catch (err) {
     next(err);
@@ -69,6 +72,7 @@ sessionRouter.post('/:id/logout', async (req: Request, res: Response, next: Next
   try {
     const id = String(req.params.id);
     await sessionManager.logoutSession(id);
+    AuditService.log('user', 'logout', 'session', { sessionId: id });
     res.json({ success: true, message: 'Session logged out' });
   } catch (err) {
     next(err);
@@ -81,6 +85,7 @@ sessionRouter.delete('/:id', async (req: Request, res: Response, next: NextFunct
     const id = String(req.params.id);
     await sessionManager.deleteSession(id);
     sessionRepository.delete(id);
+    AuditService.log('user', 'delete', 'session', { sessionId: id });
     res.json({ success: true, message: 'Session deleted' });
   } catch (err) {
     next(err);

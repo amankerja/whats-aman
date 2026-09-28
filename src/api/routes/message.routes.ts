@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import path from 'path';
 import { messageService } from '../../core/services/message.service';
+import { messageRepository } from '../../core/database/repositories/message.repository';
 import { config } from '../../config';
 
 const storage = multer.diskStorage({
@@ -258,6 +259,21 @@ messageRouter.get('/history', (req: Request, res: Response, next: NextFunction) 
       offset ? parseInt(String(offset), 10) : 0
     );
     res.json({ success: true, data: messages });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/v1/messages/mark-read - Mark all incoming messages of a chat as READ
+messageRouter.post('/mark-read', (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { sessionId, chatJid } = req.body;
+    if (!sessionId || !chatJid) {
+      res.status(400).json({ success: false, message: 'sessionId and chatJid are required' });
+      return;
+    }
+    const updated = messageRepository.markChatAsRead(String(sessionId), String(chatJid));
+    res.json({ success: true, updated });
   } catch (err) {
     next(err);
   }

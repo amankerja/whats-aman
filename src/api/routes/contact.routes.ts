@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { contactService } from '../../core/services/contact.service';
+import { AuditService } from '../../core/services/audit.service';
 
 const upload = multer({ storage: multer.memoryStorage() });
 export const contactRouter = Router();
@@ -146,6 +147,7 @@ contactRouter.delete('/:phone', (req: Request, res: Response, next: NextFunction
       return;
     }
     contactService.deleteContact(String(sessionId), String(phone));
+    AuditService.log('user', 'delete', 'contact', { sessionId, phone });
     res.json({ success: true, message: 'Contact deleted' });
   } catch (err) {
     next(err);
@@ -161,6 +163,7 @@ const handleImport = (req: Request, res: Response, next: NextFunction) => {
       return;
     }
     const count = contactService.importFromBuffer(sessionId, req.file.buffer, req.file.originalname);
+    AuditService.log('user', 'import', 'contact', { sessionId, file: req.file.originalname, count });
     res.json({ success: true, message: `Successfully imported ${count} contacts`, count });
   } catch (err) {
     next(err);

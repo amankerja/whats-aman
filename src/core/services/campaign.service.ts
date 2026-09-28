@@ -81,14 +81,21 @@ export class CampaignService {
     this.runCampaignLoop(camp).catch((err) => {
       logger.error({ campaignId, err: err.message }, 'Campaign execution loop error');
       this.activeLoops.set(campaignId, false);
-      campaignRepository.updateCampaignStatus(campaignId, 'PAUSED');
+      campaignRepository.updateCampaignStatus(campaignId, 'PAUSED', `Error eksekusi campaign: ${err.message}`);
     });
   }
 
-  public pauseCampaign(campaignId: string): void {
+  public pauseCampaign(campaignId: string, reason?: string): void {
     this.activeLoops.set(campaignId, false);
-    campaignRepository.updateCampaignStatus(campaignId, 'PAUSED');
-    logger.info({ campaignId }, 'Campaign paused');
+    campaignRepository.updateCampaignStatus(campaignId, 'PAUSED', reason);
+    if (reason) {
+      eventBus.emit('campaign.updated', {
+        campaignId,
+        status: 'PAUSED',
+        message: reason
+      });
+    }
+    logger.info({ campaignId, reason }, 'Campaign paused');
   }
 
   public deleteCampaign(campaignId: string): void {
@@ -196,6 +203,7 @@ export class CampaignService {
 
   private async runCampaignLoop(camp: CampaignRecord): Promise<void> {
     let sentInBatch = 0;
+    let lastSendAt = 0;
 
     while (this.activeLoops.get(camp.id)) {
       const items = campaignRepository.getNextQueuedRecipients(camp.id, 10);
@@ -225,7 +233,7 @@ export class CampaignService {
           });
         } else {
           logger.info({ campaignId: camp.id }, 'All recipients processed. Campaign completed.');
-          campaignRepository.updateCampaignStatus(camp.id, 'COMPLETED');
+          campaignRepository.updateCampaignStatus(camp.id, 'COMPLETED', 'Semua penerima telah diproses.');
           this.activeLoops.delete(camp.id);
           eventBus.emit('campaign.updated', {
             campaignId: camp.id,
@@ -241,19 +249,23 @@ export class CampaignService {
       for (const item of items) {
         if (!this.activeLoops.get(camp.id)) break;
 
+        // Rate limit enforcement (messages per minute) - bug fix: was stored but never enforced
+        const rateLimitPerMin = camp.rate_limit_per_minute || 0;
+        if (rateLimitPerMin > 0 && lastSendAt > 0) {
+          const minIntervalMs = 60000 / rateLimitPerMin;
+          const elapsed = Date.now() - lastSendAt;
+          if (elapsed < minIntervalMs) {
+            const waitMs = minIntervalMs - elapsed;
+            logger.debug({ campaignId: camp.id, waitMs }, '[RateLimit] Throttling to respect rate_limit_per_minute');
+            await this.delay(waitMs);
+          }
+        }
+
         // Anti-Blocking & Risk Mitigation Check (Warm-up, Daily Rate Limit, Circuit Breaker, Operating Hours)
         const antiCheck = antiBlockingGuardService.canDispatchMessage(camp.session_id);
         if (!antiCheck.allowed) {
           logger.warn({ campaignId: camp.id, reason: antiCheck.reason }, '[Anti-Blocking] Pausing campaign execution');
-          this.pauseCampaign(camp.id);
-          eventBus.emit('campaign.updated', {
-            campaignId: camp.id,
-            status: 'PAUSED',
-            sent: camp.sent_count,
-            total: camp.total_recipients,
-            failed: camp.failed_count,
-            message: `Kampanye dijeda oleh Anti-Blocking Guard: ${antiCheck.reason}`
-          });
+          this.pauseCampaign(camp.id, `Kampanye dijeda oleh Anti-Blocking Guard: ${antiCheck.reason}`);
           break;
         }
 
@@ -274,15 +286,10 @@ export class CampaignService {
 
         if (!session || session.getStatus() !== 'CONNECTED') {
           logger.warn({ campaignId: camp.id }, 'Session is disconnected. Automatically pausing campaign to protect remaining recipients.');
-          this.pauseCampaign(camp.id);
-          eventBus.emit('campaign.updated', {
-            campaignId: camp.id,
-            status: 'PAUSED',
-            sent: camp.sent_count,
-            total: camp.total_recipients,
-            failed: camp.failed_count,
-            message: 'Kampanye otomatis dijeda karena koneksi WhatsApp terputus. Sambungkan kembali sesi lalu klik Lanjutkan.'
-          });
+          this.pauseCampaign(
+            camp.id,
+            'Kampanye otomatis dijeda karena koneksi WhatsApp terputus. Sambungkan kembali sesi lalu klik Lanjutkan.'
+          );
           break;
         }
 
@@ -331,6 +338,8 @@ export class CampaignService {
           logger.error({ campaignId: camp.id, phone: item.phone, err: lastErrorMsg }, 'Failed to send campaign message after retry');
           campaignRepository.updateRecipientStatus(item.id, 'FAILED', lastErrorMsg);
         }
+
+        lastSendAt = Date.now();
 
         // Record Anti-Blocking metrics & risk calculation
         antiBlockingGuardService.recordSendResult(camp.session_id, sendSuccess, lastErrorMsg);

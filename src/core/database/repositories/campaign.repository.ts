@@ -24,6 +24,7 @@ export interface CampaignRecord {
   next_run_at?: number;
   max_runs?: number;
   runs_count?: number;
+  last_message?: string;
   created_at: number;
   updated_at: number;
 }
@@ -158,9 +159,22 @@ export class CampaignRepository {
     return stmt.all(status) as CampaignRecord[];
   }
 
-  public updateCampaignStatus(id: string, status: CampaignRecord['status']): void {
-    const stmt = this.db.prepare('UPDATE campaigns SET status = ?, updated_at = ? WHERE id = ?');
-    stmt.run(status, Date.now(), id);
+  public updateCampaignStatus(id: string, status: CampaignRecord['status'], message?: string): void {
+    const stmt = this.db.prepare(
+      message !== undefined
+        ? 'UPDATE campaigns SET status = ?, last_message = ?, updated_at = ? WHERE id = ?'
+        : 'UPDATE campaigns SET status = ?, updated_at = ? WHERE id = ?'
+    );
+    if (message !== undefined) {
+      stmt.run(status, message, Date.now(), id);
+    } else {
+      stmt.run(status, Date.now(), id);
+    }
+  }
+
+  public setLastMessage(id: string, message: string): void {
+    const stmt = this.db.prepare('UPDATE campaigns SET last_message = ?, updated_at = ? WHERE id = ?');
+    stmt.run(message, Date.now(), id);
   }
 
   public resetRecipientsForRecurring(campaignId: string, nextScheduleAt: number, nextRunAt?: number): void {

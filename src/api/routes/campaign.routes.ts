@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { campaignService } from '../../core/services/campaign.service';
 import { campaignRepository } from '../../core/database/repositories/campaign.repository';
+import { AuditService } from '../../core/services/audit.service';
 
 const upload = multer({ storage: multer.memoryStorage() });
 export const campaignRouter = Router();
@@ -58,6 +59,7 @@ campaignRouter.post('/', (req: Request, res: Response, next: NextFunction) => {
     });
 
     const created = campaignRepository.findCampaignById(campaignId);
+    AuditService.log('user', 'create', 'campaign', { campaignId, name, recipients: (recipients || []).length });
     res.status(201).json({ success: true, data: created });
   } catch (err) {
     next(err);
@@ -146,6 +148,7 @@ campaignRouter.post('/:id/start', async (req: Request, res: Response, next: Next
   try {
     const id = String(req.params.id);
     await campaignService.startCampaign(id);
+    AuditService.log('user', 'start', 'campaign', { campaignId: id });
     res.json({ success: true, message: 'Campaign started' });
   } catch (err) {
     next(err);
@@ -180,6 +183,7 @@ campaignRouter.delete('/:id', (req: Request, res: Response, next: NextFunction) 
   try {
     const id = String(req.params.id);
     campaignService.deleteCampaign(id);
+    AuditService.log('user', 'delete', 'campaign', { campaignId: id });
     res.json({ success: true, message: 'Campaign deleted' });
   } catch (err) {
     next(err);

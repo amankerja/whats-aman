@@ -13,6 +13,8 @@ export interface NormalizedMessage {
   quotedMessageId?: string;
   timestamp: number;
   resolvedPhone?: string;
+  /** True when the message came from history sync (old message). Automation must NOT auto-reply to these. */
+  isHistorical?: boolean;
 }
 
 export type ConnectionStatus = 'DISCONNECTED' | 'QR_READY' | 'PAIRING_READY' | 'CONNECTING' | 'CONNECTED';

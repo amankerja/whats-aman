@@ -4,6 +4,8 @@ import {
   Smartphone,
   MessageSquare,
   Users,
+  UserPlus,
+  Target,
   Layers,
   Send,
   Zap,
@@ -20,6 +22,7 @@ import {
   Download,
   Upload,
   CheckCircle,
+  CheckCircle2,
   AlertCircle,
   Clock,
   Activity,
@@ -120,6 +123,7 @@ interface Campaign {
   total_recipients: number;
   sent_count: number;
   failed_count: number;
+  last_message?: string;
   created_at: number;
 }
 
@@ -328,6 +332,25 @@ function formatPhoneForDisplay(phoneOrJid: string): string {
   const prefix = rest.slice(0, -4);
   const prefixGroups = prefix.match(/.{1,3}/g) ?? [prefix];
   return `+${cc} ${[...prefixGroups, last4].join(' ')}`;
+}
+
+/**
+ * Shared parser for "phone,name" recipient lines.
+ * Used by both the Quick Chat Broadcast and New Campaign forms so their
+ * name-parsing logic can never diverge again (bug fix: broadcast form
+ * previously flattened every line to just the phone, dropping names).
+ */
+function parseRecipientLines(raw: string): Array<{ phone: string; name?: string; customVars: any }> {
+  return raw
+    .split('\n')
+    .map(line => {
+      const parts = line.split(',');
+      const phone = parts[0]?.trim().replace(/[^0-9]/g, '');
+      const name = parts[1]?.trim();
+      if (!phone || phone.length < 7) return null;
+      return { phone, name: name || undefined, customVars: {} };
+    })
+    .filter(Boolean) as Array<{ phone: string; name?: string; customVars: any }>;
 }
 
 function formatWhatsAppTimestamp(timestamp: number): string {
@@ -709,8 +732,10 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = React.memo(({
 });
 
 export default function App() {
-  // Theme state: light or dark
+  // Theme state: light or dark (supports URL param ?theme=dark / ?theme=light)
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const urlTheme = new URLSearchParams(window.location.search).get('theme');
+    if (urlTheme === 'light' || urlTheme === 'dark') return urlTheme;
     return (localStorage.getItem('whatsaman_theme') as 'light' | 'dark') || 'light';
   });
 
@@ -721,10 +746,15 @@ export default function App() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
-  // Active navigation tab
+  // Active navigation tab (supports URL param ?tab=...)
   const [activeTab, setActiveTab] = useState<
     'dashboard' | 'sessions' | 'chats' | 'crm' | 'contacts' | 'groups' | 'campaigns' | 'tester' | 'automation' | 'integrations' | 'infrastructure' | 'logs'
-  >('dashboard');
+  >(() => {
+    const urlTab = new URLSearchParams(window.location.search).get('tab') as any;
+    const validTabs = ['dashboard', 'sessions', 'chats', 'crm', 'contacts', 'groups', 'campaigns', 'tester', 'automation', 'integrations', 'infrastructure', 'logs'];
+    if (validTabs.includes(urlTab)) return urlTab;
+    return 'dashboard';
+  });
 
   // AMAN CHAT Pro: Privacy & Security Mode (Alt + P)
   const [privacyMode, setPrivacyMode] = useState<boolean>(() => {
@@ -1022,6 +1052,10 @@ export default function App() {
   // Audit filter
   const [logFilter, setLogFilter] = useState('ALL');
 
+  // Anti-Blocking Guard health (per session)
+  const [abHealth, setAbHealth] = useState<Record<string, { stats: any; events: any[] }>>({});
+  const [abResetting, setAbResetting] = useState<string | null>(null);
+
   const wsRef = useRef<WebSocket | null>(null);
   const selectedSessionIdRef = useRef<string>(selectedSessionId);
   const activeChatJidRef = useRef<string | null>(activeChatJid);
@@ -1238,6 +1272,41 @@ export default function App() {
       if (data.success) setSystemStatus(data.data);
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const fetchAntiBlockingHealth = async (sessionId: string) => {
+    if (!sessionId) return;
+    try {
+      const res = await fetch(`/api/v1/system/anti-blocking/stats?sessionId=${encodeURIComponent(sessionId)}`);
+      const data = await res.json();
+      if (data.success) {
+        setAbHealth(prev => ({ ...prev, [sessionId]: data.data }));
+      }
+    } catch (err) {
+      console.error('Failed to fetch anti-blocking stats', err);
+    }
+  };
+
+  const handleResetCircuitBreaker = async (sessionId: string) => {
+    setAbResetting(sessionId);
+    try {
+      const res = await fetch('/api/v1/system/anti-blocking/reset-circuit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId })
+      });
+      const data = await res.json();
+      if (data.success) {
+        addLog(`Circuit breaker sesi ${sessionId} direset`, 'success');
+        fetchAntiBlockingHealth(sessionId);
+      } else {
+        alert(data.message || 'Gagal reset circuit breaker');
+      }
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setAbResetting(null);
     }
   };
 
@@ -1800,12 +1869,12 @@ export default function App() {
         alert('Masukkan minimal 1 nomor tujuan!');
         return;
       }
-      recipients = chatBroadcastManualNumbers
-        .split('\n')
-        .flatMap(line => line.split(','))
-        .map(n => n.trim().replace(/[^0-9]/g, ''))
-        .filter(n => n.length >= 7)
-        .map(phone => ({ phone, name: formatPhoneForDisplay(phone), customVars: {} }));
+      // Bug fix: previously every line was flattened to phone-only via flatMap(','),
+      // silently dropping the recipient names typed after the comma.
+      recipients = parseRecipientLines(chatBroadcastManualNumbers).map(r => ({
+        ...r,
+        name: r.name || formatPhoneForDisplay(r.phone)
+      }));
     } else if (chatBroadcastMode === 'select') {
       if (chatBroadcastSelectedPhones.length === 0) {
         alert('Pilih minimal 1 kontak / chat penerima!');
@@ -1996,6 +2065,7 @@ export default function App() {
 
   const handleUpdateContactStage = async (phone: string, stage: 'lead' | 'prospect' | 'customer' | 'churned') => {
     try {
+      setContacts(prev => prev.map(c => c.phone === phone ? { ...c, pipeline_stage: stage } : c));
       await fetch(`/api/v1/contacts/${phone}/stage`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -2006,6 +2076,7 @@ export default function App() {
       addLog(`Status pipeline kontak ${phone} diubah menjadi ${stage.toUpperCase()}`, 'info');
     } catch (err: any) {
       alert(err.message);
+      fetchContacts(selectedSessionId);
     }
   };
 
@@ -2025,6 +2096,8 @@ export default function App() {
     }
   };
 
+  // Perf fix: previously ONE effect fired 12 fetches and re-ran ALL of them whenever
+  // crmTimeRange changed. Split: session-scoped data vs analytics-only.
   useEffect(() => {
     if (selectedSessionId) {
       fetchContacts(selectedSessionId);
@@ -2033,18 +2106,40 @@ export default function App() {
       fetchTags(selectedSessionId);
       fetchCRMTasks(selectedSessionId);
       fetchCRMSequences(selectedSessionId);
-      fetchSalesAnalytics(selectedSessionId, crmTimeRange);
       fetchBotConfig(selectedSessionId);
       fetchCrmAutoDispatch();
+    }
+  }, [selectedSessionId]);
+
+  useEffect(() => {
+    if (selectedSessionId) {
+      fetchSalesAnalytics(selectedSessionId, crmTimeRange);
+    }
+  }, [selectedSessionId, crmTimeRange]);
+
+  // Integration data is session-scoped but only needed on its own tab; fetch lazily
+  useEffect(() => {
+    if (selectedSessionId && activeTab === 'integrations') {
       fetchIntegrationConfigs();
       fetchOutgoingWebhooks();
       fetchIntegrationLogs();
     }
-  }, [selectedSessionId, crmTimeRange]);
+  }, [selectedSessionId, activeTab]);
 
   useEffect(() => {
     if (selectedSessionId && activeChatJid) {
       fetchChatMessages(selectedSessionId, activeChatJid);
+      // Bug fix: opening a chat now clears its unread badge on the server too
+      // (previously the badge persisted forever in the DB)
+      fetch(`/api/v1/messages/mark-read`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: selectedSessionId, chatJid: activeChatJid })
+      })
+        .then(() => {
+          setChats(prev => prev.map(c => (c.chat_jid === activeChatJid ? { ...c, unread_count: 0 } : c)));
+        })
+        .catch(() => { /* non-critical */ });
     }
   }, [selectedSessionId, activeChatJid]);
 
@@ -2319,16 +2414,20 @@ export default function App() {
 
   const handleDeleteContact = async (phone: string) => {
     if (!selectedSessionId) return;
-    if (!confirm(`Hapus kontak +${phone} dari database?`)) return;
+    if (!confirm(lang === 'id' ? `Hapus kontak +${phone} dari database?` : `Delete contact +${phone} from database?`)) return;
     try {
+      setContacts(prev => prev.filter(c => c.phone !== phone));
       const res = await fetch(`/api/v1/contacts/${phone}?sessionId=${selectedSessionId}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.success) {
         fetchContacts(selectedSessionId);
         addLog(`Kontak +${phone} dihapus`, 'info');
+      } else {
+        fetchContacts(selectedSessionId);
       }
     } catch (err: any) {
       alert(err.message);
+      fetchContacts(selectedSessionId);
     }
   };
 
@@ -2434,16 +2533,7 @@ export default function App() {
         alert('Daftar nomor penerima tidak boleh kosong!');
         return;
       }
-      const lines = campRecipientsRaw.split('\n');
-      recipients = lines
-        .map(line => {
-          const parts = line.split(',');
-          const phone = parts[0]?.trim();
-          const name = parts[1]?.trim();
-          if (!phone) return null;
-          return { phone, name, customVars: {} };
-        })
-        .filter(Boolean) as any[];
+      recipients = parseRecipientLines(campRecipientsRaw);
     }
 
     if (recipients.length === 0) {
@@ -2719,7 +2809,7 @@ export default function App() {
             >
               <Eye size={18} />
             </button>
-            <button className="btn-icon" onClick={toggleTheme} aria-label="Toggle Theme">
+            <button className="btn-icon" onClick={toggleTheme} data-action="toggle-theme" aria-label="Toggle Theme">
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
           </div>
@@ -2777,6 +2867,7 @@ export default function App() {
                   if (isMobile) setIsMobileOpen(false);
                 }}
                 className={`nav-item ${isActive ? 'active' : ''}`}
+                data-tab={item.id}
                 title={isCollapsed ? item.label : undefined}
               >
                 <Icon size={19} className="flex-shrink-0" />
@@ -4161,29 +4252,85 @@ export default function App() {
             </header>
 
             {/* Pipeline Stage Funnel Filter Tabs */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            <div className="flex items-center gap-2 overflow-x-auto py-1 px-0.5 scrollbar-none">
               {[
-                { id: 'ALL', label: lang === 'id' ? 'Semua Prospek' : 'All Leads', count: contacts.length, color: 'border-slate-300 text-slate-700 dark:text-slate-200' },
-                { id: 'lead', label: `🔵 ${t.crm.lead}`, count: contacts.filter(c => !c.pipeline_stage || c.pipeline_stage === 'lead').length, color: 'border-sky-300 text-sky-700 bg-sky-50 dark:bg-sky-950/40 dark:text-sky-300' },
-                { id: 'prospect', label: `🟡 ${t.crm.prospect}`, count: contacts.filter(c => c.pipeline_stage === 'prospect').length, color: 'border-amber-300 text-amber-700 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-300' },
-                { id: 'customer', label: `💰 ${t.crm.customer}`, count: contacts.filter(c => c.pipeline_stage === 'customer').length, color: 'border-emerald-300 text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-300' },
-                { id: 'churned', label: `❌ ${t.crm.churned}`, count: contacts.filter(c => c.pipeline_stage === 'churned').length, color: 'border-rose-300 text-rose-700 bg-rose-50 dark:bg-rose-950/40 dark:text-rose-300' }
-              ].map(s => (
-                <button
-                  key={s.id}
-                  onClick={() => setCrmStageFilter(s.id as any)}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-2 flex-shrink-0 ${
-                    crmStageFilter === s.id
-                      ? 'ring-2 ring-emerald-500 shadow-sm font-extrabold ' + s.color
-                      : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50'
-                  }`}
-                >
-                  <span>{s.label}</span>
-                  <span className="bg-slate-200/70 dark:bg-slate-700 text-slate-800 dark:text-slate-200 px-1.5 py-0.5 rounded text-[10px]">
-                    {s.count}
-                  </span>
-                </button>
-              ))}
+                {
+                  id: 'ALL',
+                  label: lang === 'id' ? 'Semua Prospek' : 'All Leads',
+                  count: contacts.length,
+                  icon: Users,
+                  activeClass: 'bg-slate-900 text-white border-slate-900 shadow-sm dark:bg-slate-100 dark:text-slate-900 dark:border-slate-100',
+                  activeBadge: 'bg-slate-800 text-slate-100 dark:bg-slate-200 dark:text-slate-900',
+                  iconClass: (isActive: boolean) => isActive ? 'text-white dark:text-slate-900' : 'text-slate-400 group-hover:text-slate-600 dark:text-slate-400',
+                  hoverClass: 'hover:bg-slate-50 hover:border-slate-300 dark:hover:bg-slate-700/50'
+                },
+                {
+                  id: 'lead',
+                  label: t.crm.lead,
+                  count: contacts.filter(c => !c.pipeline_stage || c.pipeline_stage === 'lead').length,
+                  icon: UserPlus,
+                  activeClass: 'bg-[#e0f2fe] text-[#0369a1] border-sky-300 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800 shadow-sm',
+                  activeBadge: 'bg-sky-200/90 text-[#0369a1] dark:bg-sky-900/80 dark:text-sky-200',
+                  iconClass: (isActive: boolean) => isActive ? 'text-[#0369a1] dark:text-sky-300' : 'text-sky-500 dark:text-sky-400',
+                  hoverClass: 'hover:bg-sky-50/50 hover:border-sky-300 dark:hover:bg-slate-700/50'
+                },
+                {
+                  id: 'prospect',
+                  label: t.crm.prospect,
+                  count: contacts.filter(c => c.pipeline_stage === 'prospect').length,
+                  icon: Target,
+                  activeClass: 'bg-[#fef9c3] text-[#854d0e] border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800 shadow-sm',
+                  activeBadge: 'bg-amber-200/90 text-[#854d0e] dark:bg-amber-900/80 dark:text-amber-200',
+                  iconClass: (isActive: boolean) => isActive ? 'text-[#854d0e] dark:text-amber-300' : 'text-amber-500 dark:text-amber-400',
+                  hoverClass: 'hover:bg-amber-50/50 hover:border-amber-300 dark:hover:bg-slate-700/50'
+                },
+                {
+                  id: 'customer',
+                  label: t.crm.customer,
+                  count: contacts.filter(c => c.pipeline_stage === 'customer').length,
+                  icon: CheckCircle2,
+                  activeClass: 'bg-[#dcfce7] text-[#15803d] border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800 shadow-sm',
+                  activeBadge: 'bg-emerald-200/90 text-[#15803d] dark:bg-emerald-900/80 dark:text-emerald-200',
+                  iconClass: (isActive: boolean) => isActive ? 'text-[#15803d] dark:text-emerald-300' : 'text-emerald-500 dark:text-emerald-400',
+                  hoverClass: 'hover:bg-emerald-50/50 hover:border-emerald-300 dark:hover:bg-slate-700/50'
+                },
+                {
+                  id: 'churned',
+                  label: t.crm.churned,
+                  count: contacts.filter(c => c.pipeline_stage === 'churned').length,
+                  icon: XCircle,
+                  activeClass: 'bg-[#fee2e2] text-[#b91c1c] border-rose-300 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800 shadow-sm',
+                  activeBadge: 'bg-rose-200/90 text-[#b91c1c] dark:bg-rose-900/80 dark:text-rose-200',
+                  iconClass: (isActive: boolean) => isActive ? 'text-[#b91c1c] dark:text-rose-300' : 'text-rose-500 dark:text-rose-400',
+                  hoverClass: 'hover:bg-rose-50/50 hover:border-rose-300 dark:hover:bg-slate-700/50'
+                }
+              ].map(s => {
+                const isActive = crmStageFilter === s.id;
+                const IconComponent = s.icon;
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => setCrmStageFilter(s.id as any)}
+                    className={`group px-3.5 py-1.5 rounded-lg text-xs font-semibold border transition-all duration-150 flex items-center gap-2 flex-shrink-0 cursor-pointer select-none ${
+                      isActive
+                        ? `${s.activeClass} font-bold`
+                        : `bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 ${s.hoverClass}`
+                    }`}
+                  >
+                    <IconComponent size={14} className={`stroke-[2.2] transition-colors ${s.iconClass(isActive)}`} />
+                    <span>{s.label}</span>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[11px] font-bold min-w-[20px] text-center leading-none transition-colors ${
+                        isActive
+                          ? s.activeBadge
+                          : 'bg-slate-100 dark:bg-slate-700/70 text-slate-600 dark:text-slate-300 font-semibold'
+                      }`}
+                    >
+                      {s.count}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
 
             {/* 2-Column Responsive Layout */}
@@ -4192,23 +4339,52 @@ export default function App() {
               <div className="lg:col-span-7 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
-                    <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
-                      {lang === 'id' ? 'Pipeline Kontak Pelanggan' : 'Customer Pipeline Contacts'}
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                        {lang === 'id' ? 'Pipeline Kontak Pelanggan' : 'Customer Pipeline Contacts'}
+                      </h3>
+                      <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 dark:bg-slate-700/60 px-2 py-0.5 rounded-full">
+                        {contacts.filter(c => {
+                          const stage = c.pipeline_stage || 'lead';
+                          if (crmStageFilter !== 'ALL' && stage !== crmStageFilter) return false;
+                          if (selectedTagFilter !== 'ALL' && !c.tags.includes(selectedTagFilter)) return false;
+                          if (crmSearchQuery.trim()) {
+                            const q = crmSearchQuery.trim().toLowerCase();
+                            const matchPhone = c.phone.toLowerCase().includes(q);
+                            const matchName = (c.name || c.push_name || '').toLowerCase().includes(q);
+                            const matchNotes = (c.notes || '').toLowerCase().includes(q);
+                            const matchTags = c.tags.some(t => t.toLowerCase().includes(q));
+                            if (!matchPhone && !matchName && !matchNotes && !matchTags) return false;
+                          }
+                          return true;
+                        }).length} / {contacts.length}
+                      </span>
+                    </div>
                     <p className="text-xs text-slate-500">
                       {lang === 'id' ? 'Klik status stage atau tag untuk memperbarui klasifikasi prospek' : 'Click stage status or tags to update customer classification'}
                     </p>
                   </div>
 
-                  <div className="relative w-full sm:w-64">
-                    <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder={lang === 'id' ? 'Cari nama atau nomor HP...' : 'Search name or phone...'}
-                      value={crmSearchQuery}
-                      onChange={e => setCrmSearchQuery(e.target.value)}
-                      className="w-full text-xs pl-8 pr-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 focus:outline-none focus:border-emerald-500"
-                    />
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <div className="relative flex-1 sm:w-56">
+                      <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder={lang === 'id' ? 'Cari nama, HP, tag, catatan...' : 'Search name, phone, tag, notes...'}
+                        value={crmSearchQuery}
+                        onChange={e => setCrmSearchQuery(e.target.value)}
+                        className="w-full text-xs pl-8 pr-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+
+                    <button
+                      onClick={() => setIsAddContactModal(true)}
+                      className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1.5 flex-shrink-0"
+                      title={lang === 'id' ? 'Tambah Kontak / Prospek Baru' : 'Add New Contact / Lead'}
+                    >
+                      <Plus size={14} />
+                      <span>{lang === 'id' ? 'Tambah Kontak' : 'Add Contact'}</span>
+                    </button>
                   </div>
                 </div>
 
@@ -4228,6 +4404,18 @@ export default function App() {
                       {t}
                     </button>
                   ))}
+                  {(selectedTagFilter !== 'ALL' || crmStageFilter !== 'ALL' || crmSearchQuery) && (
+                    <button
+                      onClick={() => {
+                        setCrmStageFilter('ALL');
+                        setSelectedTagFilter('ALL');
+                        setCrmSearchQuery('');
+                      }}
+                      className="text-[10px] text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 underline ml-1 cursor-pointer"
+                    >
+                      {lang === 'id' ? 'Reset Semua Filter' : 'Reset All'}
+                    </button>
+                  )}
                 </div>
 
                 {/* Contacts List Table */}
@@ -4248,11 +4436,13 @@ export default function App() {
                           const stage = c.pipeline_stage || 'lead';
                           if (crmStageFilter !== 'ALL' && stage !== crmStageFilter) return false;
                           if (selectedTagFilter !== 'ALL' && !c.tags.includes(selectedTagFilter)) return false;
-                          if (crmSearchQuery) {
-                            const q = crmSearchQuery.toLowerCase();
-                            const matchPhone = c.phone.includes(q);
+                          if (crmSearchQuery.trim()) {
+                            const q = crmSearchQuery.trim().toLowerCase();
+                            const matchPhone = c.phone.toLowerCase().includes(q);
                             const matchName = (c.name || c.push_name || '').toLowerCase().includes(q);
-                            if (!matchPhone && !matchName) return false;
+                            const matchNotes = (c.notes || '').toLowerCase().includes(q);
+                            const matchTags = c.tags.some(t => t.toLowerCase().includes(q));
+                            if (!matchPhone && !matchName && !matchNotes && !matchTags) return false;
                           }
                           return true;
                         })
@@ -4380,15 +4570,71 @@ export default function App() {
                                   >
                                     <MessageSquare size={14} />
                                   </button>
+
+                                  {/* Delete Contact Button */}
+                                  <button
+                                    onClick={() => handleDeleteContact(c.phone)}
+                                    className="btn-icon p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded transition-colors"
+                                    title={lang === 'id' ? 'Hapus kontak dari database' : 'Delete contact from database'}
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
                                 </div>
                               </td>
                             </tr>
                           );
                         })}
-                      {contacts.length === 0 && (
+                      {contacts.filter(c => {
+                        const stage = c.pipeline_stage || 'lead';
+                        if (crmStageFilter !== 'ALL' && stage !== crmStageFilter) return false;
+                        if (selectedTagFilter !== 'ALL' && !c.tags.includes(selectedTagFilter)) return false;
+                        if (crmSearchQuery.trim()) {
+                          const q = crmSearchQuery.trim().toLowerCase();
+                          const matchPhone = c.phone.toLowerCase().includes(q);
+                          const matchName = (c.name || c.push_name || '').toLowerCase().includes(q);
+                          const matchNotes = (c.notes || '').toLowerCase().includes(q);
+                          const matchTags = c.tags.some(t => t.toLowerCase().includes(q));
+                          if (!matchPhone && !matchName && !matchNotes && !matchTags) return false;
+                        }
+                        return true;
+                      }).length === 0 && (
                         <tr>
-                          <td colSpan={5} className="py-8 text-center text-slate-400">
-                            {lang === 'id' ? 'Belum ada kontak di database sesi ini. Buka WhatsApp Web atau sinkronkan kontak terlebih dahulu.' : 'No contacts in database for this session. Sync contacts or link WhatsApp first.'}
+                          <td colSpan={5} className="py-12 text-center text-slate-400">
+                            {contacts.length === 0 ? (
+                              <div className="flex flex-col items-center gap-2">
+                                <Users size={32} className="text-slate-300 dark:text-slate-600" />
+                                <p className="text-xs font-medium">
+                                  {lang === 'id' ? 'Belum ada kontak di database sesi ini.' : 'No contacts in database for this session.'}
+                                </p>
+                                <button
+                                  onClick={() => setIsAddContactModal(true)}
+                                  className="btn-primary text-xs py-1 px-3 mt-1 flex items-center gap-1"
+                                >
+                                  <Plus size={13} />
+                                  <span>{lang === 'id' ? 'Tambah Kontak Pertama' : 'Add First Contact'}</span>
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center gap-2">
+                                <Search size={28} className="text-slate-300 dark:text-slate-600" />
+                                <p className="text-xs font-medium">
+                                  {lang === 'id'
+                                    ? 'Tidak ada kontak yang cocok dengan filter aktif.'
+                                    : 'No contacts match the active filter criteria.'}
+                                </p>
+                                <button
+                                  onClick={() => {
+                                    setCrmStageFilter('ALL');
+                                    setSelectedTagFilter('ALL');
+                                    setCrmSearchQuery('');
+                                  }}
+                                  className="btn-secondary text-xs py-1 px-3 mt-1 flex items-center gap-1"
+                                >
+                                  <RefreshCw size={12} />
+                                  <span>{lang === 'id' ? 'Reset Semua Filter' : 'Reset All Filters'}</span>
+                                </button>
+                              </div>
+                            )}
                           </td>
                         </tr>
                       )}
@@ -5112,6 +5358,17 @@ export default function App() {
                         </span>
                         <span>{t.campaigns.failed}: {c.failed_count}</span>
                       </div>
+                      {(c as any).last_message && (
+                        <p
+                          className={`text-[11px] mb-1.5 px-2.5 py-1 rounded-md border ${
+                            c.status === 'PAUSED'
+                              ? 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'
+                              : 'bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-900/40 dark:text-slate-300 dark:border-slate-700'
+                          }`}
+                        >
+                          {c.status === 'PAUSED' ? '⏸ ' : 'ℹ️ '}{c.last_message}
+                        </p>
+                      )}
                       <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                         <div
                           className="bg-emerald-500 h-full rounded-full transition-all duration-300"

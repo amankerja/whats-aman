@@ -123,6 +123,13 @@ export class AutomationService {
     // Avoid replying to self to prevent infinite loops
     if (message.fromMe) return;
 
+    // CRITICAL BUG FIX: never auto-reply to old messages restored from history sync.
+    // Previously the bot responded to days-old chats right after connecting, which risks bans.
+    if (message.isHistorical) {
+      logger.debug({ sessionId, msgId: message.id }, 'Skipping automation for historical (history-sync) message');
+      return;
+    }
+
     const isGroup = message.chatJid.endsWith('@g.us');
     const senderPhone = (message.senderJid || message.chatJid).replace(/[^0-9]/g, '');
 
@@ -191,6 +198,14 @@ export class AutomationService {
         if (timestamp < oneDayAgo) {
           this.contactCooldowns.delete(key);
         }
+      }
+    }
+
+    // Prune duplicate-suppression cache (bug fix: unbounded growth / memory leak)
+    if (this.lastRepliedTextByChat.size > 2000) {
+      const keysToDelete = Array.from(this.lastRepliedTextByChat.keys()).slice(0, this.lastRepliedTextByChat.size - 1000);
+      for (const key of keysToDelete) {
+        this.lastRepliedTextByChat.delete(key);
       }
     }
 

@@ -137,22 +137,25 @@ export class BaileysAdapter implements IWhatsAppEngine {
       // Save credentials whenever updated
       this.socket.ev.on('creds.update', saveCreds);
 
-      // Handle WhatsApp Phonebook Contact Sync
+      // Handle WhatsApp Phonebook Contact Sync (bug fix: listener was registered twice,
+      // causing double upserts with divergent JID formats racing each other)
       this.socket.ev.on('contacts.upsert', (newContacts) => {
         for (const c of newContacts) {
           if (!c.id) continue;
+          let phone: string | undefined = undefined;
           if (c.id.endsWith('@s.whatsapp.net') || c.id.endsWith('@c.us')) {
-            const phone = c.id.split('@')[0];
-            const name = c.name || c.notify || c.verifiedName;
-            if (/^\d{7,16}$/.test(phone)) {
-              contactRepository.upsert({
-                sessionId: this.sessionId,
-                jid: c.id,
-                phone,
-                name: name || undefined,
-                pushName: c.notify || undefined
-              });
-            }
+            phone = c.id.split('@')[0].split(':')[0];
+          } else if (c.id.endsWith('@lid')) {
+            phone = this.resolveLidToPhone(c.id);
+          }
+          if (phone && /^\d{7,16}$/.test(phone)) {
+            contactRepository.upsert({
+              sessionId: this.sessionId,
+              jid: `${phone}@s.whatsapp.net`,
+              phone,
+              name: c.name || c.notify || c.verifiedName || undefined,
+              pushName: c.notify || undefined
+            });
           }
         }
       });
@@ -160,18 +163,20 @@ export class BaileysAdapter implements IWhatsAppEngine {
       this.socket.ev.on('contacts.update', (updatedContacts) => {
         for (const c of updatedContacts) {
           if (!c.id) continue;
+          let phone: string | undefined = undefined;
           if (c.id.endsWith('@s.whatsapp.net') || c.id.endsWith('@c.us')) {
-            const phone = c.id.split('@')[0];
-            const name = c.name || c.notify || c.verifiedName;
-            if (/^\d{7,16}$/.test(phone)) {
-              contactRepository.upsert({
-                sessionId: this.sessionId,
-                jid: c.id,
-                phone,
-                name: name || undefined,
-                pushName: c.notify || undefined
-              });
-            }
+            phone = c.id.split('@')[0].split(':')[0];
+          } else if (c.id.endsWith('@lid')) {
+            phone = this.resolveLidToPhone(c.id);
+          }
+          if (phone && /^\d{7,16}$/.test(phone)) {
+            contactRepository.upsert({
+              sessionId: this.sessionId,
+              jid: `${phone}@s.whatsapp.net`,
+              phone,
+              name: c.name || c.notify || c.verifiedName || undefined,
+              pushName: c.notify || undefined
+            });
           }
         }
       });
@@ -265,27 +270,8 @@ export class BaileysAdapter implements IWhatsAppEngine {
         }
       });
 
-      // Sync contacts received from WhatsApp
-      this.socket.ev.on('contacts.upsert', (contacts) => {
-        for (const contact of contacts) {
-          if (!contact.id) continue;
-          let phone: string | undefined = undefined;
-          if (contact.id.endsWith('@s.whatsapp.net') || contact.id.endsWith('@c.us')) {
-            phone = contact.id.split('@')[0];
-          } else if (contact.id.endsWith('@lid')) {
-            phone = this.resolveLidToPhone(contact.id);
-          }
-          if (phone && /^\d{7,16}$/.test(phone)) {
-            contactRepository.upsert({
-              sessionId: this.sessionId,
-              jid: `${phone}@s.whatsapp.net`,
-              name: contact.name || contact.notify || undefined,
-              pushName: contact.notify || undefined,
-              phone
-            });
-          }
-        }
-      });
+      // Sync contacts received from WhatsApp - REMOVED: duplicate 'contacts.upsert' listener
+      // (bug fix: was registered a second time below, causing double upserts per contact)
 
       // Handle Incoming Messages & Sync History
       this.socket.ev.on('messaging-history.set', async (history) => {
@@ -295,9 +281,9 @@ export class BaileysAdapter implements IWhatsAppEngine {
             try {
               if (!msg.message) continue;
               const normalized = await this.normalizeMessage(msg);
-              if (normalized) {
-                eventBus.emit('message.received', { sessionId: this.sessionId, message: normalized });
-              }
+              // Mark as historical so downstream automation does NOT auto-reply to old messages
+              normalized.isHistorical = true;
+              eventBus.emit('message.received', { sessionId: this.sessionId, message: normalized });
             } catch (err) {
               logger.warn({ sessionId: this.sessionId, msgId: msg.key?.id, err }, 'Failed to normalize history message');
             }
@@ -415,12 +401,25 @@ export class BaileysAdapter implements IWhatsAppEngine {
     const jid = this.formatJid(to);
     let sent: any;
     try {
+      // Quoted reply support (bug fix: quotedMessageId was accepted but never used)
+      let quoted: any;
+      if (options?.quotedMessageId) {
+        try {
+          const store = (this.socket as any).store;
+          const found = store ? await store.loadMessage(jid, options.quotedMessageId) : null;
+          if (found) quoted = found;
+        } catch {
+          // store unavailable or message not found; send without quote
+        }
+      }
+
       sent = await this.socket.sendMessage(
         jid,
         {
           text,
           mentions: options?.mentions
-        }
+        },
+        quoted ? { quoted } : undefined
       );
     } catch (err: any) {
       logger.error({ sessionId: this.sessionId, jid, err: err?.message || String(err) }, 'Failed to send text message via WhatsApp socket');
@@ -451,16 +450,24 @@ export class BaileysAdapter implements IWhatsAppEngine {
     let buffer: Buffer;
     if (typeof mediaPathOrBuffer === 'string') {
       if (mediaPathOrBuffer.startsWith('http://') || mediaPathOrBuffer.startsWith('https://')) {
-        const res = await fetch(mediaPathOrBuffer);
-        if (!res.ok) {
-          throw new EngineError(`Failed to fetch media from URL: ${res.statusText}`);
+        // Timeout guard: prevents campaign loop from hanging forever on slow URLs
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000);
+        try {
+          const res = await fetch(mediaPathOrBuffer, { signal: controller.signal });
+          if (!res.ok) {
+            throw new EngineError(`Failed to fetch media from URL: ${res.statusText}`);
+          }
+          buffer = Buffer.from(await res.arrayBuffer());
+        } finally {
+          clearTimeout(timeoutId);
         }
-        buffer = Buffer.from(await res.arrayBuffer());
       } else {
         if (!fs.existsSync(mediaPathOrBuffer)) {
           throw new NotFoundError(`Media file not found at: ${mediaPathOrBuffer}`);
         }
-        buffer = fs.readFileSync(mediaPathOrBuffer);
+        // Async read (bug fix: sync read blocked the entire server during campaign media sends)
+        buffer = await fs.promises.readFile(mediaPathOrBuffer);
       }
     } else {
       buffer = mediaPathOrBuffer;
@@ -515,7 +522,7 @@ export class BaileysAdapter implements IWhatsAppEngine {
     const filePath = path.join(config.storage.mediaDir, mediaFileName);
     try {
       if (!fs.existsSync(filePath)) {
-        fs.writeFileSync(filePath, buffer);
+        await fs.promises.writeFile(filePath, buffer);
       }
     } catch {
       // ignore

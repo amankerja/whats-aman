@@ -5,6 +5,7 @@ import { BaileysAdapter } from './baileys.adapter';
 import { config } from '../../config';
 import { logger } from '../../utils/logger';
 import { NotFoundError, ConflictError } from '../../utils/errors';
+import { sessionRepository } from '../database/repositories/session.repository';
 
 export class SessionManager {
   private sessions: Map<string, IWhatsAppEngine> = new Map();
@@ -15,14 +16,15 @@ export class SessionManager {
 
     if (!fs.existsSync(sessionsDir)) {
       fs.mkdirSync(sessionsDir, { recursive: true });
-      return;
     }
 
-    const dirs = fs.readdirSync(sessionsDir, { withFileTypes: true });
+    const dirs = fs.existsSync(sessionsDir) ? fs.readdirSync(sessionsDir, { withFileTypes: true }) : [];
+    const discoveredIds = new Set<string>();
 
     for (const entry of dirs) {
       if (entry.isDirectory()) {
         const sessionId = entry.name;
+        discoveredIds.add(sessionId);
         try {
           const adapter = new BaileysAdapter(sessionId);
           this.sessions.set(sessionId, adapter);
@@ -41,6 +43,26 @@ export class SessionManager {
           logger.error({ sessionId, err }, 'Failed to initialize session directory');
         }
       }
+    }
+
+    // BUG FIX: restore sessions that exist in the database but have no auth folder
+    // (e.g. after logout or credential cleanup). Previously they silently disappeared
+    // from GET /api/v1/sessions because that endpoint reads the in-memory map only.
+    try {
+      const dbSessions = sessionRepository.findAll();
+      for (const rec of dbSessions) {
+        if (discoveredIds.has(rec.id) || this.sessions.has(rec.id)) continue;
+        // Skip the internal default seed row if it has never been a real session
+        try {
+          const adapter = new BaileysAdapter(rec.id, rec.name);
+          this.sessions.set(rec.id, adapter);
+          logger.info({ sessionId: rec.id }, 'Restored session record from database (no auth files)');
+        } catch (err) {
+          logger.warn({ sessionId: rec.id, err }, 'Failed to restore session from database');
+        }
+      }
+    } catch (err) {
+      logger.warn({ err }, 'Failed to read session records for restore');
     }
 
     logger.info(`Loaded ${this.sessions.size} session(s) from storage`);

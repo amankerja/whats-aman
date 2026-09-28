@@ -116,24 +116,31 @@ export class GroupService {
 
   public async importGroupMembersToContacts(sessionId: string, groupJid: string): Promise<{ count: number; groupName: string }> {
     const group = await this.getGroupMetadata(sessionId, groupJid);
+    const db = getDatabase();
     let count = 0;
-    for (const p of group.participants) {
-      if (!p.phone || p.phone.length < 7) continue;
-      let cleanPhone = p.phone.replace(/[^0-9]/g, '');
-      if (cleanPhone.startsWith('0')) {
-        cleanPhone = '62' + cleanPhone.substring(1);
-      } else if (cleanPhone.startsWith('8')) {
-        cleanPhone = '62' + cleanPhone;
+
+    // Perf fix: wrap all upserts in a single transaction (was N separate writes + N fsyncs)
+    const tx = db.transaction(() => {
+      for (const p of group.participants) {
+        if (!p.phone || p.phone.length < 7) continue;
+        let cleanPhone = p.phone.replace(/[^0-9]/g, '');
+        if (cleanPhone.startsWith('0')) {
+          cleanPhone = '62' + cleanPhone.substring(1);
+        } else if (cleanPhone.startsWith('8')) {
+          cleanPhone = '62' + cleanPhone;
+        }
+        contactRepository.upsert({
+          sessionId,
+          jid: `${cleanPhone}@s.whatsapp.net`,
+          phone: cleanPhone,
+          name: `Member ${group.name}`,
+          tags: ['Grup', group.name]
+        });
+        count++;
       }
-      contactRepository.upsert({
-        sessionId,
-        jid: `${cleanPhone}@s.whatsapp.net`,
-        phone: cleanPhone,
-        name: `Member ${group.name}`,
-        tags: ['Grup', group.name]
-      });
-      count++;
-    }
+    });
+    tx();
+
     logger.info({ sessionId, groupJid, count }, 'Imported group members to contacts');
     return { count, groupName: group.name };
   }
