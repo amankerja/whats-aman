@@ -340,7 +340,7 @@ const IntegrationsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
     <header className="page-header">
       <div className="page-header__title-group">
         <div className="flex items-center gap-2">
-          <Webhook className="text-blue-600" size={24} />
+          <Webhook className="text-emerald-700" size={24} />
           <h1>{t.integrations.title}</h1>
         </div>
         <span className="status-badge connected">{lang === 'id' ? 'API Ingestion Siap' : 'API Ingestion Ready'}</span>
@@ -364,7 +364,7 @@ const IntegrationsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
           type="button"
           onClick={() => setIsTestIntegrationModal(true)}
           className="btn-secondary"
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', borderColor: '#93c5fd', color: '#1d4ed8' }}
+          style={{ display: 'flex', alignItems: 'center', gap: '6px', borderColor: '#a7f3d0', color: '#059669' }}
         >
           <Send size={15} />
           <span>{t.integrations.testTrigger}</span>
@@ -390,7 +390,7 @@ const IntegrationsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
         <Code2 className="stat-watermark" />
         <div className="stat-header">
           <span className="stat-label">Google Apps Script</span>
-          <Code2 size={18} className="stat-icon text-blue-600" />
+          <Code2 size={18} className="stat-icon text-emerald-700" />
         </div>
         <div className="stat-value text-lg text-emerald-600 font-bold">{lang === 'id' ? 'Siap Digunakan' : 'Ready to Ingest'}</div>
         <div className="stat-detail">{lang === 'id' ? 'Trigger Google Forms & Sheets' : 'Trigger Google Forms & Sheets'}</div>
@@ -435,7 +435,7 @@ const IntegrationsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
           onClick={() => setSelectedIntegrationTab('google_form')}
           className={`py-3 px-5 border-b-2 flex items-center gap-2 transition ${
             selectedIntegrationTab === 'google_form'
-              ? 'border-blue-600 text-blue-600 bg-white font-bold'
+              ? 'border-emerald-600 text-emerald-700 bg-white font-bold'
               : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
@@ -447,7 +447,7 @@ const IntegrationsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
           onClick={() => setSelectedIntegrationTab('woocommerce')}
           className={`py-3 px-5 border-b-2 flex items-center gap-2 transition ${
             selectedIntegrationTab === 'woocommerce'
-              ? 'border-blue-600 text-blue-600 bg-white font-bold'
+              ? 'border-emerald-600 text-emerald-700 bg-white font-bold'
               : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
@@ -458,7 +458,7 @@ const IntegrationsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
           onClick={() => setSelectedIntegrationTab('cf7')}
           className={`py-3 px-5 border-b-2 flex items-center gap-2 transition ${
             selectedIntegrationTab === 'cf7'
-              ? 'border-blue-600 text-blue-600 bg-white font-bold'
+              ? 'border-emerald-600 text-emerald-700 bg-white font-bold'
               : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
@@ -469,7 +469,7 @@ const IntegrationsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
           onClick={() => setSelectedIntegrationTab('elementor')}
           className={`py-3 px-5 border-b-2 flex items-center gap-2 transition ${
             selectedIntegrationTab === 'elementor'
-              ? 'border-blue-600 text-blue-600 bg-white font-bold'
+              ? 'border-emerald-600 text-emerald-700 bg-white font-bold'
               : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
@@ -480,7 +480,7 @@ const IntegrationsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
           onClick={() => setSelectedIntegrationTab('outgoing')}
           className={`py-3 px-5 border-b-2 flex items-center gap-2 transition ${
             selectedIntegrationTab === 'outgoing'
-              ? 'border-blue-600 text-blue-600 bg-white font-bold'
+              ? 'border-emerald-600 text-emerald-700 bg-white font-bold'
               : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
@@ -492,7 +492,7 @@ const IntegrationsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
           onClick={() => setSelectedIntegrationTab('logs')}
           className={`py-3 px-5 border-b-2 flex items-center gap-2 transition ${
             selectedIntegrationTab === 'logs'
-              ? 'border-blue-600 text-blue-600 bg-white font-bold'
+              ? 'border-emerald-600 text-emerald-700 bg-white font-bold'
               : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
@@ -709,7 +709,7 @@ function onFormSubmit(e) {
 }`}</pre>
                   </div>
 
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-900 space-y-1.5">
+                  <div className="bg-emerald-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-900 space-y-1.5">
                     <span className="font-bold block">{t.integrations.appsScriptGuideTitle}:</span>
                     <ol className="list-decimal pl-4 space-y-1 text-slate-700">
                       <li>{t.integrations.step1}</li>
@@ -775,7 +775,7 @@ function onFormSubmit(e) {
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-3">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2">
-                <span className="bg-blue-600 text-white text-[11px] font-bold px-2 py-0.5 rounded font-mono">POST</span>
+                <span className="bg-emerald-600 text-white text-[11px] font-bold px-2 py-0.5 rounded font-mono">POST</span>
                 <h3 className="font-bold text-slate-900 text-sm">{lang === 'id' ? 'URL Webhook Contact Form 7 (WordPress)' : 'Contact Form 7 Webhook URL (WordPress)'}</h3>
               </div>
               <span className="text-xs text-slate-500 font-medium">{t.sessions.title}: <strong>{selectedSessionId || 'default'}</strong></span>
@@ -969,7 +969,7 @@ function onFormSubmit(e) {
                         {new Date(log.createdAt).toLocaleString(lang === 'id' ? 'id-ID' : 'en-US')}
                       </td>
                       <td className="py-2.5 px-4">
-                        <span className="bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase">
+                        <span className="bg-emerald-50 text-blue-700 border border-blue-200 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase">
                           {log.provider}
                         </span>
                       </td>
@@ -1004,7 +1004,7 @@ function onFormSubmit(e) {
         <div className="modal-card max-w-md w-full p-6 space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
-              <Send size={18} className="text-blue-600" />
+              <Send size={18} className="text-emerald-700" />
               <span>{t.integrations.testModalTitle}</span>
             </h3>
             <button type="button" onClick={() => setIsTestIntegrationModal(false)} className="btn-icon">
@@ -1081,7 +1081,7 @@ function onFormSubmit(e) {
         <div className="modal-card max-w-md w-full p-6 space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
-              <Share2 size={18} className="text-blue-600" />
+              <Share2 size={18} className="text-emerald-700" />
               <span>{t.integrations.addOutgoing}</span>
             </h3>
             <button type="button" onClick={() => setIsAddOutgoingWebhookModal(false)} className="btn-icon">

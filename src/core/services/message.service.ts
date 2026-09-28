@@ -365,7 +365,7 @@ export class MessageService {
           last_message: 'Mulai percakapan',
           last_from_me: 0,
           last_status: 'READ',
-          timestamp: c.updated_at || c.created_at || 0,
+          timestamp: 0,
           name: c.name || c.push_name || undefined,
           push_name: c.push_name || undefined,
           unread_count: 0,
@@ -374,8 +374,21 @@ export class MessageService {
       }
     }
 
+    const toMs = (ts: any): number => {
+      if (!ts) return 0;
+      const num = typeof ts === 'number' ? ts : Number(ts);
+      if (isNaN(num)) return 0;
+      return num < 1e11 ? num * 1000 : num;
+    };
+
     return Array.from(canonicalMap.values())
-      .sort((a, b) => b.timestamp - a.timestamp)
+      .sort((a, b) => {
+        const diff = toMs(b.timestamp) - toMs(a.timestamp);
+        if (diff !== 0) return diff;
+        const nameA = a.name || a.push_name || a.chat_jid || '';
+        const nameB = b.name || b.push_name || b.chat_jid || '';
+        return nameA.localeCompare(nameB);
+      })
       .slice(0, limit);
   }
 }

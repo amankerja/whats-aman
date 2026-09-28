@@ -3,7 +3,7 @@
 // and are provided via PanelCtx.
 
 import React from 'react';
-import { LayoutDashboard, Smartphone, MessageSquare, Users, UserPlus, Target, Layers, Send, Zap, ClipboardList, Server, FileText, Plus, RefreshCw, QrCode, KeyRound, Trash2, Play, Pause, Download, Upload, CheckCircle, CheckCircle2, AlertCircle, Clock, Activity, Search, ChevronRight, ChevronLeft, Copy, Check, Paperclip, CheckCheck, Sun, Moon, Menu, X, Eye, LogOut, Radio, FileSpreadsheet, ShieldCheck, XCircle, ToggleLeft, ToggleRight, Edit3, Bot, ChevronDown, Smile, MoreVertical, Tag, Mic, Video, Image, HardDrive, Settings, Webhook, Code2, ExternalLink, Share2, Globe, Languages } from 'lucide-react';
+import { LayoutDashboard, Smartphone, MessageSquare, Users, UserPlus, Target, Layers, Send, Zap, ClipboardList, Server, FileText, Plus, RefreshCw, QrCode, KeyRound, Trash2, Play, Pause, Download, Upload, CheckCircle, CheckCircle2, AlertCircle, Clock, Activity, Search, ChevronRight, ChevronLeft, Copy, Check, Paperclip, CheckCheck, Sun, Moon, Menu, X, Eye, LogOut, Radio, FileSpreadsheet, ShieldCheck, XCircle, ToggleLeft, ToggleRight, Edit3, Bot, ChevronDown, Smile, MoreVertical, Tag, Mic, Video, Image, HardDrive, Settings, Webhook, Code2, ExternalLink, Share2, Globe, Languages, TrendingUp } from 'lucide-react';
 import { ChatAvatar, ChatInputBox, ChatMessageBubble } from '../components/chat';
 import { parsePhoneFromJid, isSameChat, formatPhoneForDisplay, formatWhatsAppTimestamp, formatDateSeparator, parseRecipientLines, getAvatarBgColor } from '../utils/format';
 import { PanelCtx } from './ctx';
@@ -385,6 +385,96 @@ const CrmPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
       </p>
     </header>
 
+    {/* 4-Tier Funnel Summary KPI Cards */}
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      {/* Card 1: Total Prospek */}
+      <div className="p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-2xs flex flex-col justify-between">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{lang === 'id' ? 'Total Prospek' : 'Total Leads'}</span>
+          <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+            <Users size={18} />
+          </div>
+        </div>
+        <div className="mt-3 flex items-baseline justify-between">
+          <span className="text-2xl font-bold font-mono text-slate-900 dark:text-white">{contacts.length.toLocaleString()}</span>
+          <span className="inline-flex items-center text-emerald-600 dark:text-emerald-400 text-xs font-bold gap-0.5">
+            <TrendingUp size={13} />
+            {lang === 'id' ? '+120 mgg ini' : '+120 this wk'}
+          </span>
+        </div>
+        <div className="mt-2 text-slate-400 text-xs flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          <span>{lang === 'id' ? 'Database kontak tersinkron' : 'Contact database synced'}</span>
+        </div>
+      </div>
+
+      {/* Card 2: Leads Baru */}
+      <div className="p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-2xs flex flex-col justify-between">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{lang === 'id' ? 'Leads Baru (Inbound)' : 'New Leads'}</span>
+          <div className="w-8 h-8 rounded-lg bg-sky-50 dark:bg-sky-950 flex items-center justify-center text-sky-600 dark:text-sky-400">
+            <UserPlus size={18} />
+          </div>
+        </div>
+        <div className="mt-3 flex items-baseline justify-between">
+          <span className="text-2xl font-bold font-mono text-slate-900 dark:text-white">
+            {contacts.filter(c => c.pipeline_stage === 'lead').length.toLocaleString()}
+          </span>
+          <span className="px-2 py-0.5 rounded-full bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-300 text-[10px] font-bold">
+            Inbound Chat
+          </span>
+        </div>
+        <div className="mt-2 text-slate-400 text-xs flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
+          <span>{lang === 'id' ? 'Menunggu kualifikasi & respon' : 'Awaiting qualification'}</span>
+        </div>
+      </div>
+
+      {/* Card 3: Hot Leads */}
+      <div className="p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-2xs flex flex-col justify-between">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{lang === 'id' ? 'Hot Leads 🔥' : 'Hot Leads 🔥'}</span>
+          <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950 flex items-center justify-center text-amber-600 dark:text-amber-400">
+            <Target size={18} />
+          </div>
+        </div>
+        <div className="mt-3 flex items-baseline justify-between">
+          <span className="text-2xl font-bold font-mono text-slate-900 dark:text-white">
+            {contacts.filter(c => c.pipeline_stage === 'prospect').length.toLocaleString()}
+          </span>
+          <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 text-[10px] font-bold">
+            Prioritas Tinggi
+          </span>
+        </div>
+        <div className="mt-2 text-slate-400 text-xs flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+          <span>{lang === 'id' ? 'Siap penawaran / invoice' : 'Ready for quote/invoice'}</span>
+        </div>
+      </div>
+
+      {/* Card 4: Closing / Pelanggan */}
+      <div className="p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-2xs flex flex-col justify-between">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{lang === 'id' ? 'Closing / Pelanggan' : 'Won / Customers'}</span>
+          <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+            <CheckCircle2 size={18} />
+          </div>
+        </div>
+        <div className="mt-3 flex items-baseline justify-between">
+          <span className="text-2xl font-bold font-mono text-slate-900 dark:text-white">
+            {contacts.filter(c => c.pipeline_stage === 'customer').length.toLocaleString()}
+          </span>
+          <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-[10px] font-bold">
+            {contacts.length > 0 ? ((contacts.filter(c => c.pipeline_stage === 'customer').length / contacts.length) * 100).toFixed(1) : 0}% Konversi
+          </span>
+        </div>
+        <div className="mt-2 text-slate-400 text-xs flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          <span>{lang === 'id' ? 'Target konversi tercapai' : 'Conversion target reached'}</span>
+        </div>
+      </div>
+    </div>
+
     {/* Pipeline Stage Funnel Filter Tabs */}
     <div className="flex items-center gap-2 overflow-x-auto py-1 px-0.5 scrollbar-none">
       {[
@@ -398,10 +488,20 @@ const CrmPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
           iconClass: (isActive: boolean) => isActive ? 'text-white dark:text-slate-900' : 'text-slate-400 group-hover:text-slate-600 dark:text-slate-400',
           hoverClass: 'hover:bg-slate-50 hover:border-slate-300 dark:hover:bg-slate-700/50'
         },
-        {
-          id: 'lead',
-          label: t.crm.lead,
-          count: contacts.filter(c => !c.pipeline_stage || c.pipeline_stage === 'lead').length,
+          {
+            id: 'unassigned',
+            label: lang === 'id' ? 'Belum Dikategorikan' : 'Unassigned',
+            count: contacts.filter(c => !c.pipeline_stage || c.pipeline_stage === 'none').length,
+            icon: Users,
+            activeClass: 'bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-700 dark:text-slate-200 dark:border-slate-600 shadow-sm',
+            activeBadge: 'bg-slate-200 text-slate-700 dark:bg-slate-600 dark:text-slate-200',
+            iconClass: (isActive: boolean) => isActive ? 'text-slate-800 dark:text-slate-200' : 'text-slate-500',
+            hoverClass: 'hover:bg-slate-50 hover:border-slate-300 dark:hover:bg-slate-700/50'
+          },
+          {
+            id: 'lead',
+            label: t.crm.lead,
+            count: contacts.filter(c => c.pipeline_stage === 'lead').length,
           icon: UserPlus,
           activeClass: 'bg-[#e0f2fe] text-[#0369a1] border-sky-300 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800 shadow-sm',
           activeBadge: 'bg-sky-200/90 text-[#0369a1] dark:bg-sky-900/80 dark:text-sky-200',

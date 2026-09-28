@@ -9,7 +9,7 @@ export interface ContactRecord {
   phone: string;
   tags: string[];
   custom_fields: Record<string, any>;
-  pipeline_stage: 'lead' | 'prospect' | 'customer' | 'churned';
+  pipeline_stage?: 'lead' | 'prospect' | 'customer' | 'churned' | 'none';
   notes: string;
   is_business: boolean;
   is_blocked: boolean;
@@ -86,7 +86,7 @@ export class ContactRepository {
       phone: cleanPhone,
       tags: JSON.stringify(contact.tags || []),
       custom_fields: JSON.stringify(contact.customFields || {}),
-      pipeline_stage: contact.pipelineStage || 'lead',
+      pipeline_stage: contact.pipelineStage || 'none',
       notes: contact.notes || '',
       opt_out: contact.optOut ? 1 : 0,
       created_at: now,
@@ -106,7 +106,7 @@ export class ContactRepository {
       ...r,
       tags: JSON.parse(r.tags || '[]'),
       custom_fields: JSON.parse(r.custom_fields || '{}'),
-      pipeline_stage: r.pipeline_stage || 'lead',
+      pipeline_stage: r.pipeline_stage || 'none',
       notes: r.notes || '',
       is_business: Boolean(r.is_business),
       is_blocked: Boolean(r.is_blocked),
@@ -128,7 +128,7 @@ export class ContactRepository {
       ...row,
       tags: JSON.parse(row.tags || '[]'),
       custom_fields: JSON.parse(row.custom_fields || '{}'),
-      pipeline_stage: row.pipeline_stage || 'lead',
+      pipeline_stage: row.pipeline_stage || 'none',
       notes: row.notes || '',
       is_business: Boolean(row.is_business),
       is_blocked: Boolean(row.is_blocked),
@@ -145,7 +145,7 @@ export class ContactRepository {
       ...row,
       tags: JSON.parse(row.tags || '[]'),
       custom_fields: JSON.parse(row.custom_fields || '{}'),
-      pipeline_stage: row.pipeline_stage || 'lead',
+      pipeline_stage: row.pipeline_stage || 'none',
       notes: row.notes || '',
       is_business: Boolean(row.is_business),
       is_blocked: Boolean(row.is_blocked),
@@ -204,6 +204,88 @@ export class ContactRepository {
     const cleanPhone = phone.replace(/[^0-9]/g, '');
     const stmt = this.db.prepare('DELETE FROM contacts WHERE session_id = ? AND phone = ?');
     stmt.run(sessionId, cleanPhone);
+  }
+
+  public batchDelete(sessionId: string, phones: string[]): number {
+    const cleanPhones = phones.map(p => p.replace(/[^0-9]/g, '')).filter(Boolean);
+    if (cleanPhones.length === 0) return 0;
+    const stmt = this.db.prepare('DELETE FROM contacts WHERE session_id = ? AND phone = ?');
+    const deleteTx = this.db.transaction((items: string[]) => {
+      let count = 0;
+      for (const phone of items) {
+        const res = stmt.run(sessionId, phone);
+        count += res.changes;
+      }
+      return count;
+    });
+    return deleteTx(cleanPhones);
+  }
+
+  public batchUpdateStage(sessionId: string, phones: string[], stage: 'lead' | 'prospect' | 'customer' | 'churned'): number {
+    const cleanPhones = phones.map(p => p.replace(/[^0-9]/g, '')).filter(Boolean);
+    if (cleanPhones.length === 0) return 0;
+    const now = Date.now();
+    const stmt = this.db.prepare('UPDATE contacts SET pipeline_stage = ?, updated_at = ? WHERE session_id = ? AND phone = ?');
+    const updateTx = this.db.transaction((items: string[]) => {
+      let count = 0;
+      for (const phone of items) {
+        const res = stmt.run(stage, now, sessionId, phone);
+        count += res.changes;
+      }
+      return count;
+    });
+    return updateTx(cleanPhones);
+  }
+
+  public batchToggleOptOut(sessionId: string, phones: string[], optOut: boolean): number {
+    const cleanPhones = phones.map(p => p.replace(/[^0-9]/g, '')).filter(Boolean);
+    if (cleanPhones.length === 0) return 0;
+    const now = Date.now();
+    const stmt = this.db.prepare('UPDATE contacts SET opt_out = ?, updated_at = ? WHERE session_id = ? AND phone = ?');
+    const updateTx = this.db.transaction((items: string[]) => {
+      let count = 0;
+      for (const phone of items) {
+        const res = stmt.run(optOut ? 1 : 0, now, sessionId, phone);
+        count += res.changes;
+      }
+      return count;
+    });
+    return updateTx(cleanPhones);
+  }
+
+  public batchUpdateTags(sessionId: string, phones: string[], tags: string[], mode: 'add' | 'remove' | 'replace'): number {
+    const cleanPhones = phones.map(p => p.replace(/[^0-9]/g, '')).filter(Boolean);
+    if (cleanPhones.length === 0) return 0;
+    const now = Date.now();
+    const findStmt = this.db.prepare('SELECT phone, tags FROM contacts WHERE session_id = ? AND phone = ?');
+    const updateStmt = this.db.prepare('UPDATE contacts SET tags = ?, updated_at = ? WHERE session_id = ? AND phone = ?');
+
+    const tx = this.db.transaction((items: string[]) => {
+      let count = 0;
+      for (const phone of items) {
+        const row = findStmt.get(sessionId, phone) as { phone: string; tags: string } | undefined;
+        if (!row) continue;
+        let existingTags: string[] = [];
+        try {
+          existingTags = JSON.parse(row.tags || '[]');
+        } catch {
+          existingTags = [];
+        }
+        let finalTags: string[] = [];
+        if (mode === 'replace') {
+          finalTags = Array.from(new Set(tags.map(t => t.trim()).filter(Boolean)));
+        } else if (mode === 'add') {
+          finalTags = Array.from(new Set([...existingTags, ...tags.map(t => t.trim()).filter(Boolean)]));
+        } else if (mode === 'remove') {
+          const toRemove = new Set(tags.map(t => t.trim()));
+          finalTags = existingTags.filter(t => !toRemove.has(t));
+        }
+        const res = updateStmt.run(JSON.stringify(finalTags), now, sessionId, phone);
+        count += res.changes;
+      }
+      return count;
+    });
+    return tx(cleanPhones);
   }
 }
 

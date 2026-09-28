@@ -6,6 +6,18 @@ import { AuditService } from '../../core/services/audit.service';
 const upload = multer({ storage: multer.memoryStorage() });
 export const contactRouter = Router();
 
+// GET /api/v1/contacts/template - Download sample Excel template for importing contacts
+contactRouter.get('/template', (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const buffer = contactService.generateTemplateExcel();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="template_import_kontak.xlsx"');
+    res.send(buffer);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST /api/v1/contacts/sync - Synchronize contacts from session chats, groups, and LID mappings
 contactRouter.post('/sync', (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -90,7 +102,7 @@ contactRouter.put('/:phone/tags', (req: Request, res: Response, next: NextFuncti
 // POST /api/v1/contacts - Add or update contact
 contactRouter.post('/', (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { sessionId, phone, name, tags, customFields, optOut } = req.body;
+    const { sessionId, phone, name, tags, customFields, optOut, pipelineStage, notes } = req.body;
     if (!sessionId || !phone) {
       res.status(400).json({ success: false, message: 'sessionId and phone are required' });
       return;
@@ -101,9 +113,73 @@ contactRouter.post('/', (req: Request, res: Response, next: NextFunction) => {
       name,
       tags,
       customFields,
+      pipelineStage,
+      notes,
       optOut: Boolean(optOut)
     });
     res.json({ success: true, message: 'Contact saved' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/v1/contacts/batch-delete - Batch delete contacts
+contactRouter.post('/batch-delete', (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { sessionId, phones } = req.body;
+    if (!sessionId || !Array.isArray(phones) || phones.length === 0) {
+      res.status(400).json({ success: false, message: 'sessionId and non-empty phones array are required' });
+      return;
+    }
+    const count = contactService.batchDeleteContacts(String(sessionId), phones);
+    AuditService.log('user', 'batch_delete', 'contact', { sessionId, count, totalRequested: phones.length });
+    res.json({ success: true, message: `Berhasil menghapus ${count} kontak`, count });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/v1/contacts/batch-stage - Batch update pipeline stage
+contactRouter.post('/batch-stage', (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { sessionId, phones, stage } = req.body;
+    if (!sessionId || !Array.isArray(phones) || !stage) {
+      res.status(400).json({ success: false, message: 'sessionId, phones array, and stage are required' });
+      return;
+    }
+    const count = contactService.batchUpdateStage(String(sessionId), phones, stage);
+    res.json({ success: true, message: `Berhasil memperbarui stage ${count} kontak ke ${stage}`, count });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/v1/contacts/batch-opt-out - Batch toggle opt-out
+contactRouter.post('/batch-opt-out', (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { sessionId, phones, optOut } = req.body;
+    if (!sessionId || !Array.isArray(phones)) {
+      res.status(400).json({ success: false, message: 'sessionId and phones array are required' });
+      return;
+    }
+    const count = contactService.batchToggleOptOut(String(sessionId), phones, Boolean(optOut));
+    res.json({ success: true, message: `Berhasil mengubah status opt-out ${count} kontak`, count });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/v1/contacts/batch-tags - Batch update tags
+contactRouter.post('/batch-tags', (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { sessionId, phones, tags, mode } = req.body;
+    if (!sessionId || !Array.isArray(phones) || !Array.isArray(tags)) {
+      res.status(400).json({ success: false, message: 'sessionId, phones array, and tags array are required' });
+      return;
+    }
+    const updateMode = mode === 'replace' || mode === 'remove' ? mode : 'add';
+    const count = contactService.batchUpdateTags(String(sessionId), phones, tags, updateMode);
+    res.json({ success: true, message: `Berhasil memperbarui tags ${count} kontak`, count });
   } catch (err) {
     next(err);
   }

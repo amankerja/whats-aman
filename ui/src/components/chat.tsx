@@ -77,11 +77,19 @@ export const ChatAvatar: React.FC<ChatAvatarProps> = React.memo(({
           alt={displayName}
           referrerPolicy="no-referrer"
           crossOrigin="anonymous"
-          onLoad={() => {
-            loadedAvatarUrls.add(avatarUrl);
-            failedAvatarUrls.delete(avatarUrl);
-            setIsLoaded(true);
-            setHasError(false);
+          onLoad={(e) => {
+            const img = e.currentTarget;
+            if (img.naturalWidth <= 1 && img.naturalHeight <= 1) {
+              failedAvatarUrls.add(avatarUrl);
+              loadedAvatarUrls.delete(avatarUrl);
+              setHasError(true);
+              setIsLoaded(false);
+            } else {
+              loadedAvatarUrls.add(avatarUrl);
+              failedAvatarUrls.delete(avatarUrl);
+              setIsLoaded(true);
+              setHasError(false);
+            }
           }}
           onError={() => {
             failedAvatarUrls.add(avatarUrl);
@@ -123,6 +131,8 @@ interface ChatInputBoxProps {
   placeholder?: string;
   sendTitle?: string;
   attachTitle?: string;
+  value?: string;
+  onChange?: (val: string) => void;
 }
 
 export const ChatInputBox: React.FC<ChatInputBoxProps> = React.memo(({
@@ -132,41 +142,65 @@ export const ChatInputBox: React.FC<ChatInputBoxProps> = React.memo(({
   placeholder,
   sendTitle,
   attachTitle,
+  value,
+  onChange,
 }) => {
-  const [text, setText] = useState('');
+  const [internalText, setInternalText] = useState('');
+  const text = value !== undefined ? value : internalText;
+
+  const handleTextChange = (val: string) => {
+    if (onChange) {
+      onChange(val);
+    } else {
+      setInternalText(val);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      const trimmed = text.trim();
+      if (!trimmed || disabled) return;
+      onSend(trimmed);
+      handleTextChange('');
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = text.trim();
     if (!trimmed || disabled) return;
     onSend(trimmed);
-    setText('');
+    handleTextChange('');
   };
 
   return (
     <div className="room-input-footer">
       <form className="input-form" onSubmit={handleSubmit}>
-        <button
-          type="button"
-          className="btn-input-accessory"
-          title="Emoji"
-          onClick={() => setText(prev => prev + ' 😊')}
-        >
-          <Smile size={20} />
-        </button>
-        <button
-          type="button"
-          className="btn-input-accessory"
-          title={attachTitle || 'Lampirkan File'}
-          onClick={onAttach}
-        >
-          <Paperclip size={20} />
-        </button>
-        <input
-          type="text"
-          placeholder={placeholder || 'Ketik pesan...'}
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            className="btn-input-accessory"
+            title="Emoji"
+            onClick={() => handleTextChange(text + ' 😊')}
+          >
+            <Smile size={20} />
+          </button>
+          <button
+            type="button"
+            className="btn-input-accessory"
+            title={attachTitle || 'Lampirkan File'}
+            onClick={onAttach}
+          >
+            <Paperclip size={20} />
+          </button>
+        </div>
+        <textarea
+          rows={1}
+          placeholder={placeholder || 'Ketik pesan balasan... (Tekan Enter untuk kirim, Shift+Enter untuk baris baru)'}
           value={text}
-          onChange={e => setText(e.target.value)}
+          onChange={e => handleTextChange(e.target.value)}
+          onKeyDown={handleKeyDown}
           className="message-text-input"
           disabled={disabled}
         />

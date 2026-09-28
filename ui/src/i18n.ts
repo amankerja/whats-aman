@@ -59,6 +59,9 @@ export interface Translations {
     language: string;
     langIndonesian: string;
     langEnglish: string;
+    searchPlaceholder: string;
+    sendBroadcast: string;
+    newChat: string;
   };
   dashboard: {
     title: string;
@@ -392,7 +395,10 @@ export const translations: Record<Language, Translations> = {
       gatewayReady: 'Gateway Siap',
       language: 'Bahasa',
       langIndonesian: 'Bahasa Indonesia',
-      langEnglish: 'English'
+      langEnglish: 'English',
+      searchPlaceholder: 'Cari obrolan, kontak, broadcast, pesan...',
+      sendBroadcast: 'Kirim Broadcast',
+      newChat: 'Chat Baru'
     },
     dashboard: {
       title: 'Dashboard Ringkasan',
@@ -724,7 +730,10 @@ export const translations: Record<Language, Translations> = {
       gatewayReady: 'Gateway Ready',
       language: 'Language',
       langIndonesian: 'Bahasa Indonesia',
-      langEnglish: 'English'
+      langEnglish: 'English',
+      searchPlaceholder: 'Search chats, contacts, broadcasts, messages...',
+      sendBroadcast: 'Send Broadcast',
+      newChat: 'New Chat'
     },
     dashboard: {
       title: 'Dashboard Overview',

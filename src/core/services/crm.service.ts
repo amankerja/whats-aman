@@ -4,6 +4,7 @@ import { sessionManager } from '../engine/session.manager';
 import { getDatabase } from '../database/connection';
 import { logger } from '../../utils/logger';
 import { renderMessageTemplate } from '../utils/message-parser.util';
+import { antiBlockingGuardService } from './antiblocking.service';
 
 export class CRMService {
   public createTask(data: {
@@ -44,6 +45,19 @@ export class CRMService {
     if (!task) throw new Error('Follow-up task tidak ditemukan');
     if (task.status === 'COMPLETED') throw new Error('Task ini sudah pernah dieksekusi sebelumnya');
 
+    // Opt-out guard
+    const contact = contactRepository.findByPhone(task.session_id, task.contact_phone);
+    if (contact?.opt_out) {
+      crmRepository.updateTaskStatus(taskId, 'CANCELLED', 'Pelanggan telah opt-out');
+      throw new Error('Pelanggan telah opt-out dari komunikasi');
+    }
+
+    // Anti-Blocking Guard Check
+    const antiCheck = antiBlockingGuardService.canDispatchMessage(task.session_id);
+    if (!antiCheck.allowed) {
+      throw new Error(`Pengiriman ditunda oleh Anti-Blocking Guard: ${antiCheck.reason}`);
+    }
+
     const session = sessionManager.getSession(task.session_id);
     if (!session) throw new Error('Sesi WhatsApp tidak aktif atau tidak ditemukan');
 
@@ -58,7 +72,6 @@ export class CRMService {
     }
 
     // Interpolate variables & Spintax
-    const contact = contactRepository.findByPhone(task.session_id, task.contact_phone);
     const resolvedName = task.contact_name || contact?.name || contact?.push_name || 'Sahabat';
     const messageText = this.interpolate(task.message_template, {
       name: resolvedName,
@@ -66,19 +79,26 @@ export class CRMService {
       title: task.title
     });
 
-    // Send WhatsApp text
-    await session.sendText(task.contact_phone, messageText);
+    try {
+      // Send WhatsApp text
+      await session.sendText(task.contact_phone, messageText);
+      antiBlockingGuardService.recordSendResult(task.session_id, true);
 
-    // Update status to COMPLETED
-    crmRepository.updateTaskStatus(taskId, 'COMPLETED', `Terkirim pada ${new Date().toLocaleString('id-ID')}`);
+      // Update status to COMPLETED
+      crmRepository.updateTaskStatus(taskId, 'COMPLETED', `Terkirim pada ${new Date().toLocaleString('id-ID')}`);
 
-    // If task was part of a sequence, check and schedule the next step
-    if (task.sequence_id) {
-      this.scheduleNextSequenceStep(task);
+      // If task was part of a sequence, check and schedule the next step
+      if (task.sequence_id) {
+        this.scheduleNextSequenceStep(task);
+      }
+
+      logger.info({ taskId, phone: task.contact_phone }, 'Follow-up task executed successfully');
+      return { success: true, message: `Pesan follow-up berhasil dikirim ke ${task.contact_phone}` };
+    } catch (err: any) {
+      const errMsg = err?.message || 'Error pengiriman';
+      antiBlockingGuardService.recordSendResult(task.session_id, false, errMsg);
+      throw err;
     }
-
-    logger.info({ taskId, phone: task.contact_phone }, 'Follow-up task executed successfully');
-    return { success: true, message: `Pesan follow-up berhasil dikirim ke ${task.contact_phone}` };
   }
 
   public cancelTask(taskId: string, reason?: string): void {
@@ -232,10 +252,22 @@ export class CRMService {
     const conversionRate = totalLeads > 0 ? Number(((convertedCustomers / totalLeads) * 100).toFixed(1)) : 0;
 
     const sentMsgs = db.prepare('SELECT COUNT(*) as count FROM messages WHERE session_id = ? AND from_me = 1 AND timestamp >= ?').get(sessionId, startTime) as any;
-    const recvMsgs = db.prepare("SELECT COUNT(*) as count FROM messages WHERE session_id = ? AND from_me = 0 AND chat_jid NOT LIKE '%@g.us' AND timestamp >= ?").get(sessionId, startTime) as any;
+    const recvMsgs = db.prepare("SELECT COUNT(*) as count FROM messages WHERE session_id = ? AND from_me = 0 AND chat_jid NOT LIKE '%@g.us' AND chat_jid NOT LIKE '%@newsletter' AND chat_jid NOT LIKE '%@broadcast' AND timestamp >= ?").get(sessionId, startTime) as any;
     const totalSent = sentMsgs?.count || 0;
     const totalRecv = recvMsgs?.count || 0;
-    const replyRate = totalSent > 0 ? Number(((totalRecv / totalSent) * 100).toFixed(1)) : 0;
+
+    // Reply Rate = % of personal chats that received an inbound message and were replied to
+    // (outbound in the same chat & period). Immune to broadcast/auto-reply volume inflation;
+    // naturally capped at 100%.
+    const inboundChatsRow = db.prepare(
+      "SELECT COUNT(DISTINCT chat_jid) as count FROM messages WHERE session_id = ? AND from_me = 0 AND chat_jid NOT LIKE '%@g.us' AND chat_jid NOT LIKE '%@newsletter' AND chat_jid NOT LIKE '%@broadcast' AND timestamp >= ?"
+    ).get(sessionId, startTime) as any;
+    const repliedChatsRow = db.prepare(
+      "SELECT COUNT(DISTINCT chat_jid) as count FROM messages WHERE session_id = ? AND from_me = 1 AND timestamp >= ? AND chat_jid IN (SELECT DISTINCT chat_jid FROM messages WHERE session_id = ? AND from_me = 0 AND chat_jid NOT LIKE '%@g.us' AND chat_jid NOT LIKE '%@newsletter' AND chat_jid NOT LIKE '%@broadcast' AND timestamp >= ?)"
+    ).get(sessionId, startTime, sessionId, startTime) as any;
+    const inboundChats = inboundChatsRow?.count || 0;
+    const repliedChats = repliedChatsRow?.count || 0;
+    const replyRate = inboundChats > 0 ? Number(Math.min(100, (repliedChats / inboundChats) * 100).toFixed(1)) : 0;
 
     // 5. Stage Breakdown
     const stages = ['lead', 'prospect', 'customer', 'churned'];
@@ -257,6 +289,8 @@ export class CRMService {
       totalSent,
       totalRecv,
       replyRate,
+      inboundChats,
+      repliedChats,
       stageCounts
     };
   }
@@ -287,7 +321,7 @@ export class CRMService {
     csv += '\n=== DAFTAR KONTAK CRM ===\n';
     csv += 'No HP,Nama,Pipeline Stage,Tags,Catatan\n';
     for (const c of contacts) {
-      csv += `"${c.phone}","${c.name || c.push_name || ''}","${c.pipeline_stage.toUpperCase()}","${c.tags.join('; ')}","${c.notes}"\n`;
+      csv += `"${c.phone}","${c.name || c.push_name || ''}","${(c.pipeline_stage || 'none').toUpperCase()}","${c.tags.join('; ')}","${c.notes}"\n`;
     }
 
     return csv;

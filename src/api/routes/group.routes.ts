@@ -11,8 +11,32 @@ groupRouter.get('/', async (req: Request, res: Response, next: NextFunction) => 
       res.status(400).json({ success: false, message: 'sessionId is required' });
       return;
     }
-    const groups = await groupService.getGroups(String(sessionId));
+
     const cached = groupService.getCachedGroups(String(sessionId));
+    let groups: any[] = [];
+    try {
+      groups = await groupService.getGroups(String(sessionId));
+    } catch (err: any) {
+      // Fallback gracefully to cached groups from database if live socket is temporarily busy or reconnecting
+      groups = cached.map(c => ({
+        jid: c.jid,
+        name: c.name,
+        topic: c.topic,
+        memberCount: c.memberCount,
+        participants: []
+      }));
+    }
+
+    // If live call returned empty but database has cached groups, use cache
+    if ((!groups || groups.length === 0) && cached.length > 0) {
+      groups = cached.map(c => ({
+        jid: c.jid,
+        name: c.name,
+        topic: c.topic,
+        memberCount: c.memberCount,
+        participants: []
+      }));
+    }
 
     const enriched = groups.map((g) => {
       const dbGroup = cached.find((c) => c.jid === g.jid);

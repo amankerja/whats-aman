@@ -68,7 +68,7 @@ export interface Contact {
   name?: string;
   push_name?: string;
   tags: string[];
-  pipeline_stage?: 'lead' | 'prospect' | 'customer' | 'churned';
+  pipeline_stage?: 'lead' | 'prospect' | 'customer' | 'churned' | 'none';
   notes?: string;
   opt_out: boolean;
   jid?: string;
@@ -109,6 +109,8 @@ export interface SalesAnalytics {
   totalSent: number;
   totalRecv: number;
   replyRate: number;
+  inboundChats: number;
+  repliedChats: number;
   stageCounts: { lead: number; prospect: number; customer: number; churned: number };
 }
 

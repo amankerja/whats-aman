@@ -90,24 +90,28 @@ import {
   ExternalLink,
   Share2,
   Globe,
-  Languages
+  Languages,
+  Bell,
+  Shuffle,
+  Sparkles,
+  Sliders
 } from 'lucide-react';
 import { translations, Language } from './i18n';
 import { PrivacyPopover } from './components/PrivacyPopover';
 
-// Lazy-loaded per-tab panels — each page only ships when first visited
-const DashboardPanel = React.lazy(() => import('./panels/DashboardPanel'));
-const SessionsPanel = React.lazy(() => import('./panels/SessionsPanel'));
-const ChatsPanel = React.lazy(() => import('./panels/ChatsPanel'));
-const CrmPanel = React.lazy(() => import('./panels/CrmPanel'));
-const ContactsPanel = React.lazy(() => import('./panels/ContactsPanel'));
-const GroupsPanel = React.lazy(() => import('./panels/GroupsPanel'));
-const CampaignsPanel = React.lazy(() => import('./panels/CampaignsPanel'));
-const TesterPanel = React.lazy(() => import('./panels/TesterPanel'));
-const AutomationPanel = React.lazy(() => import('./panels/AutomationPanel'));
-const IntegrationsPanel = React.lazy(() => import('./panels/IntegrationsPanel'));
-const InfrastructurePanel = React.lazy(() => import('./panels/InfrastructurePanel'));
-const LogsPanel = React.lazy(() => import('./panels/LogsPanel'));
+// Static imported panels for instant zero-latency tab switching without bundle loading delays
+import DashboardPanel from './panels/DashboardPanel';
+import SessionsPanel from './panels/SessionsPanel';
+import ChatsPanel from './panels/ChatsPanel';
+import CrmPanel from './panels/CrmPanel';
+import ContactsPanel from './panels/ContactsPanel';
+import GroupsPanel from './panels/GroupsPanel';
+import CampaignsPanel from './panels/CampaignsPanel';
+import TesterPanel from './panels/TesterPanel';
+import AutomationPanel from './panels/AutomationPanel';
+import IntegrationsPanel from './panels/IntegrationsPanel';
+import InfrastructurePanel from './panels/InfrastructurePanel';
+import LogsPanel from './panels/LogsPanel';
 import type { PanelCtx } from './panels/ctx';
 
 function AppShell() {
@@ -270,29 +274,46 @@ function AppShell() {
   }, [contactsMap]);
 
   const unreadChatsCount = useMemo(() => {
-    return chats.filter(c => (c.unread_count || 0) > 0 && !c.chat_jid.includes('broadcast')).length;
+    return chats.filter(c => (c.unread_count || 0) > 0 && !c.chat_jid.includes('broadcast') && !c.chat_jid.includes('@g.us') && !c.chat_jid.includes('@newsletter')).length;
   }, [chats]);
 
   const filteredChats = useMemo(() => {
     const query = chatSearchQuery.trim().toLowerCase();
-    return chats.filter(c => {
-      if (c.chat_jid.includes('broadcast')) return false;
-      const isGroup = c.chat_jid.endsWith('@g.us');
-      const isNewsletter = c.chat_jid.endsWith('@newsletter');
-      const isPersonal = !isGroup && !isNewsletter;
-      const isUnread = (c.unread_count || 0) > 0;
+    const toMs = (ts: any): number => {
+      if (!ts) return 0;
+      const num = typeof ts === 'number' ? ts : Number(ts);
+      if (isNaN(num)) return 0;
+      return num < 1e11 ? num * 1000 : num;
+    };
 
-      if (chatFilter === 'personal' && !isPersonal) return false;
-      if (chatFilter === 'groups' && !isGroup) return false;
-      if (chatFilter === 'channels' && !isNewsletter) return false;
-      if (chatFilter === 'unread' && !isUnread) return false;
+    return chats
+      .filter(c => {
+        if (c.chat_jid.includes('broadcast')) return false;
+        const isGroup = c.chat_jid.includes('@g.us');
+        const isNewsletter = c.chat_jid.includes('@newsletter');
+        const isPersonal = !isGroup && !isNewsletter;
+        const isUnread = (c.unread_count || 0) > 0;
 
-      if (!query) return true;
+        // Tab/filter 'all' (semua) dan 'personal' (pribadi) hanya menampilkan chat personal
+        if ((chatFilter === 'all' || chatFilter === 'personal') && !isPersonal) return false;
+        if (chatFilter === 'groups' && !isGroup) return false;
+        if (chatFilter === 'channels' && !isNewsletter) return false;
+        if (chatFilter === 'unread' && (!isUnread || !isPersonal)) return false;
 
-      const groupMatch = isGroup ? groupsMap.get(c.chat_jid) : null;
-      const nameToSearch = groupMatch?.name || c.name || c.push_name || '';
-      return `${c.chat_jid} ${nameToSearch} ${c.last_message || ''}`.toLowerCase().includes(query);
-    });
+        if (!query) return true;
+
+        const groupMatch = isGroup ? groupsMap.get(c.chat_jid) : null;
+        const nameToSearch = groupMatch?.name || c.name || c.push_name || '';
+        return `${c.chat_jid} ${nameToSearch} ${c.last_message || ''}`.toLowerCase().includes(query);
+      })
+      .sort((a, b) => {
+        // Urutkan dari chat terakhir / interaksi terakhir (descending)
+        const diff = toMs(b.timestamp) - toMs(a.timestamp);
+        if (diff !== 0) return diff;
+        const nameA = a.name || a.push_name || a.chat_jid || '';
+        const nameB = b.name || b.push_name || b.chat_jid || '';
+        return nameA.localeCompare(nameB);
+      });
   }, [chats, chatFilter, chatSearchQuery, groupsMap]);
 
   const filteredContacts = useMemo(() => {
@@ -424,6 +445,14 @@ function AppShell() {
   const [campRecipientsRaw, setCampRecipientsRaw] = useState('');
   const [campRandomDelayMin, setCampRandomDelayMin] = useState(5);
   const [campRandomDelayMax, setCampRandomDelayMax] = useState(15);
+  const [campaignPreviewSeed, setCampaignPreviewSeed] = useState(0);
+  const [campLoadBalancing, setCampLoadBalancing] = useState(false);
+  const [campAutoStop, setCampAutoStop] = useState(true);
+  const [campIgnoreOptOut, setCampIgnoreOptOut] = useState(true);
+  const [campDeduplicate, setCampDeduplicate] = useState(true);
+  const [campMediaFile, setCampMediaFile] = useState<File | null>(null);
+  const [campMediaPath, setCampMediaPath] = useState<string>('');
+  const [campMediaType, setCampMediaType] = useState<'image' | 'video' | 'document' | ''>('');
 
   // Campaign Recipients View State
   const [isViewRecipientsModal, setIsViewRecipientsModal] = useState(false);
@@ -492,6 +521,20 @@ function AppShell() {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [chatMessages, activeChatJid]);
+
+  // Global topbar search (Ctrl+K) — filters chats & jumps to inbox on Enter
+  const [globalSearch, setGlobalSearch] = useState('');
+  const topbarSearchRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    const handleSearchShortcut = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        topbarSearchRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleSearchShortcut);
+    return () => window.removeEventListener('keydown', handleSearchShortcut);
+  }, []);
 
   const toggleTheme = () => {
     setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
@@ -606,7 +649,8 @@ function AppShell() {
       if (data.success) {
         setChats(data.data);
         if (!activeChatJid && data.data.length > 0) {
-          setActiveChatJid(data.data[0].chat_jid);
+          const firstPersonal = data.data.find((c: ChatItem) => !c.chat_jid.includes('@g.us') && !c.chat_jid.includes('@newsletter') && !c.chat_jid.includes('broadcast'));
+          setActiveChatJid(firstPersonal?.chat_jid || data.data[0].chat_jid);
         }
       }
     } catch (err) {
@@ -1291,8 +1335,9 @@ function AppShell() {
       // Bug fix: previously every line was flattened to phone-only via flatMap(','),
       // silently dropping the recipient names typed after the comma.
       recipients = parseRecipientLines(chatBroadcastManualNumbers).map(r => ({
-        ...r,
-        name: r.name || formatPhoneForDisplay(r.phone)
+        phone: r.phone,
+        name: r.name || formatPhoneForDisplay(r.phone),
+        customVars: r.customVars || {}
       }));
     } else if (chatBroadcastMode === 'select') {
       if (chatBroadcastSelectedPhones.length === 0) {
@@ -2026,7 +2071,11 @@ function AppShell() {
         showToast('Daftar nomor penerima tidak boleh kosong!', 'warn');
         return;
       }
-      recipients = parseRecipientLines(campRecipientsRaw);
+      recipients = parseRecipientLines(campRecipientsRaw).map(r => ({
+        phone: r.phone,
+        name: r.name,
+        customVars: r.customVars || {}
+      }));
     }
 
     if (recipients.length === 0) {
@@ -2037,6 +2086,29 @@ function AppShell() {
     }
 
     try {
+      let finalMediaPath = campMediaPath;
+      let finalMediaType = campMediaType;
+
+      // If user uploaded a media file directly in campaign modal
+      if (campMediaFile) {
+        const formData = new FormData();
+        formData.append('file', campMediaFile);
+        formData.append('sessionId', selectedSessionId);
+        const uploadRes = await fetch('/api/v1/messages/upload', {
+          method: 'POST',
+          body: formData
+        });
+        const uploadData = await uploadRes.json();
+        if (uploadData.success && uploadData.data?.filePath) {
+          finalMediaPath = uploadData.data.filePath;
+          finalMediaType = campMediaFile.type.startsWith('video')
+            ? 'video'
+            : campMediaFile.type.startsWith('image')
+            ? 'image'
+            : 'document';
+        }
+      }
+
       const res = await fetch('/api/v1/campaigns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2044,6 +2116,8 @@ function AppShell() {
           sessionId: selectedSessionId,
           name: campName,
           templateText: campTemplate,
+          mediaPath: finalMediaPath || undefined,
+          mediaType: finalMediaType || undefined,
           recipients,
           settings: {
             randomDelayMinSeconds: campRandomDelayMin,
@@ -2056,6 +2130,9 @@ function AppShell() {
         setIsNewCampaignModal(false);
         setCampName('');
         setCampRecipientsRaw('');
+        setCampMediaFile(null);
+        setCampMediaPath('');
+        setCampMediaType('');
         fetchCampaigns();
         addLog(`Broadcast "${campName}" berhasil dibuat dengan ${recipients.length} penerima`, 'success');
         showToast(`Broadcast "${campName}" dibuat dengan ${recipients.length} penerima`, 'success');
@@ -2592,6 +2669,7 @@ function AppShell() {
     fetchOutgoingWebhooks
   };
 
+  const activeSessionsCount = sessions.filter(s => s.status === 'CONNECTED').length;
   const navItems = [
     { id: 'dashboard', label: t.nav.dashboard, icon: LayoutDashboard },
     { id: 'sessions', label: t.nav.sessions, icon: Smartphone },
@@ -2650,6 +2728,67 @@ function AppShell() {
       {/* Mobile Overlay */}
       {isMobile && isMobileOpen && <div className="sidebar-overlay" onClick={() => setIsMobileOpen(false)} />}
 
+      {/* Global Topbar (Stitch style — desktop only) */}
+      {!isMobile && (
+        <header className={`topbar ${isCollapsed ? 'shifted' : ''}`}>
+          <div className="topbar__search">
+            <Search size={18} />
+            <input
+              ref={topbarSearchRef}
+              type="text"
+              value={globalSearch}
+              onChange={e => {
+                setGlobalSearch(e.target.value);
+                setChatSearchQuery(e.target.value);
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && globalSearch.trim() && activeTab !== 'chats') {
+                  setActiveTab('chats');
+                }
+              }}
+              placeholder={t.common.searchPlaceholder}
+            />
+            <span className="topbar__kbd">Ctrl+K</span>
+          </div>
+          <div className="topbar__actions">
+            <button type="button" className="topbar__pill-btn" onClick={() => setIsChatBroadcastModal(true)}>
+              <Send size={15} />
+              <span>{t.common.sendBroadcast}</span>
+            </button>
+            <button type="button" className="topbar__pill-btn topbar__pill-btn--ghost" onClick={() => setIsNewChatModal(true)}>
+              <Edit3 size={15} />
+              <span>{t.common.newChat}</span>
+            </button>
+            <button
+              type="button"
+              className="btn-icon"
+              onClick={handleManualRefreshChats}
+              title="Refresh Data"
+            >
+              <RefreshCw size={17} />
+            </button>
+            <div className="topbar__divider" />
+            <button
+              type="button"
+              className="btn-icon relative"
+              onClick={() => setActiveTab('logs')}
+              title={lang === 'id' ? 'Notifikasi & Audit Log' : 'Notifications & Audit Logs'}
+            >
+              <Bell size={18} />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-900" />
+            </button>
+            <div className="topbar__divider" />
+            <div className="topbar__profile">
+              <div className="topbar__avatar">AO</div>
+              <div className="topbar__meta">
+                <span className="topbar__meta-name">Admin Operasional</span>
+                <span className="topbar__meta-sub">Superadmin • Aktif</span>
+              </div>
+            </div>
+          </div>
+        </header>
+      )}
+
       {/* WhatsAman Sidebar */}
       <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobile ? (isMobileOpen ? 'open' : '') : ''}`}>
         <div className="sidebar-header">
@@ -2672,6 +2811,42 @@ function AppShell() {
             </div>
           )}
         </div>
+
+        {/* Active Session Pill (Stitch style) */}
+        {!isCollapsed && sessions.length > 0 && (
+          <div className="session-selector-container">
+            <div className="session-selector-card">
+              <div className="session-selector-header">
+                <span className="session-selector-tag">Sesi Aktif</span>
+                <span className={`session-status-badge ${activeSession?.status === 'CONNECTED' ? 'is-connected' : 'is-disconnected'}`}>
+                  {activeSession?.status === 'CONNECTED' ? 'Tersambung' : activeSession?.status || 'Offline'}
+                </span>
+              </div>
+              <div className="session-selector-control">
+                <span
+                  className={`session-selector-dot ${activeSession?.status === 'CONNECTED' ? 'is-pulse' : ''}`}
+                />
+                <select
+                  value={selectedSessionId}
+                  onChange={e => setSelectedSessionId(e.target.value)}
+                  className="session-selector-select"
+                  aria-label="Pilih sesi WhatsApp aktif"
+                >
+                  {sessions.map(s => {
+                    const isConn = s.status === 'CONNECTED';
+                    return (
+                      <option key={s.id} value={s.id}>
+                        {isConn ? '● ' : '○ '}
+                        {s.name || s.id} ({s.phoneNumber ? s.phoneNumber : s.status})
+                      </option>
+                    );
+                  })}
+                </select>
+                <ChevronDown size={14} className="session-selector-chevron" />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Floating Circular Collapse Toggle */}
         {!isMobile && (
@@ -2702,7 +2877,17 @@ function AppShell() {
                 title={isCollapsed ? item.label : undefined}
               >
                 <Icon size={19} className="flex-shrink-0" />
-                {!isCollapsed && <span className="font-medium text-sm">{item.label}</span>}
+                {!isCollapsed && (
+                  <>
+                    <span className="font-medium text-sm">{item.label}</span>
+                    {item.id === 'sessions' && activeSessionsCount > 0 && (
+                      <span className="nav-badge nav-badge--soft">{activeSessionsCount} Online</span>
+                    )}
+                    {item.id === 'chats' && unreadChatsCount > 0 && (
+                      <span className="nav-badge">{unreadChatsCount}</span>
+                    )}
+                  </>
+                )}
               </button>
             );
           })}
@@ -2710,23 +2895,7 @@ function AppShell() {
 
         {/* Sidebar Footer: Theme & System Status */}
         <div className="sidebar-footer">
-          {/* Quick Active Session Select */}
-          {!isCollapsed && sessions.length > 0 && (
-            <div className="mb-1">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Active Session</label>
-              <select
-                value={selectedSessionId}
-                onChange={e => setSelectedSessionId(e.target.value)}
-                className="w-full text-xs font-semibold py-1.5 px-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800"
-              >
-                {sessions.map(s => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} ({s.status})
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <div className="sidebar-footer-card">
 
           {/* AMAN CHAT Pro: Privacy Blur Toggle Button */}
           <button
@@ -2772,13 +2941,14 @@ function AppShell() {
           {/* Core Status Pill */}
           {!isCollapsed && (
             <div className="flex items-center justify-between pt-1 px-1 text-[11px] text-slate-400 font-medium">
-              <span>Core Service</span>
+              <span>Core Gateway</span>
               <span className={`inline-flex items-center gap-1 font-semibold ${isGlobalConnected ? 'text-emerald-600' : 'text-slate-500'}`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${isGlobalConnected ? 'bg-emerald-500' : 'bg-slate-400'}`} />
                 {isGlobalConnected ? 'Online' : 'Standby'}
               </span>
             </div>
           )}
+          </div>
         </div>
       </aside>
 
@@ -2796,20 +2966,18 @@ function AppShell() {
           setPrivacySettings={setPrivacySettings}
         />
 
-        <React.Suspense fallback={<div style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-muted)' }}>Memuat halaman...</div>}>
-          {activeTab === 'dashboard' && <DashboardPanel ctx={panelCtx} />}
-          {activeTab === 'sessions' && <SessionsPanel ctx={panelCtx} />}
-          {activeTab === 'chats' && <ChatsPanel ctx={panelCtx} />}
-          {activeTab === 'crm' && <CrmPanel ctx={panelCtx} />}
-          {activeTab === 'contacts' && <ContactsPanel ctx={panelCtx} />}
-          {activeTab === 'groups' && <GroupsPanel ctx={panelCtx} />}
-          {activeTab === 'campaigns' && <CampaignsPanel ctx={panelCtx} />}
-          {activeTab === 'tester' && <TesterPanel ctx={panelCtx} />}
-          {activeTab === 'automation' && <AutomationPanel ctx={panelCtx} />}
-          {activeTab === 'integrations' && <IntegrationsPanel ctx={panelCtx} />}
-          {activeTab === 'infrastructure' && <InfrastructurePanel ctx={panelCtx} />}
-          {activeTab === 'logs' && <LogsPanel ctx={panelCtx} />}
-        </React.Suspense>
+        {activeTab === 'dashboard' && <DashboardPanel ctx={panelCtx} />}
+        {activeTab === 'sessions' && <SessionsPanel ctx={panelCtx} />}
+        {activeTab === 'chats' && <ChatsPanel ctx={panelCtx} />}
+        {activeTab === 'crm' && <CrmPanel ctx={panelCtx} />}
+        {activeTab === 'contacts' && <ContactsPanel ctx={panelCtx} />}
+        {activeTab === 'groups' && <GroupsPanel ctx={panelCtx} />}
+        {activeTab === 'campaigns' && <CampaignsPanel ctx={panelCtx} />}
+        {activeTab === 'tester' && <TesterPanel ctx={panelCtx} />}
+        {activeTab === 'automation' && <AutomationPanel ctx={panelCtx} />}
+        {activeTab === 'integrations' && <IntegrationsPanel ctx={panelCtx} />}
+        {activeTab === 'infrastructure' && <InfrastructurePanel ctx={panelCtx} />}
+        {activeTab === 'logs' && <LogsPanel ctx={panelCtx} />}
 
       </main>
 
@@ -3627,221 +3795,708 @@ function AppShell() {
 
       {/* 7. Modal: New Campaign */}
       {isNewCampaignModal && (
-        <div className="modal-overlay">
-          <div className="modal modal-lg">
-            <div className="modal-header">
-              <h2>{lang === 'id' ? 'Buat Broadcast Baru' : 'New Broadcast Campaign'}</h2>
-              <button onClick={() => setIsNewCampaignModal(false)} className="btn-icon">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-hidden animate-in fade-in duration-200">
+          <div className="relative w-full max-w-[1240px] h-[92vh] max-h-[92vh] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden my-auto border border-slate-200 dark:border-slate-800">
+            {/* Modal Header */}
+            <div className="px-6 py-3.5 bg-white dark:bg-slate-900 flex items-center justify-between border-b border-slate-100 dark:border-slate-800 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 flex items-center justify-center shadow-xs">
+                  <Send size={18} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
+                      {lang === 'id' ? 'Buat Kampanye Broadcast Baru' : 'New Broadcast Campaign'}
+                    </h2>
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold">
+                      Pro Anti-Banned
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {lang === 'id'
+                      ? 'Kirim pesan siaran massal dengan perlindungan spintax humanis & simulator HP real-time.'
+                      : 'Send mass broadcast messages with human-like spintax protection & real-time smartphone simulator.'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsNewCampaignModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                title="Tutup Modal"
+              >
                 <X size={18} />
               </button>
             </div>
-            <div className="modal-body space-y-4">
-              <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">
-                  {lang === 'id' ? 'Judul Broadcast' : 'Campaign Title'}
-                </label>
-                <input
-                  type="text"
-                  placeholder={lang === 'id' ? 'misal: Promo Produk A - Weekend Special' : 'e.g. Product Promo A - Weekend Special'}
-                  value={campName}
-                  onChange={e => setCampName(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-xs"
-                />
-              </div>
 
-              {/* Audience Source Selector: Group vs Manual */}
-              <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1.5">
-                  {lang === 'id' ? 'Target Penerima Pesan (Sumber Kontak)' : 'Audience Source (Target Recipients)'}
-                </label>
-                <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-lg">
-                  <button
-                    type="button"
-                    onClick={() => setCampAudienceMode('group')}
-                    className={`text-xs py-2 px-3 rounded-md font-semibold flex items-center justify-center gap-1.5 transition-all ${
-                      campAudienceMode === 'group'
-                        ? 'bg-white text-blue-700 shadow-sm border border-slate-200'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <Tag size={14} />
-                    <span>{lang === 'id' ? 'Pilih dari Group Kontak' : 'Select from Contact Group'}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCampAudienceMode('manual')}
-                    className={`text-xs py-2 px-3 rounded-md font-semibold flex items-center justify-center gap-1.5 transition-all ${
-                      campAudienceMode === 'manual'
-                        ? 'bg-white text-blue-700 shadow-sm border border-slate-200'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <FileText size={14} />
-                    <span>{lang === 'id' ? 'Input Nomor Manual / Tempel' : 'Manual Phone Input / Paste'}</span>
-                  </button>
-                </div>
+            {/* Stepper Wizard Indicator */}
+            <div className="px-6 py-2 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between border-b border-slate-200/60 dark:border-slate-800 shrink-0 text-xs">
+              <div className="flex items-center gap-2 font-bold text-slate-800 dark:text-slate-200">
+                <span className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[9px] font-bold">
+                  ✓
+                </span>
+                <span>1. Info &amp; Pengirim</span>
               </div>
+              <div className="w-6 h-px bg-slate-200 dark:bg-slate-700"></div>
+              <div className="flex items-center gap-2 font-bold text-slate-800 dark:text-slate-200">
+                <span className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[9px] font-bold">
+                  ✓
+                </span>
+                <span>2. Target Penerima</span>
+              </div>
+              <div className="w-6 h-px bg-slate-200 dark:bg-slate-700"></div>
+              <div className="flex items-center gap-2 font-bold text-emerald-600 dark:text-emerald-400">
+                <span className="w-4 h-4 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 ring-2 ring-emerald-500/40 flex items-center justify-center text-[9px] font-bold">
+                  3
+                </span>
+                <span>3. Konten &amp; Template</span>
+              </div>
+              <div className="w-6 h-px bg-slate-200 dark:bg-slate-700"></div>
+              <div className="flex items-center gap-2 font-medium text-slate-400">
+                <span className="w-4 h-4 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400 flex items-center justify-center text-[9px] font-bold">
+                  4
+                </span>
+                <span>4. Jadwal &amp; Jitter</span>
+              </div>
+            </div>
 
-              {campAudienceMode === 'group' ? (
-                <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-lg space-y-3">
-                  <div>
-                    <label className="text-xs font-semibold text-blue-950 block mb-1">
-                      {lang === 'id' ? 'Pilih Group Kontak Sasaran:' : 'Select Target Contact Group:'}
+            {/* Modal Body: 2-Column Split */}
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+                {/* LEFT COLUMN: Campaign Setup Form (7 of 12) */}
+                <div className="lg:col-span-7 flex flex-col gap-3.5">
+                  {/* 1. Nama Kampanye */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
+                      <span>{lang === 'id' ? 'Nama Kampanye Siaran' : 'Campaign Title'}</span>
+                      <span className="text-[11px] text-slate-400 font-normal">Identifikasi internal</span>
                     </label>
-                    <select
-                      value={campSelectedTag}
-                      onChange={e => setCampSelectedTag(e.target.value)}
-                      className="w-full border border-blue-300 rounded-lg p-2.5 text-xs bg-white text-slate-800 font-medium focus:outline-none focus:border-blue-500"
-                    >
-                      <option value="ALL">
-                        {lang === 'id'
-                          ? `Semua Kontak (${contacts.filter(c => !c.opt_out).length} Kontak Aktif)`
-                          : `All Contacts (${contacts.filter(c => !c.opt_out).length} Active Contacts)`}
-                      </option>
-                      {availableTags.map(t => (
-                        <option key={t.tag} value={t.tag}>
-                          {lang === 'id' ? `Group: ${t.tag} (${t.count} Kontak)` : `Group: ${t.tag} (${t.count} Contacts)`}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="flex items-center justify-between text-xs text-slate-600 pt-1">
-                    <span className="flex items-center gap-1.5 font-medium text-blue-900">
-                      <CheckCircle size={14} className="text-blue-600" />
-                      <span>
-                        {lang === 'id' ? 'Target Penerima: ' : 'Target Recipients: '}
-                        <strong className="text-blue-700 font-bold">
-                          {campSelectedTag === 'ALL'
-                            ? contacts.filter(c => !c.opt_out).length
-                            : contacts.filter(c => c.tags.includes(campSelectedTag) && !c.opt_out).length}
-                        </strong>{' '}
-                        {lang === 'id'
-                          ? 'kontak (Nomor Opt-Out otomatis difilter)'
-                          : 'contacts (Opt-out numbers automatically filtered)'}
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={campName}
+                        onChange={e => setCampName(e.target.value)}
+                        placeholder={lang === 'id' ? 'misal: Promo Akhir Bulan - Flash Sale VIP' : 'e.g. VIP Flash Sale Promo'}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white dark:focus:bg-slate-900 transition-all"
+                      />
+                      <span className="absolute right-2.5 top-2.5 px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-[10px] font-bold text-slate-600 dark:text-slate-300">
+                        BROADCAST
                       </span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleFillRecipientsFromGroup}
-                      className="text-xs text-blue-700 hover:underline font-semibold"
-                      title={lang === 'id' ? 'Salin nomor dari group ini ke editor teks manual' : 'Copy numbers from this group to manual editor'}
-                    >
-                      {lang === 'id' ? 'Salin ke Teks Manual →' : 'Copy to Manual Text →'}
-                    </button>
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-xs font-semibold text-slate-700 block">
-                      {lang === 'id'
-                        ? 'Daftar Penerima (Format: Nomor,Nama per baris)'
-                        : 'Recipients List (Format: Phone,Name per line)'}
-                    </label>
-                    {availableTags.length > 0 && (
+
+                  {/* 2. Sesi WhatsApp Pengirim & Multi-Device */}
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800 flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                        <Smartphone size={15} className="text-emerald-600 dark:text-emerald-400" />
+                        <span>Sesi WhatsApp Pengirim</span>
+                      </label>
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-[10px] font-bold flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        Risiko Banned 0/100 (Aman)
+                      </span>
+                    </div>
+                    <div className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xs flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 flex items-center justify-center font-bold text-xs">
+                          {activeSession?.name?.substring(0, 3)?.toUpperCase() || 'S23'}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-xs font-bold text-slate-900 dark:text-white">
+                            {activeSession?.name || 'SAMSUNG S23'} ({activeSession?.phoneNumber || activeSession?.id || '+62 822-2308-9790'})
+                          </span>
+                          <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                            Batas Harian: 420 / 2.500 pesan terpakai
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 font-semibold border border-emerald-200 dark:border-emerald-800">
+                        Aktif
+                      </span>
+                    </div>
+
+                    {/* Multi-Device Load Balance Switch */}
+                    <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
+                      <div className="flex flex-col">
+                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                          Multi-Device Load Balancing
+                        </span>
+                        <span className="text-[11px] text-slate-400">
+                          Rotasi pesan otomatis jika memiliki lebih dari 1 sesi aktif
+                        </span>
+                      </div>
                       <button
                         type="button"
-                        onClick={handleFillRecipientsFromGroup}
-                        className="text-[11px] text-blue-600 hover:underline font-medium"
+                        onClick={() => setCampLoadBalancing(!campLoadBalancing)}
+                        className={`w-9 h-5 rounded-full transition-colors relative p-0.5 flex items-center ${
+                          campLoadBalancing ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-700'
+                        }`}
                       >
-                        {lang === 'id'
-                          ? `+ Salin dari group "${campSelectedTag === 'ALL' ? 'Semua Kontak' : campSelectedTag}"`
-                          : `+ Copy from group "${campSelectedTag === 'ALL' ? 'All Contacts' : campSelectedTag}"`}
+                        <span
+                          className={`w-4 h-4 rounded-full bg-white shadow-xs transition-transform transform ${
+                            campLoadBalancing ? 'translate-x-4' : 'translate-x-0'
+                          }`}
+                        ></span>
                       </button>
-                    )}
+                    </div>
                   </div>
-                  <textarea
-                    rows={5}
-                    value={campRecipientsRaw}
-                    onChange={e => setCampRecipientsRaw(e.target.value)}
-                    placeholder="628123456789,Budi Santoso&#10;628987654321,Siti Aminah"
-                    className="w-full border border-slate-200 rounded-lg p-2.5 text-xs font-mono"
-                  />
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    {lang === 'id'
-                      ? 'Dapat menempelkan langsung ribuan nomor dari file Notepad / Excel.'
-                      : 'You can paste thousands of phone numbers directly from Notepad / Excel.'}
-                  </p>
-                </div>
-              )}
 
-              <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">
-                  {lang === 'id' ? 'Template Pesan (Spintax & Variabel)' : 'Message Template (Spintax & Variables)'}
-                </label>
-                {messageTemplates.length > 0 && (
-                  <select
-                    value=""
-                    onChange={e => {
-                      const tpl = messageTemplates.find(t => t.id === e.target.value);
-                      if (tpl) setCampTemplate(tpl.content);
-                    }}
-                    className="w-full text-xs border border-slate-200 rounded-lg p-2 mb-2 bg-slate-50"
-                  >
-                    <option value="">{lang === 'id' ? '📂 Gunakan Template Tersimpan...' : '📂 Use Saved Template...'}</option>
-                    {messageTemplates.map(tpl => (
-                      <option key={tpl.id} value={tpl.id}>{tpl.name} ({tpl.category})</option>
-                    ))}
-                  </select>
-                )}
-                <textarea
-                  rows={4}
-                  value={campTemplate}
-                  onChange={e => setCampTemplate(e.target.value)}
-                  placeholder={lang === 'id' ? 'misal: {Halo|Hai} {{name}}, penawaran spesial untuk nomor {{phone}}...' : 'e.g. {Hello|Hi} {{name}}, special offer for phone {{phone}}...'}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-xs focus:outline-none focus:border-blue-500"
-                />
-                <p className="text-[11px] text-slate-400 mt-1">
-                  {lang === 'id'
-                    ? <>Mendukung spintax <code>{`{Halo|Hai}`}</code> dan variabel <code>{`{{name}}`}</code>, <code>{`{{phone}}`}</code></>
-                    : <>Supports spintax <code>{`{Hello|Hi}`}</code> and variables <code>{`{{name}}`}</code>, <code>{`{{phone}}`}</code></>}
-                </p>
-              </div>
+                  {/* 3. Target Penerima Pesan */}
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
+                      <span>Target Penerima Pesan</span>
+                      <span className="text-xs text-emerald-700 dark:text-emerald-400 font-bold">
+                        {campAudienceMode === 'group'
+                          ? (campSelectedTag === 'ALL'
+                              ? contacts.filter(c => !c.opt_out).length
+                              : contacts.filter(c => c.tags?.includes(campSelectedTag) && !c.opt_out).length)
+                          : campRecipientsRaw.split('\n').filter(l => l.trim().length > 0).length}{' '}
+                        Kontak Terpilih
+                      </span>
+                    </label>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">
-                    {lang === 'id' ? 'Jeda Acak Minimum (detik)' : 'Random Delay Min (seconds)'}
-                  </label>
-                  <input
-                    type="number"
-                    value={campRandomDelayMin}
-                    onChange={e => setCampRandomDelayMin(Number(e.target.value))}
-                    className="w-full border border-slate-200 rounded-lg p-2 text-xs font-mono"
-                  />
+                    {/* Source Tabs */}
+                    <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-center">
+                      <button
+                        type="button"
+                        onClick={() => setCampAudienceMode('group')}
+                        className={`py-1.5 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                          campAudienceMode === 'group'
+                            ? 'bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 shadow-xs'
+                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                        }`}
+                      >
+                        <Tag size={13} />
+                        <span>Grup CRM ({contacts.filter(c => !c.opt_out).length})</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCampAudienceMode('manual')}
+                        className={`py-1.5 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                          campAudienceMode === 'manual'
+                            ? 'bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 shadow-xs'
+                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                        }`}
+                      >
+                        <FileText size={13} />
+                        <span>Impor CSV / Tempel</span>
+                      </button>
+                    </div>
+
+                    {campAudienceMode === 'group' ? (
+                      <div className="p-3 bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-800 rounded-xl space-y-2.5">
+                        <div>
+                          <label className="text-[11px] font-bold text-emerald-900 dark:text-emerald-300 block mb-1">
+                            Pilih Segmen / Tag Kontak:
+                          </label>
+                          <select
+                            value={campSelectedTag}
+                            onChange={e => setCampSelectedTag(e.target.value)}
+                            className="w-full border border-emerald-300 dark:border-emerald-700 rounded-lg p-2 text-xs bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-medium focus:outline-none focus:border-emerald-500"
+                          >
+                            <option value="ALL">
+                              Semua Kontak ({contacts.filter(c => !c.opt_out).length} Kontak Aktif)
+                            </option>
+                            {availableTags.map(t => (
+                              <option key={t.tag} value={t.tag}>
+                                Tag: {t.tag} ({t.count} Kontak)
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 pt-0.5">
+                          <span className="flex items-center gap-1 text-emerald-800 dark:text-emerald-300 font-medium">
+                            <CheckCircle2 size={13} className="text-emerald-600" />
+                            Nomor opt-out otomatis disaring &amp; dilewati
+                          </span>
+                          <button
+                            type="button"
+                            onClick={handleFillRecipientsFromGroup}
+                            className="text-emerald-700 dark:text-emerald-400 hover:underline font-semibold"
+                          >
+                            Salin ke Teks Manual →
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <textarea
+                          rows={4}
+                          value={campRecipientsRaw}
+                          onChange={e => setCampRecipientsRaw(e.target.value)}
+                          placeholder="phone,name,invoice,total,kota&#10;628123456789,Budi Santoso,INV-01,150.000,Jakarta&#10;628987654321,Siti Aminah,INV-02,275.000,Bandung"
+                          className="w-full border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 text-xs font-mono bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+                        />
+                        <div className="flex items-center justify-between text-[11px] text-slate-500">
+                          <span>Mendukung kolom CSV atau format <code>nomor,nama</code>.</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCampRecipientsRaw(
+                                "phone,name,invoice,total,kota\n628123456789,Budi Santoso,INV-101,Rp 150.000,Surabaya\n628987654321,Siti Aminah,INV-102,Rp 250.000,Semarang"
+                              );
+                              setCampTemplate(
+                                "{Halo|Hai} kak {{name}}! Pesanan {{invoice}} sebesar {{total}} tujuan {{kota}} sedang diproses."
+                              );
+                            }}
+                            className="text-emerald-700 dark:text-emerald-400 font-semibold hover:underline"
+                          >
+                            + Muat Contoh Format CSV
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Smart Hygiene Toggles */}
+                    <div className="grid grid-cols-2 gap-2 mt-1">
+                      <button
+                        type="button"
+                        onClick={() => setCampIgnoreOptOut(!campIgnoreOptOut)}
+                        className={`p-2 rounded-lg border flex items-center justify-between text-xs transition-colors ${
+                          campIgnoreOptOut
+                            ? 'bg-emerald-50/70 dark:bg-emerald-950/40 border-emerald-300 text-emerald-800 dark:text-emerald-300 font-medium'
+                            : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200/60 text-slate-500'
+                        }`}
+                      >
+                        <span>Abaikan Opt-out/Unsub</span>
+                        <CheckCircle2 size={16} className={campIgnoreOptOut ? 'text-emerald-600' : 'text-slate-300'} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCampDeduplicate(!campDeduplicate)}
+                        className={`p-2 rounded-lg border flex items-center justify-between text-xs transition-colors ${
+                          campDeduplicate
+                            ? 'bg-emerald-50/70 dark:bg-emerald-950/40 border-emerald-300 text-emerald-800 dark:text-emerald-300 font-medium'
+                            : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200/60 text-slate-500'
+                        }`}
+                      >
+                        <span>Hapus Duplikasi Nomor</span>
+                        <CheckCircle2 size={16} className={campDeduplicate ? 'text-emerald-600' : 'text-slate-300'} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 4. Penyusun Pesan (Message Composer) */}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                        <Edit3 size={14} className="text-emerald-600" />
+                        <span>Konten Pesan Siaran</span>
+                      </label>
+                      <span className="text-[11px] text-slate-400">Spintax &amp; Format WA Didukung</span>
+                    </div>
+
+                    {/* Variable Pills Insertion Bar */}
+                    <div className="flex flex-wrap items-center gap-1.5 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase mr-1">Variabel:</span>
+                      {[
+                        { label: '{{nama}}', val: '{{nama}}' },
+                        { label: '{{nomor_hp}}', val: '{{nomor_hp}}' },
+                        { label: '{{sapaan_waktu}}', val: '{{sapaan_waktu}}' },
+                        { label: '{{kode_kupon}}', val: '{{kode_kupon}}' },
+                        { label: '{{invoice}}', val: '{{invoice}}' },
+                        { label: '{{total}}', val: '{{total}}' },
+                        { label: '{{kota}}', val: '{{kota}}' }
+                      ].map(chip => (
+                        <button
+                          key={chip.label}
+                          type="button"
+                          onClick={() => setCampTemplate(prev => prev + (prev.endsWith(' ') || prev === '' ? '' : ' ') + chip.val)}
+                          className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 text-[11px] font-mono font-medium transition-colors shadow-2xs"
+                        >
+                          {chip.label}
+                        </button>
+                      ))}
+                      <div className="ml-auto flex items-center gap-1 text-[11px] text-slate-500">
+                        <Shuffle size={12} className="text-emerald-600" />
+                        <span>Spintax: &#123;A|B|C&#125;</span>
+                      </div>
+                    </div>
+
+                    {/* Saved Templates Selector */}
+                    {messageTemplates.length > 0 && (
+                      <select
+                        value=""
+                        onChange={e => {
+                          const tpl = messageTemplates.find(t => t.id === e.target.value);
+                          if (tpl) setCampTemplate(tpl.content);
+                        }}
+                        className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-lg p-2 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                      >
+                        <option value="">📂 Gunakan Template Tersimpan...</option>
+                        {messageTemplates.map(tpl => (
+                          <option key={tpl.id} value={tpl.id}>
+                            {tpl.name} ({tpl.category})
+                          </option>
+                        ))}
+                      </select>
+                    )}
+
+                    {/* Text Area */}
+                    <div className="relative">
+                      <textarea
+                        rows={5}
+                        value={campTemplate}
+                        onChange={e => setCampTemplate(e.target.value)}
+                        placeholder="{Halo|Hai|Selamat siang} kak {{nama}}! Dapatkan diskon 35% dengan kode {{kode_kupon}}..."
+                        className="w-full p-3.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-slate-200 shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-500 leading-relaxed resize-none"
+                      />
+                      <span className="absolute right-3 bottom-2.5 text-[10px] text-slate-400 bg-white/90 dark:bg-slate-800/90 px-1.5 py-0.5 rounded">
+                        {campTemplate.length} Karakter
+                      </span>
+                    </div>
+
+                    {/* Attachment Info Capsule */}
+                    <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-800 flex items-center justify-between">
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <label className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center text-emerald-600 cursor-pointer hover:bg-emerald-200 transition-colors shrink-0">
+                          <Image size={18} />
+                          <input
+                            type="file"
+                            accept="image/*,video/*,application/pdf"
+                            className="hidden"
+                            onChange={e => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                setCampMediaFile(file);
+                                setCampMediaType(file.type.startsWith('video') ? 'video' : file.type.startsWith('image') ? 'image' : 'document');
+                              }
+                            }}
+                          />
+                        </label>
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
+                            {campMediaFile ? campMediaFile.name : 'Lampirkan Gambar / Dokumen (Opsional)'}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            {campMediaFile
+                              ? `${(campMediaFile.size / 1024).toFixed(0)} KB • File Terpilih`
+                              : 'Klik ikon untuk menyertakan media siaran'}
+                          </span>
+                        </div>
+                      </div>
+                      {campMediaFile ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCampMediaFile(null);
+                            setCampMediaPath('');
+                            setCampMediaType('');
+                          }}
+                          className="px-2 py-0.5 rounded bg-rose-50 text-rose-700 text-[10px] font-bold border border-rose-200 hover:bg-rose-100"
+                        >
+                          Hapus File
+                        </button>
+                      ) : (
+                        <label className="px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold border border-emerald-200 dark:border-emerald-800 cursor-pointer hover:bg-emerald-100">
+                          + Pilih Media
+                          <input
+                            type="file"
+                            accept="image/*,video/*,application/pdf"
+                            className="hidden"
+                            onChange={e => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                setCampMediaFile(file);
+                                setCampMediaType(file.type.startsWith('video') ? 'video' : file.type.startsWith('image') ? 'image' : 'document');
+                              }
+                            }}
+                          />
+                        </label>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 5. Proteksi Anti-Banned & Jitter Humanis */}
+                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                        <ShieldCheck size={16} className="text-emerald-600" />
+                        <span>Proteksi Anti-Banned &amp; Jadwal Kirim</span>
+                      </span>
+                      <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-bold">
+                        Smart Jitter Aktif
+                      </span>
+                    </div>
+
+                    {/* Jitter Delay Inputs */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] font-medium text-slate-500 block mb-1">
+                          Jeda Minimum (detik)
+                        </label>
+                        <input
+                          type="number"
+                          value={campRandomDelayMin}
+                          onChange={e => setCampRandomDelayMin(Math.max(1, Number(e.target.value)))}
+                          className="w-full border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-xs font-mono bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-medium text-slate-500 block mb-1">
+                          Jeda Maksimum (detik)
+                        </label>
+                        <input
+                          type="number"
+                          value={campRandomDelayMax}
+                          onChange={e => setCampRandomDelayMax(Math.max(campRandomDelayMin, Number(e.target.value)))}
+                          className="w-full border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-xs font-mono bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] text-slate-400">
+                      <span>Rentang Jeda Acak: <strong>{campRandomDelayMin} - {campRandomDelayMax} Detik</strong> per pesan</span>
+                      <span>Meniru pola ketik alami manusia</span>
+                    </div>
+
+                    {/* Auto-Stop Switch */}
+                    <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-slate-700/60 text-xs">
+                      <span className="text-slate-600 dark:text-slate-400 text-[11px]">
+                        Hentikan otomatis jika terjadi kegagalan &gt; 5 kali berturut-turut
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setCampAutoStop(!campAutoStop)}
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-colors ${
+                          campAutoStop
+                            ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
+                            : 'bg-slate-100 text-slate-500 border-slate-200'
+                        }`}
+                      >
+                        {campAutoStop ? 'Auto-Stop ON' : 'Auto-Stop OFF'}
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">
-                    {lang === 'id' ? 'Jeda Acak Maksimum (detik)' : 'Random Delay Max (seconds)'}
-                  </label>
-                  <input
-                    type="number"
-                    value={campRandomDelayMax}
-                    onChange={e => setCampRandomDelayMax(Number(e.target.value))}
-                    className="w-full border border-slate-200 rounded-lg p-2 text-xs font-mono"
-                  />
+
+                {/* RIGHT COLUMN: Realtime WhatsApp Smartphone Simulator (5 of 12) */}
+                <div className="lg:col-span-5 flex flex-col gap-3">
+                  {/* Recipient Simulator Selector */}
+                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between shadow-2xs">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 flex items-center justify-center">
+                        <Users size={14} />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-slate-400 font-medium">Pratinjau Variabel Untuk:</span>
+                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                          Budi Santoso (+62 812-3456-7890)
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCampaignPreviewSeed(s => s + 1)}
+                      className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 border border-slate-200 dark:border-slate-700 text-xs font-bold shadow-2xs transition-colors flex items-center gap-1"
+                      title="Acak Spintax & Sapaan"
+                    >
+                      <Shuffle size={12} />
+                      <span>Acak</span>
+                    </button>
+                  </div>
+
+                  {/* SMARTPHONE FRAME CONTAINER */}
+                  <div className="w-full rounded-[26px] bg-slate-900 p-2 shadow-2xl flex flex-col border border-slate-700">
+                    {/* Inner Bezel Screen */}
+                    <div className="w-full rounded-[20px] bg-[#0b141b] overflow-hidden flex flex-col relative h-[490px]">
+                      {/* Phone Status Bar */}
+                      <div className="h-6 px-3.5 bg-[#1f2c34] text-slate-300 flex items-center justify-between text-[10px] font-sans">
+                        <span className="font-semibold">13:45</span>
+                        <div className="w-10 h-3 bg-black rounded-full mx-auto"></div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px]">5G</span>
+                          <span className="text-[11px]">88%</span>
+                        </div>
+                      </div>
+
+                      {/* WhatsApp Top Header */}
+                      <div className="px-3 py-2 bg-[#1f2c34] text-white flex items-center justify-between shadow-xs">
+                        <div className="flex items-center gap-2">
+                          <ChevronLeft size={16} className="text-slate-300" />
+                          <div className="relative">
+                            <div className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-[11px]">
+                              WA
+                            </div>
+                            <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-400 ring-1 ring-[#1f2c34]"></span>
+                          </div>
+                          <div className="flex flex-col">
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs font-bold text-white leading-tight">WhatsAman Official</span>
+                              <CheckCircle2 size={12} className="text-emerald-400 fill-emerald-400" />
+                            </div>
+                            <span className="text-[9px] text-slate-300">
+                              online ({activeSession?.phoneNumber || '+62 822-2308-9790'})
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-slate-300">
+                          <MoreVertical size={16} />
+                        </div>
+                      </div>
+
+                      {/* Chat Canvas with Radial Pattern */}
+                      <div
+                        className="flex-1 p-3 overflow-y-auto flex flex-col justify-end bg-[#0b141b] relative"
+                        style={{
+                          backgroundImage: 'radial-gradient(#1f2c34 1px, transparent 1px)',
+                          backgroundSize: '14px 14px'
+                        }}
+                      >
+                        {/* Date Stamp */}
+                        <div className="flex justify-center mb-2.5">
+                          <span className="px-2 py-0.5 rounded-md bg-[#182229] text-slate-400 text-[9px] uppercase tracking-wider shadow-2xs">
+                            Hari Ini
+                          </span>
+                        </div>
+
+                        {/* WhatsApp Message Bubble */}
+                        <div className="max-w-[92%] bg-[#005c4b] text-white rounded-2xl rounded-tl-xs p-2 shadow-md flex flex-col gap-1.5 self-start animate-in fade-in duration-150">
+                          {/* Promotional Banner Preview */}
+                          <div className="w-full rounded-xl overflow-hidden bg-gradient-to-tr from-emerald-800 via-teal-700 to-emerald-600 p-2.5 text-white flex flex-col justify-between aspect-[16/9] shadow-inner">
+                            <div className="flex items-center justify-between">
+                              <span className="px-1.5 py-0.5 rounded bg-black/40 text-[8px] uppercase tracking-wider font-bold">
+                                PROMO SPESIAL
+                              </span>
+                              <span className="text-xs font-bold text-emerald-200">35% OFF</span>
+                            </div>
+                            <div className="flex flex-col mt-2">
+                              <span className="text-xs font-bold leading-tight">WhatsAman Gateway Pro</span>
+                              <span className="text-[9px] text-emerald-100">Broadcast massal aman &amp; tertarget.</span>
+                            </div>
+                          </div>
+
+                          {/* Rendered Evaluated Message Body */}
+                          <div className="px-1 pt-1 flex flex-col gap-1 text-[11px] leading-relaxed text-slate-100 font-sans">
+                            <p className="whitespace-pre-wrap">
+                              {(() => {
+                                let txt = campTemplate || 'Halo kak {{nama}}!';
+                                // Evaluate Spintax {A|B|C}
+                                txt = txt.replace(/\{([^{}]+)\}/g, (_, choices) => {
+                                  const opts = choices.split('|');
+                                  const idx = Math.abs(campaignPreviewSeed) % opts.length;
+                                  return opts[idx] || opts[0];
+                                });
+                                // Replace variables
+                                txt = txt.replace(/\{\{name\}\}|\{\{nama\}\}/gi, 'Budi Santoso');
+                                txt = txt.replace(/\{\{phone\}\}|\{\{nomor_hp\}\}|\{\{nomor\}\}/gi, '+62 812-3456-7890');
+                                txt = txt.replace(/\{\{sapaan_waktu\}\}/gi, 'Selamat siang');
+                                txt = txt.replace(/\{\{kode_kupon\}\}/gi, 'VIPMEI2025');
+                                txt = txt.replace(/\{\{invoice\}\}/gi, 'INV-2026-088');
+                                txt = txt.replace(/\{\{total\}\}/gi, 'Rp 150.000');
+                                txt = txt.replace(/\{\{kota\}\}/gi, 'Surabaya');
+                                return txt;
+                              })()}
+                            </p>
+
+                            {/* Timestamp & Double Blue Tick */}
+                            <div className="flex items-center justify-end gap-1 text-[9px] text-emerald-200/80 -mt-0.5">
+                              <span>13:45</span>
+                              <CheckCheck size={12} className="text-sky-400 font-bold" />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Fake Bottom Input Bar */}
+                      <div className="p-1.5 bg-[#1f2c34] flex items-center gap-1 shrink-0">
+                        <div className="flex-1 bg-[#2a3942] rounded-full px-2.5 py-1 flex items-center justify-between text-slate-400 text-[10px]">
+                          <span className="flex items-center gap-1">
+                            <Smile size={12} />
+                            <span>Ketik pesan</span>
+                          </span>
+                          <Paperclip size={12} />
+                        </div>
+                        <div className="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center">
+                          <Mic size={12} />
+                        </div>
+                      </div>
+
+                      {/* Phone Home Bar */}
+                      <div className="h-3 bg-[#1f2c34] flex items-center justify-center">
+                        <div className="w-14 h-1 bg-slate-500 rounded-full"></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Spintax Summary Banner */}
+                  <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-800 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <Sparkles size={14} className="text-emerald-600" />
+                      <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                        Simulasi Spintax &amp; Variabel Aktif
+                      </span>
+                    </div>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 font-bold border border-emerald-200 dark:border-emerald-800">
+                      Live Mockup
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
-            <div className="modal-footer">
-              <button onClick={() => setIsNewCampaignModal(false)} className="btn-secondary">
-                {t.common.cancel}
-              </button>
-              <button
-                onClick={handleCreateCampaign}
-                disabled={
-                  !campName.trim() ||
-                  (campAudienceMode === 'manual' && !campRecipientsRaw.trim()) ||
-                  (campAudienceMode === 'group' &&
-                    (campSelectedTag === 'ALL'
-                      ? contacts.filter(c => !c.opt_out).length === 0
-                      : contacts.filter(c => c.tags.includes(campSelectedTag) && !c.opt_out).length === 0))
-                }
-                className="btn-primary"
-              >
-                {lang === 'id' ? 'Jadwalkan Broadcast' : 'Schedule Broadcast'}
-              </button>
+
+            {/* MODAL FOOTER */}
+            <div className="px-6 py-3.5 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4 shrink-0 shadow-lg">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-emerald-600">
+                  <Clock size={16} />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-slate-900 dark:text-white">
+                    Estimasi Selesai:{' '}
+                    {(() => {
+                      const count =
+                        campAudienceMode === 'group'
+                          ? (campSelectedTag === 'ALL'
+                              ? contacts.filter(c => !c.opt_out).length
+                              : contacts.filter(c => c.tags?.includes(campSelectedTag) && !c.opt_out).length)
+                          : campRecipientsRaw.split('\n').filter(l => l.trim().length > 0).length;
+                      const avgDelay = Math.max(1, ((Number(campRandomDelayMin) || 5) + (Number(campRandomDelayMax) || 15)) / 2);
+                      const totalSec = Math.round(count * avgDelay);
+                      const h = Math.floor(totalSec / 3600);
+                      const m = Math.floor((totalSec % 3600) / 60);
+                      const s = totalSec % 60;
+                      if (h > 0) return `~${h} Jam ${m} Menit`;
+                      if (m > 0) return `~${m} Menit ${s} Detik`;
+                      return `~${s} Detik`;
+                    })()}
+                  </span>
+                  <span className="text-[10px] text-slate-400">
+                    {campAudienceMode === 'group'
+                      ? (campSelectedTag === 'ALL'
+                          ? contacts.filter(c => !c.opt_out).length
+                          : contacts.filter(c => c.tags?.includes(campSelectedTag) && !c.opt_out).length)
+                      : campRecipientsRaw.split('\n').filter(l => l.trim().length > 0).length}{' '}
+                    Penerima • Rata-rata jeda humanis {((Number(campRandomDelayMin) || 5) + (Number(campRandomDelayMax) || 15)) / 2} detik
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsNewCampaignModal(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-all"
+                >
+                  {t.common.cancel}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCreateCampaign}
+                  disabled={
+                    !campName.trim() ||
+                    (campAudienceMode === 'manual' && !campRecipientsRaw.trim()) ||
+                    (campAudienceMode === 'group' &&
+                      (campSelectedTag === 'ALL'
+                        ? contacts.filter(c => !c.opt_out).length === 0
+                        : contacts.filter(c => c.tags?.includes(campSelectedTag) && !c.opt_out).length === 0))
+                  }
+                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Send size={14} />
+                  <span>{lang === 'id' ? 'Jadwalkan & Mulai Siaran' : 'Schedule & Start Campaign'}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

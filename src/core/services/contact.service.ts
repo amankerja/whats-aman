@@ -102,6 +102,22 @@ export class ContactService {
     contactRepository.delete(sessionId, phone);
   }
 
+  public batchDeleteContacts(sessionId: string, phones: string[]): number {
+    return contactRepository.batchDelete(sessionId, phones);
+  }
+
+  public batchUpdateStage(sessionId: string, phones: string[], stage: 'lead' | 'prospect' | 'customer' | 'churned'): number {
+    return contactRepository.batchUpdateStage(sessionId, phones, stage);
+  }
+
+  public batchToggleOptOut(sessionId: string, phones: string[], optOut: boolean): number {
+    return contactRepository.batchToggleOptOut(sessionId, phones, optOut);
+  }
+
+  public batchUpdateTags(sessionId: string, phones: string[], tags: string[], mode: 'add' | 'remove' | 'replace'): number {
+    return contactRepository.batchUpdateTags(sessionId, phones, tags, mode);
+  }
+
   public getTags(sessionId: string): Array<{ tag: string; count: number }> {
     return contactRepository.getAllTags(sessionId);
   }
@@ -134,8 +150,10 @@ export class ContactService {
 
     let count = 0;
     for (const row of rows) {
-      // Look for phone field under common names: phone, no_hp, nomor, telp, mobile
-      const rawPhone = row.phone || row.no_hp || row.nomor || row.telp || row.mobile || row.Phone || row.WhatsApp;
+      // Look for phone field under various aliases in Indonesian and English
+      const rawPhone = 
+        row['Nomor Telepon'] || row['No HP'] || row['No WA'] || row['Telepon'] || row['Handphone'] ||
+        row.phone || row.no_hp || row.nomor || row.telp || row.mobile || row.Phone || row.WhatsApp;
       if (!rawPhone) continue;
 
       let phone = String(rawPhone).replace(/[^0-9]/g, '');
@@ -147,10 +165,24 @@ export class ContactService {
         phone = '62' + phone;
       }
 
-      const name = row.name || row.nama || row.Nama || row.Name || '';
-      const tags = row.tag || row.tags ? String(row.tag || row.tags).split(',').map((t) => t.trim()) : [];
-      const stage = (row.stage || row.pipeline || 'lead').toLowerCase();
-      const validStage = ['lead', 'prospect', 'customer', 'churned'].includes(stage) ? (stage as any) : 'lead';
+      const name = 
+        row['Nama Kontak'] || row['Nama Lengkap'] || row['Nama Pelanggan'] || row['Pelanggan'] ||
+        row.name || row.nama || row.Nama || row.Name || '';
+
+      const rawTags = 
+        row['Group / Tags'] || row['Group'] || row['Grup'] || row['Kategori'] ||
+        row.tag || row.tags || row.Tag || row.Tags || '';
+      const tags = rawTags ? String(rawTags).split(',').map((t) => t.trim()).filter(Boolean) : [];
+
+      const rawStage = (
+        row['Pipeline Stage'] || row['Status Pipeline'] || row['Status CRM'] ||
+        row.stage || row.pipeline || 'lead'
+      ).toString().toLowerCase().trim();
+      const validStage = ['lead', 'prospect', 'customer', 'churned'].includes(rawStage) ? (rawStage as any) : 'lead';
+
+      const notes = 
+        row['Catatan CRM'] || row['Catatan'] || row['Keterangan'] ||
+        row.notes || row.catatan || row.Notes || row.Catatan || '';
 
       this.addOrUpdateContact({
         sessionId,
@@ -158,7 +190,7 @@ export class ContactService {
         name,
         tags,
         pipelineStage: validStage,
-        notes: row.notes || row.catatan || '',
+        notes,
         customFields: row
       });
       count++;
@@ -170,20 +202,61 @@ export class ContactService {
 
   public exportToExcel(sessionId: string): Buffer {
     const { data } = this.getContacts(sessionId, 10000, 0);
-    const exportRows = data.map((c) => ({
-      Phone: c.phone,
-      Name: c.name || '',
-      PushName: c.push_name || '',
-      PipelineStage: (c.pipeline_stage || 'lead').toUpperCase(),
-      Tags: c.tags.join(', '),
-      Notes: c.notes || '',
-      OptOut: c.opt_out ? 'YES' : 'NO',
-      ...c.custom_fields
+    const exportRows = data.map((c, idx) => ({
+      No: idx + 1,
+      'Nomor Telepon': c.phone,
+      'Nama Kontak': c.name || '',
+      'Push Name (WA)': c.push_name || '',
+      'Pipeline Stage': (c.pipeline_stage || 'lead').toUpperCase(),
+      'Group / Tags': c.tags.join(', '),
+      'Status Opt-Out': c.opt_out ? 'OPT-OUT (BLOKIR)' : 'OPT-IN AKTIF',
+      'Catatan CRM': c.notes || ''
     }));
 
     const worksheet = xlsx.utils.json_to_sheet(exportRows);
     const workbook = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(workbook, worksheet, 'Contacts');
+    xlsx.utils.book_append_sheet(workbook, worksheet, 'Direktori Kontak');
+    return xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+  }
+
+  public generateTemplateExcel(): Buffer {
+    const sampleRows = [
+      {
+        'Nomor Telepon': '081234567890',
+        'Nama Kontak': 'Budi Santoso',
+        'Pipeline Stage': 'lead',
+        'Group / Tags': 'VIP, Pelanggan Baru',
+        'Catatan CRM': 'Minat promo paket bundling awal bulan'
+      },
+      {
+        'Nomor Telepon': '6289876543210',
+        'Nama Kontak': 'Siti Rahmawati',
+        'Pipeline Stage': 'prospect',
+        'Group / Tags': 'Reseller, Jawa Barat',
+        'Catatan CRM': 'Menunggu konfirmasi sampel produk'
+      },
+      {
+        'Nomor Telepon': '085712345678',
+        'Nama Kontak': 'Ahmad Fauzi',
+        'Pipeline Stage': 'customer',
+        'Group / Tags': 'Prioritas, Grosir',
+        'Catatan CRM': 'Repeat order rutin setiap minggu'
+      }
+    ];
+
+    const worksheet = xlsx.utils.json_to_sheet(sampleRows);
+    
+    // Set nice column widths
+    worksheet['!cols'] = [
+      { wch: 18 }, // Nomor Telepon
+      { wch: 22 }, // Nama Kontak
+      { wch: 16 }, // Pipeline Stage
+      { wch: 25 }, // Group / Tags
+      { wch: 40 }  // Catatan CRM
+    ];
+
+    const workbook = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(workbook, worksheet, 'Template Kontak');
     return xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
   }
 }

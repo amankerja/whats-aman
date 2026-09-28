@@ -92,6 +92,11 @@ sessionRouter.delete('/:id', async (req: Request, res: Response, next: NextFunct
   }
 });
 
+const TRANSPARENT_1X1_GIF = Buffer.from(
+  'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+  'base64'
+);
+
 // GET /api/v1/sessions/:id/avatar - Direct image stream or redirect
 sessionRouter.get('/:id/avatar', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -101,7 +106,10 @@ sessionRouter.get('/:id/avatar', async (req: Request, res: Response, next: NextF
     const url = await sessionManager.getProfilePictureUrl(sessionId, jid, forceRefresh);
 
     if (!url) {
-      res.status(404).json({ success: false, message: 'Avatar not found' });
+      res.setHeader('Content-Type', 'image/gif');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      res.setHeader('X-Avatar-Status', 'not-found');
+      res.status(200).send(TRANSPARENT_1X1_GIF);
       return;
     }
 
@@ -117,6 +125,7 @@ sessionRouter.get('/:id/avatar', async (req: Request, res: Response, next: NextF
         const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
         res.setHeader('Content-Type', contentType);
         res.setHeader('Cache-Control', 'public, max-age=86400');
+        res.setHeader('X-Avatar-Status', 'found');
         res.send(buffer);
         return;
       }
@@ -126,7 +135,10 @@ sessionRouter.get('/:id/avatar', async (req: Request, res: Response, next: NextF
 
     res.redirect(url);
   } catch (err) {
-    res.status(404).json({ success: false, message: 'Avatar not found' });
+    res.setHeader('Content-Type', 'image/gif');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('X-Avatar-Status', 'not-found');
+    res.status(200).send(TRANSPARENT_1X1_GIF);
   }
 });
 

@@ -858,8 +858,13 @@ export class BaileysAdapter implements IWhatsAppEngine {
       }
     }
 
-    const timestamp = typeof msg.messageTimestamp === 'number'
-      ? msg.messageTimestamp * 1000
+    const rawTs = (msg.messageTimestamp as any)?.low !== undefined
+      ? Number((msg.messageTimestamp as any).low)
+      : typeof msg.messageTimestamp === 'number'
+      ? msg.messageTimestamp
+      : Number(msg.messageTimestamp);
+    const timestamp = !isNaN(rawTs) && rawTs > 0
+      ? (rawTs < 1e11 ? rawTs * 1000 : rawTs)
       : Date.now();
 
     // Fast LID resolution for normalized message

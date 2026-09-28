@@ -83,8 +83,9 @@ const MONTH_NAMES_ID = [
 ];
 
 export function formatWhatsAppTimestamp(timestamp: number): string {
-  if (!timestamp) return '';
-  const date = new Date(timestamp);
+  if (!timestamp || timestamp <= 0) return '';
+  const ms = timestamp < 1e11 ? timestamp * 1000 : timestamp;
+  const date = new Date(ms);
   const now = new Date();
 
   const isToday = date.toDateString() === now.toDateString();
@@ -107,8 +108,9 @@ export function formatWhatsAppTimestamp(timestamp: number): string {
 }
 
 export function formatDateSeparator(timestamp: number): string {
-  if (!timestamp) return '';
-  const date = new Date(timestamp);
+  if (!timestamp || timestamp <= 0) return '';
+  const ms = timestamp < 1e11 ? timestamp * 1000 : timestamp;
+  const date = new Date(ms);
   const now = new Date();
 
   const isToday = date.toDateString() === now.toDateString();
@@ -127,21 +129,79 @@ export function formatDateSeparator(timestamp: number): string {
 }
 
 /**
- * Shared parser for "phone,name" recipient lines.
- * Used by both the Quick Chat Broadcast and New Campaign forms so their
- * name-parsing logic can never diverge again.
+ * Shared parser for recipient lines.
+ * Format standard: phone,name
+ * Format with custom vars:
+ * 1) Header row: phone,name,invoice,total,...
+ * 2) Key=Value inline: 62812345678,Budi,invoice=INV-001,total=150.000
+ * 3) Simple CSV columns: 62812345678,Budi,INV-001,150.000
  */
-export function parseRecipientLines(raw: string): Array<{ phone: string; name?: string; customVars: any }> {
-  return raw
-    .split('\n')
-    .map(line => {
-      const parts = line.split(',');
-      const phone = parts[0]?.trim().replace(/[^0-9]/g, '');
-      const name = parts[1]?.trim();
-      if (!phone || phone.length < 7) return null;
-      return { phone, name: name || undefined, customVars: {} };
-    })
-    .filter(Boolean) as Array<{ phone: string; name?: string; customVars: any }>;
+export function parseRecipientLines(raw: string): Array<{ phone: string; name?: string; variables?: Record<string, string>; customVars?: Record<string, string> }> {
+  const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  if (lines.length === 0) return [];
+
+  // Check if first row is header row
+  let headerCols: string[] | null = null;
+  const firstParts = lines[0].split(',').map(p => p.trim());
+  const firstPhoneCand = firstParts[0].replace(/[^0-9]/g, '');
+  if (firstPhoneCand.length < 7 && lines.length > 1) {
+    headerCols = firstParts.map(col => col.toLowerCase().replace(/[^a-z0-9_]/g, ''));
+  }
+
+  const startIdx = headerCols ? 1 : 0;
+  const results: Array<{ phone: string; name?: string; variables?: Record<string, string>; customVars?: Record<string, string> }> = [];
+
+  for (let i = startIdx; i < lines.length; i++) {
+    const parts = lines[i].split(',').map(p => p.trim());
+    if (parts.length === 0) continue;
+
+    const phone = parts[0]?.replace(/[^0-9]/g, '');
+    if (!phone || phone.length < 7) continue;
+
+    let name = parts[1] && !parts[1].includes('=') ? parts[1] : undefined;
+    const variables: Record<string, string> = {};
+
+    if (headerCols && headerCols.length > 0) {
+      parts.forEach((val, idx) => {
+        const colKey = headerCols![idx];
+        if (colKey && val) {
+          variables[colKey] = val;
+          if ((colKey === 'name' || colKey === 'nama') && !name) {
+            name = val;
+          }
+        }
+      });
+    } else {
+      // Parse key=value or additional columns
+      for (let j = 1; j < parts.length; j++) {
+        const seg = parts[j];
+        if (seg.includes('=')) {
+          const [k, ...v] = seg.split('=');
+          const cleanK = k.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+          const val = v.join('=').trim();
+          if (cleanK) {
+            variables[cleanK] = val;
+            if ((cleanK === 'name' || cleanK === 'nama') && !name) {
+              name = val;
+            }
+          }
+        } else if (j > 1) {
+          variables[`var${j - 1}`] = seg;
+        }
+      }
+    }
+
+    if (name) {
+      variables['name'] = name;
+      variables['nama'] = name;
+    }
+    variables['phone'] = phone;
+    variables['nomor'] = phone;
+
+    results.push({ phone, name, variables, customVars: variables });
+  }
+
+  return results;
 }
 
 export function getAvatarBgColor(str: string): string {
