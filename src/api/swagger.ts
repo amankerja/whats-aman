@@ -3,7 +3,7 @@ export const swaggerDocument = {
   info: {
     title: 'WhatsAman REST API',
     version: '1.0.0',
-    description: 'REST API untuk WhatsAman — WhatsApp Dashboard by Aman Kerja Studio (Berbasis Baileys Engine)'
+    description: 'REST API untuk WhatsAman — WhatsApp Dashboard by Aman Kerja Studio (Berbasis Aman Gateway Engine)'
   },
   servers: [
     {

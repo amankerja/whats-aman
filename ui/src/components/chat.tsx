@@ -1,7 +1,7 @@
 // Chat UI components extracted from App.tsx (refactor stage 1)
 
 import React, { useState, useEffect } from 'react';
-import { Users, Radio, Smartphone, Paperclip, Smile, Send, CheckCheck, Mic, Video, FileText, Image } from 'lucide-react';
+import { Users, Radio, Smartphone, Paperclip, Smile, Send, CheckCheck, Mic, Video, FileText, Image, Clock, AlertCircle } from 'lucide-react';
 import type { ChatMessage } from '../types';
 import { getAvatarBgColor } from '../utils/format';
 
@@ -17,7 +17,17 @@ interface ChatAvatarProps {
 }
 
 const loadedAvatarUrls = new Set<string>();
-const failedAvatarUrls = new Set<string>();
+const failedAvatarUrls = new Map<string, number>();
+
+function isAvatarFailed(url: string): boolean {
+  const failedAt = failedAvatarUrls.get(url);
+  if (!failedAt) return false;
+  if (Date.now() - failedAt > 30000) {
+    failedAvatarUrls.delete(url);
+    return false;
+  }
+  return true;
+}
 
 export const ChatAvatar: React.FC<ChatAvatarProps> = React.memo(({
   sessionId,
@@ -29,9 +39,16 @@ export const ChatAvatar: React.FC<ChatAvatarProps> = React.memo(({
   size = 18,
   style
 }) => {
-  const avatarUrl = sessionId && jid ? `/api/v1/sessions/${sessionId}/avatar?jid=${encodeURIComponent(jid)}` : null;
+  const isValidAvatarJid = Boolean(
+    jid &&
+    jid !== '0' &&
+    !jid.startsWith('0@') &&
+    jid !== 'status@broadcast' &&
+    !jid.includes('@broadcast')
+  );
+  const avatarUrl = sessionId && isValidAvatarJid ? `/api/v1/sessions/${sessionId}/avatar?jid=${encodeURIComponent(jid)}` : null;
 
-  const [hasError, setHasError] = useState(() => avatarUrl ? failedAvatarUrls.has(avatarUrl) : false);
+  const [hasError, setHasError] = useState(() => avatarUrl ? isAvatarFailed(avatarUrl) : false);
   const [isLoaded, setIsLoaded] = useState(() => avatarUrl ? loadedAvatarUrls.has(avatarUrl) : false);
 
   useEffect(() => {
@@ -43,11 +60,10 @@ export const ChatAvatar: React.FC<ChatAvatarProps> = React.memo(({
     if (loadedAvatarUrls.has(avatarUrl)) {
       setIsLoaded(true);
       setHasError(false);
-    } else if (failedAvatarUrls.has(avatarUrl)) {
+    } else if (isAvatarFailed(avatarUrl)) {
       setIsLoaded(false);
       setHasError(true);
     } else {
-      setIsLoaded(false);
       setHasError(false);
     }
   }, [avatarUrl]);
@@ -58,16 +74,18 @@ export const ChatAvatar: React.FC<ChatAvatarProps> = React.memo(({
 
   return (
     <div
-      className={`chat-avatar ${className || ''} privacy-blur-pic`}
+      className={`chat-avatar rounded-full ${className || ''} privacy-blur-pic`}
       style={{
-        backgroundColor: (!isLoaded || hasError) ? bgColor : 'transparent',
+        backgroundColor: isLoaded && !hasError ? 'transparent' : bgColor,
         color: textColor,
         fontWeight: 700,
         position: 'relative',
         overflow: 'hidden',
+        borderRadius: '50%',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        contain: 'paint layout',
         ...style
       }}
     >
@@ -75,12 +93,14 @@ export const ChatAvatar: React.FC<ChatAvatarProps> = React.memo(({
         <img
           src={avatarUrl}
           alt={displayName}
+          loading="lazy"
+          decoding="async"
           referrerPolicy="no-referrer"
           crossOrigin="anonymous"
           onLoad={(e) => {
             const img = e.currentTarget;
             if (img.naturalWidth <= 1 && img.naturalHeight <= 1) {
-              failedAvatarUrls.add(avatarUrl);
+              failedAvatarUrls.set(avatarUrl, Date.now());
               loadedAvatarUrls.delete(avatarUrl);
               setHasError(true);
               setIsLoaded(false);
@@ -92,25 +112,36 @@ export const ChatAvatar: React.FC<ChatAvatarProps> = React.memo(({
             }
           }}
           onError={() => {
-            failedAvatarUrls.add(avatarUrl);
+            failedAvatarUrls.set(avatarUrl, Date.now());
             loadedAvatarUrls.delete(avatarUrl);
             setHasError(true);
             setIsLoaded(false);
           }}
           style={{
             position: 'absolute',
-            top: 0,
-            left: 0,
+            inset: 0,
             width: '100%',
             height: '100%',
             objectFit: 'cover',
             borderRadius: '50%',
-            display: isLoaded ? 'block' : 'none'
+            opacity: isLoaded && !hasError ? 1 : 0,
+            transition: 'opacity 0.2s ease-in-out',
+            zIndex: 1
           }}
         />
       )}
-      {(!isLoaded || hasError) && (
-        isGroup ? (
+      <span
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: '100%',
+          height: '100%',
+          opacity: isLoaded && !hasError ? 0 : 1,
+          transition: 'opacity 0.2s ease-in-out'
+        }}
+      >
+        {isGroup ? (
           <Users size={size} />
         ) : isNewsletter ? (
           <Radio size={size} />
@@ -118,8 +149,8 @@ export const ChatAvatar: React.FC<ChatAvatarProps> = React.memo(({
           displayName.slice(0, 2).toUpperCase()
         ) : (
           <Smartphone size={size} />
-        )
-      )}
+        )}
+      </span>
     </div>
   );
 });
@@ -145,14 +176,20 @@ export const ChatInputBox: React.FC<ChatInputBoxProps> = React.memo(({
   value,
   onChange,
 }) => {
-  const [internalText, setInternalText] = useState('');
-  const text = value !== undefined ? value : internalText;
+  // Ultra-responsive local draft state: keystrokes reflect immediately with 0ms latency
+  const [text, setText] = useState(value || '');
+
+  // Synchronize when external value changes (e.g. quick reply selected or cleared)
+  useEffect(() => {
+    if (value !== undefined) {
+      setText(value);
+    }
+  }, [value]);
 
   const handleTextChange = (val: string) => {
+    setText(val);
     if (onChange) {
       onChange(val);
-    } else {
-      setInternalText(val);
     }
   };
 
@@ -162,7 +199,8 @@ export const ChatInputBox: React.FC<ChatInputBoxProps> = React.memo(({
       const trimmed = text.trim();
       if (!trimmed || disabled) return;
       onSend(trimmed);
-      handleTextChange('');
+      setText('');
+      if (onChange) onChange('');
     }
   };
 
@@ -171,7 +209,8 @@ export const ChatInputBox: React.FC<ChatInputBoxProps> = React.memo(({
     const trimmed = text.trim();
     if (!trimmed || disabled) return;
     onSend(trimmed);
-    handleTextChange('');
+    setText('');
+    if (onChange) onChange('');
   };
 
   return (
@@ -295,10 +334,16 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = React.memo(({
               {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </span>
             {isMe && (
-              <CheckCheck
-                size={14}
-                className={`message-status-icon ${m.status === 'READ' ? 'read' : ''}`}
-              />
+              m.status === 'PENDING' ? (
+                <Clock size={12} className="message-status-icon text-slate-400" />
+              ) : m.status === 'FAILED' ? (
+                <AlertCircle size={12} className="message-status-icon text-rose-500" />
+              ) : (
+                <CheckCheck
+                  size={14}
+                  className={`message-status-icon ${m.status === 'READ' ? 'read' : ''}`}
+                />
+              )
             )}
           </div>
         </div>

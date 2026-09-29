@@ -63,6 +63,41 @@ export class MessageRepository {
     });
   }
 
+  public saveBatch(messages: NormalizedMessage[], status: MessageRecord['status'] = 'DELIVERED'): void {
+    if (!messages.length) return;
+    const stmt = this.getStatement('save_msg', `
+      INSERT OR REPLACE INTO messages (
+        id, session_id, message_id, chat_jid, sender_jid, from_me, push_name,
+        content_text, media_type, media_url, caption, status, timestamp, created_at
+      ) VALUES (
+        @id, @session_id, @message_id, @chat_jid, @sender_jid, @from_me, @push_name,
+        @content_text, @media_type, @media_url, @caption, @status, @timestamp, @created_at
+      )
+    `);
+    const tx = this.db.transaction((items: NormalizedMessage[]) => {
+      const now = Date.now();
+      for (const msg of items) {
+        stmt.run({
+          id: `${msg.sessionId}:${msg.id}`,
+          session_id: msg.sessionId,
+          message_id: msg.id,
+          chat_jid: msg.chatJid,
+          sender_jid: msg.senderJid,
+          from_me: msg.fromMe ? 1 : 0,
+          push_name: msg.pushName || null,
+          content_text: msg.text || null,
+          media_type: msg.mediaType || null,
+          media_url: msg.mediaUrl || null,
+          caption: msg.caption || null,
+          status,
+          timestamp: msg.timestamp,
+          created_at: now
+        });
+      }
+    });
+    tx(messages);
+  }
+
   public updateStatus(sessionId: string, messageId: string, status: MessageRecord['status']): void {
     const stmt = this.getStatement('update_status', `
       UPDATE messages SET status = ? WHERE session_id = ? AND message_id = ?
@@ -126,7 +161,11 @@ export class MessageRepository {
     const stmt = this.getStatement('find_recent_chats', `
       WITH RecentMessages AS (
         SELECT * FROM messages
-        WHERE session_id = ? AND chat_jid != 'status@broadcast' AND chat_jid NOT LIKE '%@broadcast'
+        WHERE session_id = ? 
+          AND chat_jid != 'status@broadcast' 
+          AND chat_jid NOT LIKE '%@broadcast'
+          AND chat_jid != '0@s.whatsapp.net'
+          AND chat_jid != '0'
         ORDER BY timestamp DESC
         LIMIT ${RECENT_WINDOW}
       ),
@@ -171,9 +210,17 @@ export class MessageRepository {
           WHEN rm.chat_jid LIKE '%@g.us' THEN NULL 
           ELSE COALESCE(c.push_name, cpn.peer_push_name) 
         END as push_name,
-        COALESCE(unreads.unread_count, 0) as unread_count
+        COALESCE(unreads.unread_count, 0) as unread_count,
+        COALESCE(
+          c.phone,
+          CASE 
+            WHEN rm.chat_jid LIKE '%@s.whatsapp.net' THEN SUBSTR(rm.chat_jid, 1, INSTR(rm.chat_jid, '@') - 1)
+            WHEN rm.chat_jid LIKE '%@c.us' THEN SUBSTR(rm.chat_jid, 1, INSTR(rm.chat_jid, '@') - 1)
+            ELSE NULL 
+          END
+        ) as resolved_phone
       FROM RankedMessages rm
-      LEFT JOIN contacts c ON c.session_id = rm.session_id AND c.jid = rm.chat_jid
+      LEFT JOIN contacts c ON c.session_id = rm.session_id AND (c.jid = rm.chat_jid OR c.phone = REPLACE(rm.chat_jid, '@lid', ''))
       LEFT JOIN groups g ON g.session_id = rm.session_id AND g.jid = rm.chat_jid
       LEFT JOIN (
         SELECT chat_jid, peer_push_name

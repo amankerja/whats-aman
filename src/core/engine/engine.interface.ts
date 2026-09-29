@@ -91,4 +91,6 @@ export interface IWhatsAppEngine {
   getGroupMetadata(groupJid: string): Promise<GroupInfo>;
   resolveLidToPhone?(lid: string): string | undefined;
   getProfilePictureUrl?(jid?: string, forceRefresh?: boolean): Promise<string | null>;
+  subscribePresence?(jid: string): Promise<void>;
+  sendPresenceUpdate?(presence: 'available' | 'unavailable'): Promise<void>;
 }

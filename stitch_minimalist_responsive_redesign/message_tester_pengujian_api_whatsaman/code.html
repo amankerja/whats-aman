@@ -58,7 +58,7 @@
 <div class="flex items-center gap-2 mt-1 font-body-sm text-body-sm text-on-surface-variant">
 <span>Latensi: <strong class="text-primary font-semibold">38 ms</strong></span>
 <span>•</span>
-<span>Baileys v6.5.0</span>
+<span>Aman Gateway v6.5.0</span>
 </div>
 </div>
 </div>
@@ -202,7 +202,7 @@
 </div>
 </div>
 <!-- Optional Media Attachment Box (Hidden by default, shown via JS) -->
-<div class="hidden flex flex-col gap-2 p-3 bg-surface-container-low rounded-xl" id="media-attachment-box">
+<div class="hidden flex-col gap-2 p-3 bg-surface-container-low rounded-xl" id="media-attachment-box">
 <label class="font-label-md text-label-md font-bold text-on-surface flex items-center justify-between">
 <span>Lampiran Berkas (Media URL / Upload)</span>
 <span class="font-label-xs text-label-xs text-on-surface-variant">Maks. 16MB</span>
@@ -355,7 +355,7 @@
 </div>
 </div>
 <!-- View 2: Live API Response Terminal (Dark code container) -->
-<div class="hidden flex flex-col gap-2" id="view-json-response">
+<div class="hidden" id="view-json-response">
 <div class="bg-inverse-surface text-inverse-on-surface rounded-xl overflow-hidden shadow-inner flex flex-col">
 <!-- macOS Console Top Bar -->
 <div class="flex items-center justify-between px-3 py-2 bg-inverse-surface/80">
@@ -418,7 +418,7 @@
 <span class="material-symbols-outlined text-[20px]">bolt</span>
 </div>
 <div class="flex flex-col">
-<span class="font-label-md text-label-md font-bold text-on-surface">Status Buffer Baileys Gateway</span>
+<span class="font-label-md text-label-md font-bold text-on-surface">Status Buffer Aman Gateway</span>
 <span class="font-label-xs text-label-xs text-on-surface-variant">Buffer: 0 antrean pending • Socket ID: #983-live</span>
 </div>
 </div>
@@ -590,8 +590,10 @@
     const mediaBox = document.getElementById('media-attachment-box');
     if (type === 'media' || type === 'document') {
       mediaBox.classList.remove('hidden');
+      mediaBox.classList.add('flex');
     } else {
       mediaBox.classList.add('hidden');
+      mediaBox.classList.remove('flex');
     }
   }
 

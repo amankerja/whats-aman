@@ -32,7 +32,7 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { ChatAvatar } from '../components/chat';
-import { formatPhoneForDisplay } from '../utils/format';
+import { formatPhoneForDisplay, isLidNumber, getCleanContactName, isPhoneLike } from '../utils/format';
 import { PanelCtx } from './ctx';
 import type { Contact } from '../types';
 
@@ -78,6 +78,8 @@ const ContactsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
   // Advanced Filters
   const [stageFilter, setStageFilter] = useState<'ALL' | 'lead' | 'prospect' | 'customer' | 'churned'>('ALL');
   const [optOutFilter, setOptOutFilter] = useState<'ALL' | 'active' | 'opt_out'>('ALL');
+  const [namedFilter, setNamedFilter] = useState<'named' | 'all'>('named');
+  const [isCleaningUnnamed, setIsCleaningUnnamed] = useState(false);
 
   // Multi-Selection State
   const [selectedPhones, setSelectedPhones] = useState<Set<string>>(new Set());
@@ -97,10 +99,25 @@ const ContactsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
   // Ref for file input
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Ultra-responsive debounced search: typing is 0ms instant
+  const [searchDraft, setSearchDraft] = useState(contactSearchQuery);
+  useEffect(() => {
+    setSearchDraft(contactSearchQuery);
+  }, [contactSearchQuery]);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      if (searchDraft !== contactSearchQuery) {
+        setContactSearchQuery(searchDraft);
+      }
+    }, 150);
+    return () => clearTimeout(handler);
+  }, [searchDraft, contactSearchQuery, setContactSearchQuery]);
+
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [contactSearchQuery, selectedTagFilter, stageFilter, optOutFilter, pageSize, selectedSessionId]);
+  }, [contactSearchQuery, selectedTagFilter, stageFilter, optOutFilter, namedFilter, pageSize, selectedSessionId]);
 
   // Clean selection if session changes
   useEffect(() => {
@@ -150,6 +167,18 @@ const ContactsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
       result = result.filter(c => Boolean(c.opt_out));
     }
 
+    // Filter by Named Status (default: hide nameless bot/strangers)
+    if (namedFilter === 'named' && !contactSearchQuery.trim()) {
+      result = result.filter(c => {
+        const name = (c.name || '').trim();
+        const push = (c.push_name || '').trim();
+        const hasName = Boolean(name && name !== '-' && name !== '—');
+        const hasPush = Boolean(push && push !== '-' && push !== '—');
+        const hasMetadata = (c.tags && c.tags.length > 0) || Boolean(c.notes) || (c.deal_value !== undefined && c.deal_value !== null);
+        return hasName || hasPush || hasMetadata;
+      });
+    }
+
     // Filter by Search Query
     if (contactSearchQuery.trim()) {
       const q = contactSearchQuery.toLowerCase().trim();
@@ -172,8 +201,12 @@ const ContactsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
         valA = a.phone || '';
         valB = b.phone || '';
       } else if (sortColumn === 'name') {
-        valA = (a.name || a.push_name || a.phone || '').toLowerCase();
-        valB = (b.name || b.push_name || b.phone || '').toLowerCase();
+        const nameA = a.name || a.push_name || '';
+        const nameB = b.name || b.push_name || '';
+        if (!nameA && nameB) return 1;
+        if (nameA && !nameB) return -1;
+        valA = nameA.toLowerCase();
+        valB = nameB.toLowerCase();
       } else if (sortColumn === 'stage') {
         valA = a.pipeline_stage || 'lead';
         valB = b.pipeline_stage || 'lead';
@@ -306,6 +339,50 @@ const ContactsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
       showToast(err.message || 'Gagal export kontak', 'error');
     } finally {
       setIsExportingContacts(false);
+    }
+  };
+
+  // Clean bot / unnamed contacts
+  const handleCleanUnnamed = async () => {
+    if (!selectedSessionId) {
+      showToast(lang === 'id' ? 'Silakan pilih sesi WhatsApp terlebih dahulu' : 'Please select a WhatsApp session first', 'warn');
+      return;
+    }
+
+    const ok = await appConfirm(
+      lang === 'id'
+        ? 'Apakah Anda yakin ingin menghapus semua nomor bot, OTP, dan kontak tanpa nama dari database?'
+        : 'Are you sure you want to remove all bot numbers, OTP, and unnamed contacts from database?',
+      {
+        danger: true,
+        confirmLabel: lang === 'id' ? 'Ya, Bersihkan' : 'Yes, Clean'
+      }
+    );
+    if (!ok) return;
+
+    try {
+      setIsCleaningUnnamed(true);
+      const res = await fetch('/api/v1/contacts/clean-unnamed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: selectedSessionId })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(
+          lang === 'id'
+            ? `Berhasil membersihkan ${data.count || 0} kontak tanpa nama/bot!`
+            : `Successfully cleaned ${data.count || 0} unnamed/bot contacts!`,
+          'success'
+        );
+        await Promise.all([fetchContacts(selectedSessionId), fetchTags(selectedSessionId)]);
+      } else {
+        showToast(data.message || 'Gagal membersihkan kontak', 'error');
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Gagal membersihkan kontak', 'error');
+    } finally {
+      setIsCleaningUnnamed(false);
     }
   };
 
@@ -518,13 +595,15 @@ const ContactsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
     setSelectedTagFilter('ALL');
     setStageFilter('ALL');
     setOptOutFilter('ALL');
+    setNamedFilter('named');
   };
 
   const hasActiveFilters =
     Boolean(contactSearchQuery.trim()) ||
     selectedTagFilter !== 'ALL' ||
     stageFilter !== 'ALL' ||
-    optOutFilter !== 'ALL';
+    optOutFilter !== 'ALL' ||
+    namedFilter !== 'named';
 
   return (
     <>
@@ -736,6 +815,18 @@ const ContactsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
                 <span>{isExportingContacts ? (lang === 'id' ? 'Mengekspor...' : 'Exporting...') : (lang === 'id' ? 'Ekspor Excel' : 'Export')}</span>
               </button>
 
+              {/* Clean Bot / Unnamed Contacts */}
+              <button
+                type="button"
+                onClick={handleCleanUnnamed}
+                disabled={isCleaningUnnamed}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white text-[#b91c1c] border border-[#fecaca] rounded-[8px] hover:bg-[#fef2f2] transition-colors disabled:opacity-60"
+                title={lang === 'id' ? 'Hapus semua kontak bot/tanpa nama dari database CRM' : 'Purge all bot/unnamed contacts from CRM'}
+              >
+                <Trash2 size={13} className={isCleaningUnnamed ? 'animate-spin text-[#b91c1c]' : 'text-[#b91c1c]'} />
+                <span>{isCleaningUnnamed ? (lang === 'id' ? 'Membersihkan...' : 'Cleaning...') : (lang === 'id' ? 'Bersihkan Bot' : 'Clean Bots')}</span>
+              </button>
+
               {/* Add Single Contact Modal */}
               <button
                 type="button"
@@ -758,14 +849,14 @@ const ContactsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
               <input
                 type="text"
                 placeholder={lang === 'id' ? 'Cari nama, nomor HP, group, catatan...' : 'Search name, phone, tags, notes...'}
-                value={contactSearchQuery}
-                onChange={e => setContactSearchQuery(e.target.value)}
+                value={searchDraft}
+                onChange={e => setSearchDraft(e.target.value)}
                 className="w-full pl-9 pr-8 py-1.5 text-xs bg-white border border-[#e2e8f0] rounded-[8px] text-[#0f172a] placeholder-[#94a3b8] focus:outline-none focus:border-[#059669]"
               />
-              {contactSearchQuery && (
+              {searchDraft && (
                 <button
                   type="button"
-                  onClick={() => setContactSearchQuery('')}
+                  onClick={() => { setSearchDraft(''); setContactSearchQuery(''); }}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#94a3b8] hover:text-[#0f172a]"
                 >
                   <X size={12} />
@@ -818,6 +909,18 @@ const ContactsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
                   <option value="ALL">{lang === 'id' ? 'Semua Status Opt-Out' : 'All Status'}</option>
                   <option value="active">{lang === 'id' ? 'Hanya Opt-In Aktif' : 'Opt-In Active Only'}</option>
                   <option value="opt_out">{lang === 'id' ? 'Hanya Opt-Out (Blokir)' : 'Opt-Out Only'}</option>
+                </select>
+              </div>
+
+              {/* Filter by Named Only */}
+              <div className="flex items-center gap-1 bg-white border border-[#e2e8f0] rounded-[8px] px-2.5 py-1 text-xs">
+                <select
+                  value={namedFilter}
+                  onChange={e => setNamedFilter(e.target.value as any)}
+                  className="bg-transparent text-xs text-[#0f172a] focus:outline-none cursor-pointer"
+                >
+                  <option value="named">{lang === 'id' ? 'Hanya Kontak Bernama' : 'Named Contacts Only'}</option>
+                  <option value="all">{lang === 'id' ? 'Semua Kontak (Termasuk Tanpa Nama)' : 'All Contacts'}</option>
                 </select>
               </div>
 
@@ -1128,7 +1231,7 @@ const ContactsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
                             <ChatAvatar
                               sessionId={selectedSessionId}
                               jid={`${c.phone}@s.whatsapp.net`}
-                              name={c.name || c.push_name || c.phone}
+                              name={getCleanContactName(c.name, c.push_name) || c.phone}
                               size={14}
                               className="chat-avatar privacy-blur privacy-blur-pic flex-shrink-0 rounded-full"
                               style={{ width: '32px', height: '32px' }}
@@ -1136,20 +1239,25 @@ const ContactsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
                             <div>
                               <div className="flex items-center gap-1.5">
                                 <span className="font-mono font-semibold text-[#0f172a] text-[13px] privacy-blur privacy-blur-name">
-                                  {formatPhoneForDisplay(c.phone) || `+${c.phone}`}
+                                  {c.phone && isLidNumber(c.phone) ? (
+                                    <span className="text-[11px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded font-medium border border-amber-200">
+                                      🔒 Nomor Privat
+                                    </span>
+                                  ) : (
+                                    formatPhoneForDisplay(c.phone) || `+${c.phone}`
+                                  )}
                                 </span>
-                                <a
-                                  href={`https://wa.me/${c.phone}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-[#94a3b8] hover:text-[#059669] transition-colors"
-                                  title={lang === 'id' ? 'Buka di WhatsApp Web / App' : 'Open in WhatsApp'}
-                                >
-                                  <ExternalLink size={11} />
-                                </a>
-                              </div>
-                              <div className="text-[10px] text-[#94a3b8] font-mono privacy-blur privacy-blur-name">
-                                {c.phone}@s.whatsapp.net
+                                {c.phone && !isLidNumber(c.phone) && (
+                                  <a
+                                    href={`https://wa.me/${c.phone}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[#94a3b8] hover:text-[#059669] transition-colors"
+                                    title={lang === 'id' ? 'Buka di WhatsApp Web / App' : 'Open in WhatsApp'}
+                                  >
+                                    <ExternalLink size={11} />
+                                  </a>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -1158,14 +1266,14 @@ const ContactsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
                         {/* Name */}
                         <td className="py-2.5 px-3">
                           <div className="font-medium text-[#0f172a] privacy-blur privacy-blur-name">
-                            {c.name || c.push_name || '—'}
+                            {getCleanContactName(c.name, c.push_name) || '—'}
                           </div>
                         </td>
 
                         {/* Push Name */}
                         <td className="py-2.5 px-3">
                           <span className="text-[#64748b] text-[11px] privacy-blur privacy-blur-name">
-                            {c.push_name || '—'}
+                            {(!isPhoneLike(c.push_name) ? c.push_name : '') || '—'}
                           </span>
                         </td>
 

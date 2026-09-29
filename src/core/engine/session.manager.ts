@@ -142,6 +142,13 @@ export class SessionManager {
     }
     return null;
   }
+
+  public async subscribePresence(sessionId: string, jid: string): Promise<void> {
+    const session = this.findSession(sessionId);
+    if (session && session.subscribePresence) {
+      await session.subscribePresence(jid);
+    }
+  }
 }
 
 export const sessionManager = new SessionManager();

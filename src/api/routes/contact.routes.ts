@@ -33,6 +33,36 @@ contactRouter.post('/sync', (req: Request, res: Response, next: NextFunction) =>
   }
 });
 
+// POST /api/v1/contacts/resolve-lids - Resolve all raw WhatsApp LIDs into real phone numbers and clean duplicates
+contactRouter.post('/resolve-lids', (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { sessionId } = req.body;
+    const result = contactService.resolveAndCleanLidContacts(sessionId ? String(sessionId) : undefined);
+    res.json({
+      success: true,
+      message: `Berhasil meresolusi ${result.resolvedCount} LID (${result.mergedDuplicates} digabung, ${result.updatedCount} diperbarui, ${result.messagesUpdated} pesan sinkron)`,
+      ...result
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/v1/contacts/clean-unnamed - Remove all unnamed stranger/bot contacts from CRM
+contactRouter.post('/clean-unnamed', (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { sessionId } = req.body;
+    if (!sessionId) {
+      res.status(400).json({ success: false, message: 'sessionId is required' });
+      return;
+    }
+    const result = contactService.cleanUnnamedContacts(String(sessionId));
+    res.json({ success: true, ...result });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/v1/contacts - List contacts
 contactRouter.get('/', (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -43,7 +73,7 @@ contactRouter.get('/', (req: Request, res: Response, next: NextFunction) => {
     }
     const result = contactService.getContacts(
       String(sessionId),
-      limit ? parseInt(String(limit), 10) : 100,
+      limit ? parseInt(String(limit), 10) : 10000,
       offset ? parseInt(String(offset), 10) : 0
     );
     res.json({ success: true, ...result });
@@ -102,11 +132,12 @@ contactRouter.put('/:phone/tags', (req: Request, res: Response, next: NextFuncti
 // POST /api/v1/contacts - Add or update contact
 contactRouter.post('/', (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { sessionId, phone, name, tags, customFields, optOut, pipelineStage, notes } = req.body;
+    const { sessionId, phone, name, tags, customFields, optOut, pipelineStage, dealValue, deal_value, notes } = req.body;
     if (!sessionId || !phone) {
       res.status(400).json({ success: false, message: 'sessionId and phone are required' });
       return;
     }
+    const val = dealValue !== undefined ? Number(dealValue) : (deal_value !== undefined ? Number(deal_value) : undefined);
     contactService.addOrUpdateContact({
       sessionId,
       phone,
@@ -114,6 +145,7 @@ contactRouter.post('/', (req: Request, res: Response, next: NextFunction) => {
       tags,
       customFields,
       pipelineStage,
+      dealValue: val !== undefined && !isNaN(val) ? val : undefined,
       notes,
       optOut: Boolean(optOut)
     });
@@ -208,6 +240,23 @@ contactRouter.patch('/:phone/opt-out', (req: Request, res: Response, next: NextF
     }
     contactService.setOptOut(String(sessionId), String(phone), Boolean(optOut));
     res.json({ success: true, message: `Contact opt-out set to ${Boolean(optOut)}` });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PATCH /api/v1/contacts/:phone/deal-value - Update deal value
+contactRouter.patch('/:phone/deal-value', (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const sessionId = (req.query.sessionId || req.body.sessionId) as string;
+    const phone = req.params.phone;
+    const dealValue = Number(req.body.dealValue ?? req.body.deal_value ?? 0);
+    if (!sessionId) {
+      res.status(400).json({ success: false, message: 'sessionId is required' });
+      return;
+    }
+    contactService.updateDealValue(String(sessionId), String(phone), isNaN(dealValue) ? 0 : dealValue);
+    res.json({ success: true, message: 'Deal value updated successfully', dealValue: isNaN(dealValue) ? 0 : dealValue });
   } catch (err) {
     next(err);
   }

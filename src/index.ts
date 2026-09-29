@@ -73,4 +73,13 @@ Swagger UI : http://${config.server.host}:${config.server.port}/docs
   }
 }
 
+// Global safety net: absorb aborted network streams and external disconnects without killing the server
+process.on('uncaughtException', (err: any) => {
+  logger.error({ err: err?.message, stack: err?.stack, code: err?.code }, 'Uncaught exception absorbed safely');
+});
+
+process.on('unhandledRejection', (reason: any) => {
+  logger.error({ reason: reason?.message || reason }, 'Unhandled promise rejection absorbed safely');
+});
+
 bootstrap();

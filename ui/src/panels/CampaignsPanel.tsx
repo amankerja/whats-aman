@@ -3,7 +3,7 @@
 // and are provided via PanelCtx.
 
 import React, { useState } from 'react';
-import { LayoutDashboard, Smartphone, MessageSquare, Users, UserPlus, Target, Layers, Send, Zap, ClipboardList, Server, FileText, Plus, RefreshCw, QrCode, KeyRound, Trash2, Play, Pause, Download, Upload, CheckCircle, CheckCircle2, AlertCircle, Clock, Activity, Search, ChevronRight, ChevronLeft, Copy, Check, Paperclip, CheckCheck, Sun, Moon, Menu, X, Eye, LogOut, Radio, FileSpreadsheet, ShieldCheck, XCircle, ToggleLeft, ToggleRight, Edit3, Bot, ChevronDown, Smile, MoreVertical, Tag, Mic, Video, Image, HardDrive, Settings, Webhook, Code2, ExternalLink, Share2, Globe, Languages, HelpCircle, BookOpen, Sparkles } from 'lucide-react';
+import { LayoutDashboard, Smartphone, MessageSquare, Users, UserPlus, Target, Layers, Send, Zap, ClipboardList, Server, FileText, Plus, RefreshCw, QrCode, KeyRound, Trash2, Play, Pause, Download, Upload, CheckCircle, CheckCircle2, AlertCircle, Clock, Activity, Search, ChevronRight, ChevronLeft, Copy, Check, Paperclip, CheckCheck, Sun, Moon, Menu, X, Eye, LogOut, Radio, FileSpreadsheet, ShieldCheck, XCircle, ToggleLeft, ToggleRight, Edit3, Bot, ChevronDown, Smile, MoreVertical, Tag, Mic, Video, Image, HardDrive, Settings, Webhook, Code2, ExternalLink, Share2, Globe, Languages, HelpCircle, BookOpen, Sparkles, CheckSquare, Square, MinusSquare } from 'lucide-react';
 import { ChatAvatar, ChatInputBox, ChatMessageBubble } from '../components/chat';
 import { parsePhoneFromJid, isSameChat, formatPhoneForDisplay, formatWhatsAppTimestamp, formatDateSeparator, parseRecipientLines, getAvatarBgColor } from '../utils/format';
 import { PanelCtx } from './ctx';
@@ -361,6 +361,70 @@ const CampaignsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
     const matchesSearch = `${c.name} ${c.id} ${c.template_text || ''}`.toLowerCase().includes(campSearch.toLowerCase());
     return matchesFilter && matchesSearch;
   });
+
+  // Multiple Selection & Batch Actions for Broadcast Campaigns
+  const [selectedCampIds, setSelectedCampIds] = useState<Set<string>>(new Set());
+
+  const handleToggleSelectCampaign = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setSelectedCampIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const allCampsSelected = filteredCampaigns.length > 0 && selectedCampIds.size === filteredCampaigns.length;
+  const someCampsSelected = selectedCampIds.size > 0 && !allCampsSelected;
+
+  const handleSelectAllCampaigns = () => {
+    if (allCampsSelected) {
+      setSelectedCampIds(new Set());
+    } else {
+      setSelectedCampIds(new Set(filteredCampaigns.map(c => c.id)));
+    }
+  };
+
+  const handleBatchPauseCampaigns = async () => {
+    if (selectedCampIds.size === 0) return;
+    const ids = Array.from(selectedCampIds);
+    for (const id of ids) {
+      await handlePauseCampaign(id);
+    }
+    showToast(lang === 'id' ? `Menjeda ${ids.length} kampanye siaran` : `Paused ${ids.length} campaigns`, 'info');
+  };
+
+  const handleBatchStartCampaigns = async () => {
+    if (selectedCampIds.size === 0) return;
+    const ids = Array.from(selectedCampIds);
+    for (const id of ids) {
+      await handleStartCampaign(id);
+    }
+    showToast(lang === 'id' ? `Memulai ${ids.length} kampanye siaran` : `Started ${ids.length} campaigns`, 'success');
+  };
+
+  const handleBatchDeleteCampaigns = async () => {
+    if (selectedCampIds.size === 0) return;
+    const count = selectedCampIds.size;
+    const ok = await appConfirm(
+      lang === 'id'
+        ? `Apakah Anda yakin ingin menghapus ${count} kampanye broadcast terpilih?`
+        : `Are you sure you want to delete ${count} selected broadcast campaigns?`,
+      {
+        confirmLabel: lang === 'id' ? `Hapus ${count} Kampanye` : `Delete ${count} Campaigns`,
+        cancelLabel: lang === 'id' ? 'Batal' : 'Cancel',
+        danger: true
+      }
+    );
+    if (!ok) return;
+
+    for (const id of Array.from(selectedCampIds)) {
+      await handleDeleteCampaign(id);
+    }
+    setSelectedCampIds(new Set());
+    showToast(lang === 'id' ? `Berhasil menghapus ${count} kampanye` : `Deleted ${count} campaigns`, 'success');
+  };
 
   return (
     <div className="space-y-6">
@@ -789,6 +853,69 @@ const CampaignsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
         </div>
       </section>
 
+      {/* Campaigns Bulk Action Bar */}
+      {selectedCampIds.size > 0 && (
+        <div className="bg-white border-2 border-emerald-500 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-md sticky top-2 z-30 animate-in fade-in slide-in-from-top-2 duration-150">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 bg-emerald-100 px-2.5 py-1 rounded-full">
+              <Check size={13} className="stroke-[3]" />
+              {selectedCampIds.size} {lang === 'id' ? 'Kampanye Terpilih' : 'Campaigns Selected'}
+            </span>
+            <button
+              type="button"
+              onClick={handleSelectAllCampaigns}
+              className="text-xs text-emerald-600 hover:underline font-semibold cursor-pointer"
+            >
+              {allCampsSelected
+                ? (lang === 'id' ? 'Batalkan pilihan' : 'Deselect all')
+                : (lang === 'id' ? `Pilih seluruh ${filteredCampaigns.length} kampanye` : `Select all ${filteredCampaigns.length} campaigns`)}
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Batch Start */}
+            <button
+              type="button"
+              onClick={handleBatchStartCampaigns}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer"
+            >
+              <Play size={13} />
+              <span>{lang === 'id' ? 'Mulai Terpilih' : 'Start Selected'}</span>
+            </button>
+
+            {/* Batch Pause */}
+            <button
+              type="button"
+              onClick={handleBatchPauseCampaigns}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+            >
+              <Pause size={13} />
+              <span>{lang === 'id' ? 'Jeda Terpilih' : 'Pause Selected'}</span>
+            </button>
+
+            {/* Batch Delete */}
+            <button
+              type="button"
+              onClick={handleBatchDeleteCampaigns}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+            >
+              <Trash2 size={13} />
+              <span>{lang === 'id' ? 'Hapus' : 'Delete'}</span>
+            </button>
+
+            {/* Clear Selection */}
+            <button
+              type="button"
+              onClick={() => setSelectedCampIds(new Set())}
+              className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              title={lang === 'id' ? 'Batalkan pilihan' : 'Clear selection'}
+            >
+              <X size={15} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Campaign Cards List */}
       <section className="flex flex-col gap-4">
         {filteredCampaigns.length === 0 ? (
@@ -802,7 +929,7 @@ const CampaignsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
             </p>
             <button
               onClick={() => setIsNewCampaignModal(true)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-sm mt-2"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-sm mt-2 cursor-pointer"
             >
               <Plus size={16} />
               <span>{t.campaigns.newBroadcast}</span>
@@ -814,11 +941,14 @@ const CampaignsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
             const isPaused = c.status === 'PAUSED';
             const isCompleted = c.status === 'COMPLETED';
             const percent = c.total_recipients > 0 ? Math.round((c.sent_count / c.total_recipients) * 100) : 0;
+            const isSelected = selectedCampIds.has(c.id);
 
             return (
               <div
                 key={c.id}
-                className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-sm hover:shadow-md transition-all flex flex-col gap-4 relative overflow-hidden"
+                className={`bg-white rounded-xl p-5 border shadow-sm hover:shadow-md transition-all flex flex-col gap-4 relative overflow-hidden ${
+                  isSelected ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-slate-200/90'
+                }`}
               >
                 {/* Top Accent Ribbon */}
                 <div
@@ -833,7 +963,19 @@ const CampaignsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
 
                 {/* Card Header */}
                 <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-3">
-                  <div className="flex items-start gap-3.5 min-w-0">
+                  <div className="flex items-start gap-2.5 min-w-0">
+                    <button
+                      type="button"
+                      onClick={(e) => handleToggleSelectCampaign(c.id, e)}
+                      className="p-1 text-slate-400 hover:text-emerald-600 rounded transition-colors mt-0.5 cursor-pointer shrink-0"
+                      title={isSelected ? (lang === 'id' ? 'Batalkan pilihan' : 'Deselect') : (lang === 'id' ? 'Pilih kampanye' : 'Select campaign')}
+                    >
+                      {isSelected ? (
+                        <CheckSquare size={18} className="text-emerald-600 fill-emerald-50" />
+                      ) : (
+                        <Square size={18} className="text-slate-300 hover:text-slate-500" />
+                      )}
+                    </button>
                     <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5">
                       <Radio size={20} />
                     </div>

@@ -7,19 +7,20 @@
 
 ## 1. Filosofi & Prinsip Desain
 
-1. **Single Engine, Zero Redundancy**: Tidak menjalankan WAHA, OpenWA, dan Baileys sebagai 3 server terpisah. Sebaliknya, mengambil filosofi arsitektur terbaik dari masing-masing:
-   - **Baileys**: Lapisan terbawah sebagai *Transport & WhatsApp Socket Protocol Engine*.
+1. **Single Engine, Zero Redundancy**: Tidak menjalankan WAHA, OpenWA, dan engine terpisah yang berat. Sebaliknya, mengambil filosofi arsitektur terbaik:
+   - **Aman Gateway**: Lapisan terbawah sebagai *Transport & WhatsApp Socket Protocol Engine* murni berbasis WebSocket.
    - **WAHA**: Konsep *Session Management, REST API terstandarisasi, OpenAPI/Swagger Docs, dan Webhook Dispatcher*.
    - **OpenWA**: Konsep *Application Tools (Campaign Engine, Contact & Group Tools, Auto-Responder Rules, Web Dashboard)*.
+   - **Mini CRM Pipeline**: Visual Kanban funnel (Lead ➔ Prospect ➔ Customer ➔ Churned), follow-up task scheduler, dan customer notes.
 2. **Decoupled Engine via Interface (`IWhatsAppEngine`)**:
-   - Lapisan bisnis **tidak boleh bergantung langsung** pada implementasi Baileys secara mentah.
+   - Lapisan bisnis **tidak boleh bergantung langsung** pada implementasi engine socket secara mentah.
    - Seluruh interaksi dibungkus dalam abstraksi `IWhatsAppEngine` dan `EventAdapter`.
-   - Jika protokol WhatsApp berubah di masa depan, kita hanya perlu memperbarui *Engine Adapter*, tanpa menyentuh database, REST API, atau Campaign Engine.
+   - Jika protokol WhatsApp Web berubah di masa depan, kita hanya perlu memperbarui *Engine Adapter*, tanpa menyentuh database, REST API, CRM, atau Campaign Engine.
 3. **True Portable & Zero External Dependency**:
    - Tidak memerlukan instalasi Node.js manual, Docker, MySQL, Redis, atau Chrome/Puppeteer oleh pengguna akhir.
-   - Database menggunakan **SQLite** file tunggal (`data/database.sqlite`).
+   - Database menggunakan **SQLite** file tunggal (`data/database.sqlite`) dengan mode WAL.
    - Sesi tersimpan rapi dan terisolasi per akun di `data/sessions/<session-id>/auth/`.
-   - Dapat dijalankan dari Flashdisk / Harddisk eksternal (Mode Portabel) maupun via Installer (Mode Terinstal).
+   - Dapat dijalankan dari Flashdisk / Harddisk eksternal (Mode Portabel `.bat`) maupun via Native Desktop Window (Tauri `.exe`).
 
 ---
 
@@ -28,8 +29,8 @@
 ```
 ┌────────────────────────────────────────────────────────┐
 │                   DESKTOP / WEB UI                     │
-│           (React + Vite + Tailwind / Flat UI)          │
-│    Dashboard • Sessions • Contacts • Campaigns • Logs  │
+│         (React + Vite + Tailwind / Flat UI / Tauri)    │
+│  Sessions • Chats • CRM Pipeline • Campaigns • Tester  │
 └───────────────────────────┬────────────────────────────┘
                             │ HTTP / WebSocket (Localhost:3000)
                             ▼
@@ -46,7 +47,8 @@
 │  │                   SERVICE LAYER                  │  │
 │  │  SessionService    • MessageService              │  │
 │  │  ContactService    • CampaignEngine (Queue/Rate) │  │
-│  │  AutomationEngine  • BackupService               │  │
+│  │  CRMService        • AutomationEngine            │  │
+│  │  BackupService     • TelemetryService            │  │
 │  └─────────┬─────────────────────────────▲──────────┘  │
 │            ▼                             │             │
 │  ┌───────────────────┐        ┌──────────┴──────────┐  │
@@ -57,7 +59,7 @@
              │ Socket                      │ Events
              ▼                             │
 ┌───────────────────────────┐              │
-│       BAILEYS ENGINE      │──────────────┘
+│    AMAN GATEWAY ENGINE    │──────────────┘
 │ Multi-Device • QR • Pair  │ (Connection, Upsert,
 │ Messages • Media • Groups │  Receipts, Presence)
 └────────────┬──────────────┘
@@ -84,21 +86,21 @@ WhatsAppLocalHub/
 ├── config/                     # Konfigurasi aplikasi & runtime paths
 │   └── default.json
 ├── data/                       # Direktori data lokal (Portable Storage)
-│   ├── database.sqlite         # SQLite database utama
-│   ├── sessions/               # Isolasi sesi autentikasi Baileys
+│   ├── database.sqlite         # SQLite database utama (WAL mode)
+│   ├── sessions/               # Isolasi sesi autentikasi Aman Gateway
 │   │   ├── marketing/
-│   │   │   ├── auth/           # Kredensial multi-device Baileys
+│   │   │   ├── auth/           # Kredensial multi-device Aman Gateway
 │   │   │   └── metadata.json   # Status & info akun
 │   │   └── cs/
 │   ├── media/                  # File gambar/dokumen masuk & keluar
 │   ├── backups/                # Arsip backup (.wahub)
 │   └── exports/                # Hasil ekspor Excel/CSV kontak & grup
-├── logs/                       # File logging sistem (Winston/Pino)
+├── logs/                       # File logging sistem
 ├── src/
 │   ├── core/
-│   │   ├── engine/             # Abstraksi Engine & Adapter Baileys
+│   │   ├── engine/             # Abstraksi Engine & Adapter Aman Gateway
 │   │   │   ├── engine.interface.ts
-│   │   │   ├── baileys.adapter.ts
+│   │   │   ├── baileys.adapter.ts  # Implementasi Aman Gateway Socket Adapter
 │   │   │   └── session.manager.ts
 │   │   ├── events/             # Internal Event Bus
 │   │   │   ├── event-bus.ts
@@ -164,14 +166,14 @@ WhatsAppLocalHub/
 
 ## 5. Roadmap 10 Milestone Eksekusi
 
-* **M0 — Architecture & Foundation**: Project boilerplate, TypeScript monorepo/modular layout, Winston logger, Config loader, Base Error Handlers.
-* **M1 — Baileys Core**: `IWhatsAppEngine`, Session Manager, QR & Pairing code handler, Auto-reconnect, Multi-device session isolation (`data/sessions/<id>/auth`).
-* **M2 — Message Core**: Send/Receive text & media, Baileys Event Adapter, Internal Event Bus, Contact & Group synchronization.
-* **M3 — SQLite Storage & Migrations**: Better-SQLite3 engine, schema migrations, repositories, transaction safety, and backup engine (`.wahub`).
+* **M0 — Architecture & Foundation**: Project boilerplate, TypeScript modular layout, Config loader, Base Error Handlers.
+* **M1 — Aman Gateway Core**: `IWhatsAppEngine`, Session Manager, QR & Pairing code handler, Auto-reconnect, Multi-device session isolation (`data/sessions/<id>/auth`).
+* **M2 — Message Core**: Send/Receive text & media, Aman Gateway Event Adapter, Internal Event Bus, Contact & Group synchronization.
+* **M3 — SQLite Storage & Migrations**: Better-SQLite3 engine, schema migrations, repositories, transaction safety, and backup engine.
 * **M4 — REST API & OpenAPI**: Express REST API v1, Swagger UI (`/docs`), API Key middleware, validation, error mapping.
-* **M5 — Dashboard UI**: Modern Vite + React + Tailwind dashboard: Session manager with live QR/Pairing code, Chat monitor, Contact table, Groups view.
+* **M5 — Dashboard & CRM UI**: Modern Vite + React + Tailwind dashboard: Session manager, Live Chat monitor, Contact table, Groups view, dan Mini CRM Sales Pipeline.
 * **M6 — Automation Engine**: Condition-Action rule evaluator (keyword matches, regex, working hours, auto-reply text/media).
 * **M7 — Campaign Engine**: Audience manager, Excel/CSV importer, template variable parser (`{{name}}`), random interval rate limiter, compliance opt-out handling, live campaign monitor.
-* **M8 — Webhook & Integration**: Webhook dispatcher with exponential backoff retry, event filtering, n8n/external system compatibility.
-* **M9 — Portable Windows Packaging**: Single-click launcher (`WhatsAppLocalHub.bat` / `.exe`), local runtime bundling, portable data isolation.
+* **M8 — Webhook & Integration**: Webhook dispatcher with exponential backoff retry, event filtering, Google Apps Script & external system compatibility.
+* **M9 — Portable Windows & Tauri Packaging**: Single-click launcher (`WhatsAppLocalHub.bat`), Tauri native desktop build (`WhatsAppLocalHub.exe`), portable data isolation.
 * **M10 — Hardening & Verification**: Recovery from abrupt shutdown, session corruption self-healing, unit & integration tests, audit log check.

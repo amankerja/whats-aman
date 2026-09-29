@@ -57,6 +57,7 @@ export interface PanelCtx {
   setChats: React.Dispatch<React.SetStateAction<ChatItem[]>>;
   activeChatJid: string | null;
   setActiveChatJid: (v: string | null) => void;
+  presenceMap: Record<string, { status: string; lastSeen?: number }>;
   chatMessages: ChatMessage[];
   setChatMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   chatSearchQuery: string;
@@ -191,7 +192,8 @@ export interface PanelCtx {
   handleToggleOptOut: (phone: string, currentStatus: boolean) => Promise<void>;
   handleDeleteContact: (phone: string) => Promise<void>;
   handleImportGroupToContacts: (jid: string) => Promise<void>;
-  handleUpdateContactStage: (phone: string, stage: 'lead' | 'prospect' | 'customer' | 'churned') => Promise<void>;
+  handleUpdateContactStage: (phone: string, stage: 'lead' | 'prospect' | 'customer' | 'churned' | 'none') => Promise<void>;
+  handleUpdateDealValue: (phone: string, dealValue: number) => Promise<void>;
   handleOpenChatWithContact: (phone: string, name?: string) => void;
   isNewCampaignModal: boolean;
   setIsNewCampaignModal: (v: boolean) => void;

@@ -7,7 +7,7 @@
 
 **WhatsAman** adalah aplikasi desktop modern all-in-one yang menggabungkan kekuatan **WhatsApp Multi-Session Gateway**, **Broadcast Engine Cerdas**, dan **Mini CRM Sales Pipeline** dalam satu sistem mandiri yang **100% Portabel di Windows**.
 
-Dibuat dengan menggabungkan keunggulan arsitektur terbaik dari **Baileys (Engine Inti)**, **WAHA (REST API & Webhooks)**, dan **OpenWA (Tools & Automation)**, WhatsAman menghadirkan solusi otomatisasi WhatsApp kelas enterprise tanpa ketergantungan server cloud dan **tanpa biaya langganan bulanan**.
+Dibuat dengan menggabungkan keunggulan arsitektur terbaik dari **Aman Gateway (Engine Inti)**, **WAHA (REST API & Webhooks)**, dan **OpenWA (Tools & Automation)**, WhatsAman menghadirkan solusi otomatisasi WhatsApp kelas enterprise tanpa ketergantungan server cloud dan **tanpa biaya langganan bulanan**.
 
 ---
 
@@ -16,7 +16,7 @@ Dibuat dengan menggabungkan keunggulan arsitektur terbaik dari **Baileys (Engine
 | Masalah yang Sering Dialami Bisnis | Solusi Nyata dari WhatsAman |
 | :--- | :--- |
 | **Biaya Langganan Bulanan Mahal**<br>Layanan WhatsApp gateway atau bot pihak ketiga rata-rata menarik biaya Rp150.000 – Rp1.500.000 per bulan per nomor. | **Beli Sekali, Pakai Selamanya**<br>WhatsAman berjalan 100% di komputer/laptop lokal Anda. Tidak ada biaya langganan per bulan, tidak ada limit kuota pesan dari server luar. |
-| **Aplikasi Lain Berat & Bikin Laptop Lemot**<br>Banyak software blast WhatsApp menggunakan Puppeteer/Chromium headless yang memakan RAM hingga 800MB–1.5GB per sesi. | **Super Ringan (RAM Hanya ~40–70 MB)**<br>Menggunakan pure WebSocket protocol Baileys tanpa browser Chromium tersembunyi. Ringan, hemat CPU, dan bisa jalankan multi-sesi bersamaan dengan lancar. |
+| **Aplikasi Lain Berat & Bikin Laptop Lemot**<br>Banyak software blast WhatsApp menggunakan Puppeteer/Chromium headless yang memakan RAM hingga 800MB–1.5GB per sesi. | **Super Ringan (RAM Hanya ~40–70 MB)**<br>Menggunakan pure WebSocket protocol Aman Gateway tanpa browser Chromium tersembunyi. Ringan, hemat CPU, dan bisa jalankan multi-sesi bersamaan dengan lancar. |
 | **Nomor Rentan Diblokir WhatsApp**<br>Mengirim pesan massal dengan template kaku dan ritme robotik memicu sensor spam WhatsApp. | **Proteksi Anti-Ban Terpadu**<br>Dilengkapi fitur Spintax (`{Halo\|Hai\|Selamat pagi}`), variabel nama (`{{name}}`), *Random Interval Delay* (detik acak), dan *Batch Pause Automation*. |
 | **Database Prospek & Chat Tercecer**<br>CS melayani banyak chat tetapi tidak tahu status prospek, followup terlambat, data closing hilang. | **Built-in CRM & Pipeline Funnel**<br>Papan Kanban visual (Lead ➔ Prospect ➔ Customer ➔ Churned), pencatat riwayat order/catatan pelanggan, dan jadwal follow-up otomatis. |
 | **Kamera HP Rusak / Tidak Bisa Scan QR**<br>Banyak software hanya menyediakan login via kamera QR code. | **Dukungan 8-Digit Pairing Code**<br>Bisa login cukup dengan memasukkan nomor HP, WhatsApp di ponsel Anda akan memunculkan kode 8 digit. Praktis dan cepat! |

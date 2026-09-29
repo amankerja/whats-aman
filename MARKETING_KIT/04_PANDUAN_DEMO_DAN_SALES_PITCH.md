@@ -69,7 +69,7 @@ Ketika calon pembeli mengajukan pertanyaan ragu, gunakan jawaban diplomatis beri
 
 ### 2. Keberatan: *"Laptop saya bukan laptop gaming / spek biasa saja, apakah berat?"*
 > **Jawaban:**  
-> *"Justru itulah keunggulan utama WhatsAman! Software lain di luaran sana menjalankan browser Google Chrome tersembunyi (Puppeteer) yang memakan RAM 800 MB sampai 1,5 GB per nomor dan bikin laptop panas. WhatsAman dibangun dengan teknologi Baileys murni berbasis WebSocket. Penggunaan RAM-nya hanya sekitar 40–70 MB saja. Di laptop Core i3 atau RAM 4 GB pun berjalan sangat ringan dan lancar."*
+> *"Justru itulah keunggulan utama WhatsAman! Software lain di luaran sana menjalankan browser Google Chrome tersembunyi (Puppeteer) yang memakan RAM 800 MB sampai 1,5 GB per nomor dan bikin laptop panas. WhatsAman dibangun dengan teknologi Aman Gateway murni berbasis WebSocket. Penggunaan RAM-nya hanya sekitar 40–70 MB saja. Di laptop Core i3 atau RAM 4 GB pun berjalan sangat ringan dan lancar."*
 
 ---
 

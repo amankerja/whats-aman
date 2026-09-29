@@ -145,7 +145,7 @@ Untuk memaksimalkan pendapatan dari penjualan WhatsAman, Anda bisa membaginya ke
 A: WhatsAman dirancang dengan fitur proteksi terlengkap di kelasnya: variasi kalimat otomatis (*Spintax*), personalisasi nama pelanggan, jeda waktu acak (*Random Human Delay 5–15 detik*), dan istirahat berkala (*Batch Pause*). Selama Anda mengirimkan pesan yang relevan dan menggunakan ritme yang wajar, risiko pemblokiran dapat diminimalisir secara signifikan.
 
 **Q: Laptop saya spek standar (RAM 4 GB / Core i3), apakah sanggup menjalankannya?**  
-A: Sangat sanggup! Tidak seperti aplikasi lain yang menjalankan Google Chrome tersembunyi (Puppeteer) yang rakus RAM hingga 1 GB lebih, WhatsAman berkomunikasi langsung via WebSocket murni (@whiskeysockets/baileys). Pemakaian RAM hanya sekitar 40–70 MB per nomor, sangat ringan dan tidak membuat laptop panas.
+A: Sangat sanggup! Tidak seperti aplikasi lain yang menjalankan Google Chrome tersembunyi (Puppeteer) yang rakus RAM hingga 1 GB lebih, WhatsAman berkomunikasi langsung via WebSocket murni (Aman Gateway Engine). Pemakaian RAM hanya sekitar 40–70 MB per nomor, sangat ringan dan tidak membuat laptop panas.
 
 **Q: Apakah saya harus paham bahasa pemrograman untuk menggunakannya?**  
 A: Sama sekali tidak! WhatsAman adalah aplikasi desktop dengan tampilan visual interaktif modern. Cukup klik ganda untuk membuka aplikasi, scan QR / masukkan kode pairing, dan seluruh fitur langsung siap digunakan.

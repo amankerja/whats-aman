@@ -46,26 +46,75 @@ export function isSameChat(
 
 const TWO_DIGIT_COUNTRY_CODE = /^(?:2[07]|3[0-469]|4[013-9]|5[1-8]|6[0-6]|8[1246]|9[0-58])/;
 
+export function isLidNumber(digits: string): boolean {
+  if (!digits) return false;
+  // WhatsApp LIDs are 14 to 16 digits long. Only Indonesian numbers starting with 628 can be up to 14 digits.
+  return digits.length >= 14 && !digits.startsWith('628');
+}
+
+export function isPhoneLike(val?: string | null): boolean {
+  if (!val) return true;
+  const trimmed = val.trim();
+  if (!trimmed || trimmed === '-' || trimmed === '—') return true;
+  if (trimmed.includes('@s.whatsapp.net') || trimmed.includes('@c.us') || trimmed.includes('@lid')) return true;
+  const digits = trimmed.replace(/[\s\+\-\(\)\.]/g, '');
+  return /^\d{7,16}$/.test(digits);
+}
+
+export function getCleanContactName(name?: string | null, pushName?: string | null): string {
+  if (name && !isPhoneLike(name)) {
+    return name.trim();
+  }
+  if (pushName && !isPhoneLike(pushName)) {
+    return pushName.trim();
+  }
+  return '';
+}
+
 export function formatPhoneForDisplay(phoneOrJid: string): string {
   if (!phoneOrJid) return '';
   if (phoneOrJid.includes('@g.us')) return 'Grup WhatsApp';
   if (phoneOrJid.includes('@newsletter')) return 'Saluran WhatsApp';
   if (phoneOrJid.includes('broadcast')) return 'Status';
-  if (phoneOrJid.includes('@lid')) return 'WhatsApp User (LID)';
+  if (phoneOrJid.includes('@lid')) return 'Kontak WhatsApp (LID)';
 
   const digits = /^\d+$/.test(phoneOrJid) ? phoneOrJid : parsePhoneFromJid(phoneOrJid);
   if (!digits) {
     return phoneOrJid;
   }
-  // Reject tokens longer than 15 digits (e.g. raw anonymous LID tokens)
-  if (digits.length > 15) {
-    return 'WhatsApp Contact';
+  // Reject raw anonymous LID tokens (14-16 digits starting with 1, 2, or 98)
+  if (isLidNumber(digits) || digits.length > 15) {
+    return 'Kontak WhatsApp (LID)';
   }
   if (digits.length <= 4) return `+${digits}`;
 
+  // Indonesian mobile / phone format (+62 8xx-xxxx-xxxx)
+  if (digits.startsWith('62') && digits.length >= 10 && digits.length <= 13) {
+    const rest = digits.slice(2);
+    if (rest.startsWith('8')) {
+      const p1 = rest.slice(0, 3);
+      const p2 = rest.slice(3, 7);
+      const p3 = rest.slice(7);
+      return p3 ? `+62 ${p1}-${p2}-${p3}` : `+62 ${p1}-${p2}`;
+    }
+  }
+
   let ccLen = 3;
-  if (digits.length <= 6 || digits[0] === '1' || digits[0] === '7') ccLen = 1;
-  else if (TWO_DIGIT_COUNTRY_CODE.test(digits)) ccLen = 2;
+  // ONLY use 1-digit country code if length matches standard NANP (10 or 11 digits)
+  if (digits[0] === '1') {
+    if (digits.length === 10 || digits.length === 11) {
+      ccLen = 1;
+    } else {
+      return 'Kontak WhatsApp (LID)';
+    }
+  } else if (digits[0] === '7' && (digits.length === 11 || digits.length === 10)) {
+    ccLen = 1;
+  } else if (TWO_DIGIT_COUNTRY_CODE.test(digits)) {
+    if (digits.length >= 14) {
+      return 'Kontak WhatsApp (LID)';
+    }
+    ccLen = 2;
+  }
 
   const cc = digits.slice(0, ccLen);
   const rest = digits.slice(ccLen);

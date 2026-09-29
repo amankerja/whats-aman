@@ -15,7 +15,12 @@ import {
   Sparkles,
   ExternalLink,
   Store,
-  UserCheck
+  UserCheck,
+  Check,
+  X,
+  CheckSquare,
+  Square,
+  MinusSquare
 } from 'lucide-react';
 import { PanelCtx } from './ctx';
 
@@ -189,6 +194,19 @@ const GroupsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
     showToast(lang === 'id' ? `Selesai mengekstrak kontak grup terpilih!` : `Finished batch group extraction!`, 'success');
     setSelectedGroups(new Set());
   };
+
+  const handleBatchExportExcel = async () => {
+    if (selectedGroups.size === 0) return;
+    const jids = Array.from(selectedGroups);
+    showToast(lang === 'id' ? `Mengekspor ${jids.length} file Excel grup...` : `Exporting ${jids.length} groups to Excel...`, 'info');
+    for (const jid of jids) {
+      const g = groups.find(item => item.jid === jid);
+      await handleExportGroupExcel(jid, g?.name || 'group');
+    }
+  };
+
+  const allGroupsSelected = filteredGroups.length > 0 && selectedGroups.size === filteredGroups.length;
+  const someGroupsSelected = selectedGroups.size > 0 && !allGroupsSelected;
 
   return (
     <div className="space-y-6">
@@ -436,6 +454,59 @@ const GroupsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
         </div>
       </div>
 
+      {/* Groups Bulk Actions Bar */}
+      {selectedGroups.size > 0 && (
+        <div className="bg-white dark:bg-slate-800 border-2 border-emerald-500 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-md sticky top-2 z-30 animate-in fade-in slide-in-from-top-2 duration-150">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 dark:text-emerald-200 bg-emerald-100 dark:bg-emerald-950/80 px-2.5 py-1 rounded-full">
+              <Check size={13} className="stroke-[3]" />
+              {selectedGroups.size} {lang === 'id' ? 'Grup Terpilih' : 'Groups Selected'}
+            </span>
+            <button
+              type="button"
+              onClick={handleSelectAllGroups}
+              className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline font-semibold"
+            >
+              {allGroupsSelected
+                ? (lang === 'id' ? 'Batalkan pilihan' : 'Deselect all')
+                : (lang === 'id' ? `Pilih seluruh ${filteredGroups.length} grup` : `Select all ${filteredGroups.length} groups`)}
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Batch Extract to Contacts */}
+            <button
+              type="button"
+              onClick={handleBatchExtract}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer"
+            >
+              <UserCheck size={14} />
+              <span>{lang === 'id' ? `Ekstrak ${selectedGroups.size} Grup ke Kontak CRM` : `Extract ${selectedGroups.size} Groups`}</span>
+            </button>
+
+            {/* Batch Export Excel */}
+            <button
+              type="button"
+              onClick={handleBatchExportExcel}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 rounded-lg text-xs font-semibold transition-all border border-slate-200 dark:border-slate-600 cursor-pointer"
+            >
+              <FileSpreadsheet size={14} className="text-emerald-600" />
+              <span>{lang === 'id' ? 'Ekspor Excel Terpilih' : 'Export Selected Excel'}</span>
+            </button>
+
+            {/* Clear Selection */}
+            <button
+              type="button"
+              onClick={() => setSelectedGroups(new Set())}
+              className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+              title={lang === 'id' ? 'Batalkan pilihan' : 'Clear selection'}
+            >
+              <X size={15} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 4. CONTENT AREA: GRID OR TABLE */}
       {filteredGroups.length === 0 ? (
         <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-12 text-center text-slate-400 space-y-2">
@@ -473,12 +544,18 @@ const GroupsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
                         </span>
                       </div>
                     </div>
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => handleToggleSelectGroup(g.jid)}
-                      className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-emerald-600 mt-1"
-                    />
+                    <button
+                      type="button"
+                      onClick={() => handleToggleSelectGroup(g.jid)}
+                      className="text-slate-400 hover:text-emerald-600 shrink-0 transition-colors p-0.5 rounded cursor-pointer mt-1"
+                      title={isSelected ? (lang === 'id' ? 'Batalkan pilihan' : 'Deselect card') : (lang === 'id' ? 'Pilih kartu grup' : 'Select group card')}
+                    >
+                      {isSelected ? (
+                        <CheckSquare size={18} className="text-emerald-600 fill-emerald-50 dark:fill-emerald-950" />
+                      ) : (
+                        <Square size={18} className="text-slate-300 dark:text-slate-600 hover:text-slate-500" />
+                      )}
+                    </button>
                   </div>
 
                   <div className="space-y-1.5 text-xs text-slate-500 dark:text-slate-400">
@@ -553,12 +630,20 @@ const GroupsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
               <thead className="bg-slate-50 dark:bg-slate-900 text-slate-400 font-bold uppercase tracking-wider text-[11px] border-b border-slate-200 dark:border-slate-700">
                 <tr>
                   <th className="py-3.5 pl-4 pr-2 w-10">
-                    <input
-                      type="checkbox"
-                      checked={selectedGroups.size === filteredGroups.length && filteredGroups.length > 0}
-                      onChange={handleSelectAllGroups}
-                      className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-emerald-600"
-                    />
+                    <button
+                      type="button"
+                      onClick={handleSelectAllGroups}
+                      className="inline-flex items-center justify-center text-emerald-600 hover:opacity-80 cursor-pointer"
+                      title={allGroupsSelected ? (lang === 'id' ? 'Batalkan pilihan' : 'Deselect all') : (lang === 'id' ? 'Pilih semua' : 'Select all')}
+                    >
+                      {allGroupsSelected ? (
+                        <CheckSquare size={16} />
+                      ) : someGroupsSelected ? (
+                        <MinusSquare size={16} />
+                      ) : (
+                        <Square size={16} className="text-slate-400" />
+                      )}
+                    </button>
                   </th>
                   <th className="py-3.5 px-4">{lang === 'id' ? 'Grup WhatsApp' : 'WhatsApp Group'}</th>
                   <th className="py-3.5 px-4">JID WhatsApp</th>
@@ -571,13 +656,19 @@ const GroupsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
                   const isSelected = selectedGroups.has(g.jid);
                   return (
                     <tr key={g.jid} className={`hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-colors ${isSelected ? 'bg-emerald-50/50 dark:bg-emerald-950/20' : ''}`}>
-                      <td className="py-3.5 pl-4 pr-2">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => handleToggleSelectGroup(g.jid)}
-                          className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-emerald-600"
-                        />
+                      <td className="py-3.5 pl-4 pr-2 text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleSelectGroup(g.jid)}
+                          className="inline-flex items-center justify-center text-emerald-600 cursor-pointer"
+                          title={isSelected ? (lang === 'id' ? 'Batalkan pilihan' : 'Deselect') : (lang === 'id' ? 'Pilih grup' : 'Select group')}
+                        >
+                          {isSelected ? (
+                            <CheckSquare size={16} />
+                          ) : (
+                            <Square size={16} className="text-slate-300 dark:text-slate-600 hover:text-slate-400" />
+                          )}
+                        </button>
                       </td>
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-3">

@@ -269,13 +269,18 @@ export class CRMService {
     const repliedChats = repliedChatsRow?.count || 0;
     const replyRate = inboundChats > 0 ? Number(Math.min(100, (repliedChats / inboundChats) * 100).toFixed(1)) : 0;
 
-    // 5. Stage Breakdown
+    // 5. Stage Breakdown & Deal Values
     const stages = ['lead', 'prospect', 'customer', 'churned'];
     const stageCounts: Record<string, number> = { lead: 0, prospect: 0, customer: 0, churned: 0 };
+    const stageValues: Record<string, number> = { lead: 0, prospect: 0, customer: 0, churned: 0 };
     for (const stage of stages) {
-      const r = db.prepare('SELECT COUNT(*) as count FROM contacts WHERE session_id = ? AND pipeline_stage = ?').get(sessionId, stage) as any;
+      const r = db.prepare('SELECT COUNT(*) as count, COALESCE(SUM(deal_value), 0) as total_val FROM contacts WHERE session_id = ? AND pipeline_stage = ?').get(sessionId, stage) as any;
       stageCounts[stage] = r?.count || 0;
+      stageValues[stage] = Number(r?.total_val || 0);
     }
+
+    const totalPipelineValue = (stageValues.lead || 0) + (stageValues.prospect || 0);
+    const totalClosingValue = stageValues.customer || 0;
 
     return {
       timeRange,
@@ -291,7 +296,10 @@ export class CRMService {
       replyRate,
       inboundChats,
       repliedChats,
-      stageCounts
+      stageCounts,
+      stageValues,
+      totalPipelineValue,
+      totalClosingValue
     };
   }
 
@@ -307,6 +315,8 @@ export class CRMService {
     csv += `Hot Leads,${stats.hotLeads}\n`;
     csv += `Converted Customers,${stats.convertedCustomers}\n`;
     csv += `Conversion Rate,${stats.conversionRate}%\n`;
+    csv += `Total Potensi Pipeline (Rp),${stats.totalPipelineValue}\n`;
+    csv += `Total Omset Closing Won (Rp),${stats.totalClosingValue}\n`;
     csv += `Follow-up Due,${stats.followUpDue}\n`;
     csv += `Follow-up Selesai,${stats.followUpCompleted}\n`;
     csv += `Reply Rate,${stats.replyRate}%\n\n`;
@@ -319,9 +329,9 @@ export class CRMService {
     }
 
     csv += '\n=== DAFTAR KONTAK CRM ===\n';
-    csv += 'No HP,Nama,Pipeline Stage,Tags,Catatan\n';
+    csv += 'No HP,Nama,Pipeline Stage,Nilai Deal (Rp),Tags,Catatan\n';
     for (const c of contacts) {
-      csv += `"${c.phone}","${c.name || c.push_name || ''}","${(c.pipeline_stage || 'none').toUpperCase()}","${c.tags.join('; ')}","${c.notes}"\n`;
+      csv += `"${c.phone}","${c.name || c.push_name || ''}","${(c.pipeline_stage || 'none').toUpperCase()}","${c.deal_value || 0}","${c.tags.join('; ')}","${c.notes}"\n`;
     }
 
     return csv;

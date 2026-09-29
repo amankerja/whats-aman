@@ -62,10 +62,10 @@ export const config: AppConfig = {
   isPortable,
   server: {
     port: parseInt(process.env.PORT || '3000', 10),
-    host: process.env.HOST || '127.0.0.1',
+    host: process.env.HOST || '0.0.0.0',
     corsOrigins: process.env.CORS_ORIGINS
       ? process.env.CORS_ORIGINS.split(',')
-      : ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:5173'],
+      : ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:5173', 'http://127.0.0.1:5173', 'http://tauri.localhost', 'tauri://localhost'],
     apiKey: process.env.API_KEY || undefined
   },
   storage: {
@@ -77,10 +77,10 @@ export const config: AppConfig = {
     exportsDir
   },
   whatsapp: {
-    browser: ['WhatsAman', 'Desktop', '1.0.0'],
+    browser: ['Ubuntu', 'Chrome', '20.0.04'] as [string, string, string],
     syncFullHistory: false,
     qrCodeTimeoutMs: 60000,
-    reconnectMaxRetries: 5
+    reconnectMaxRetries: 25
   },
   campaign: {
     defaultRateLimitPerMin: 20,

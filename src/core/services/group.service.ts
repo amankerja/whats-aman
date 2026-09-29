@@ -351,6 +351,19 @@ export class GroupService {
         }
         if (!cleanPhone || cleanPhone.length < 7) continue;
 
+        // Skip anonymous LIDs where WhatsApp hides the member's phone number!
+        const isAnonymousLid = cleanPhone.length >= 14 && (cleanPhone.startsWith('1') || cleanPhone.startsWith('2') || cleanPhone.startsWith('98'));
+        if (isAnonymousLid) {
+          const session = sessionManager.getSession(sessionId);
+          const resolved = session ? (session as any).resolveLidToPhone?.(cleanPhone) : undefined;
+          if (resolved) {
+            cleanPhone = resolved;
+          } else {
+            // Cannot import member without real phone number to CRM contacts!
+            continue;
+          }
+        }
+
         if (cleanPhone.startsWith('0')) {
           cleanPhone = '62' + cleanPhone.substring(1);
         } else if (cleanPhone.startsWith('8')) {

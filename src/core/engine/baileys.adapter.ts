@@ -7,6 +7,7 @@ import {
   makeWASocket,
   useMultiFileAuthState,
   DisconnectReason,
+  Browsers,
   WASocket,
   proto,
   WAMessage,
@@ -49,6 +50,15 @@ export class BaileysAdapter implements IWhatsAppEngine {
   private authPath: string;
   private metaPath: string;
   private profilePicCache: Map<string, { url: string | null; timestamp: number }> = new Map();
+  private avatarInFlight: Map<string, Promise<string | null>> = new Map();
+  private mediaDownloadQueue: Array<() => Promise<void>> = [];
+  private activeMediaDownloads = 0;
+  private maxConcurrentMediaDownloads = 2;
+  private failedMediaDownloads = new Set<string>();
+  private lidCache: Map<string, string> = new Map();
+  private lidCacheLoaded = false;
+  private msgRetryCounterCache: Map<string, any> = new Map();
+  private subscribedPresences: Set<string> = new Set();
 
   constructor(sessionId: string, sessionName?: string) {
     this.sessionId = sessionId;
@@ -129,55 +139,116 @@ export class BaileysAdapter implements IWhatsAppEngine {
         auth: state,
         logger: baileysLogger,
         printQRInTerminal: false,
-        browser: config.whatsapp.browser,
+        browser: Browsers.ubuntu('Chrome'),
+        markOnlineOnConnect: true,
+        keepAliveIntervalMs: 25000,
+        connectTimeoutMs: 60000,
+        defaultQueryTimeoutMs: 30000,
         syncFullHistory: config.whatsapp.syncFullHistory,
-        generateHighQualityLinkPreview: true
+        generateHighQualityLinkPreview: true,
+        msgRetryCounterCache: {
+          get: <T>(key: string): T | undefined => this.msgRetryCounterCache.get(key) as T,
+          set: <T>(key: string, value: T): void => { this.msgRetryCounterCache.set(key, value); },
+          del: (key: string): void => { this.msgRetryCounterCache.delete(key); },
+          flushAll: (): void => { this.msgRetryCounterCache.clear(); }
+        } as any,
+        getMessage: async (key: proto.IMessageKey) => {
+          if (!key.id) return undefined;
+          const msg = messageRepository.findByMessageId(this.sessionId, key.id);
+          if (msg?.content_text) {
+            return { conversation: msg.content_text };
+          }
+          return undefined;
+        }
       });
 
       // Save credentials whenever updated
       this.socket.ev.on('creds.update', saveCreds);
 
-      // Handle WhatsApp Phonebook Contact Sync (bug fix: listener was registered twice,
-      // causing double upserts with divergent JID formats racing each other)
+      // Handle WhatsApp Real-time Presences (Online / Offline / Composing / Recording)
+      this.socket.ev.on('presence.update', (presenceUpdate) => {
+        const { id, presences } = presenceUpdate;
+        eventBus.emit('presence.update', {
+          sessionId: this.sessionId,
+          jid: id,
+          presences: presences as any
+        });
+      });
+
+      // Handle WhatsApp Phonebook Contact Sync (batched with single SQLite transaction)
       this.socket.ev.on('contacts.upsert', (newContacts) => {
+        const toUpsert: any[] = [];
         for (const c of newContacts) {
           if (!c.id) continue;
-          let phone: string | undefined = undefined;
-          if (c.id.endsWith('@s.whatsapp.net') || c.id.endsWith('@c.us')) {
-            phone = c.id.split('@')[0].split(':')[0];
-          } else if (c.id.endsWith('@lid')) {
-            phone = this.resolveLidToPhone(c.id);
+          const cleanId = c.id.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+          if (!cleanId) continue;
+
+          // First try to resolve if cleanId is an LID
+          const resolved = this.resolveLidToPhone(cleanId);
+          const isLid = c.id.endsWith('@lid') || (cleanId.length >= 14 && (cleanId.startsWith('1') || cleanId.startsWith('2') || cleanId.startsWith('98')));
+          if (isLid && !resolved) {
+            // Skip anonymous LIDs where WhatsApp conceals the phone number
+            continue;
           }
-          if (phone && /^\d{7,16}$/.test(phone)) {
-            contactRepository.upsert({
-              sessionId: this.sessionId,
-              jid: `${phone}@s.whatsapp.net`,
-              phone,
-              name: c.name || c.notify || c.verifiedName || undefined,
-              pushName: c.notify || undefined
-            });
+
+          // Skip nameless strangers/bots without any saved name or pushName
+          const rawName = (c.name || c.notify || c.verifiedName || '').trim();
+          if (!rawName || rawName === '-' || rawName === '—') {
+            continue;
           }
+
+          const phone = resolved || (c.id.endsWith('@s.whatsapp.net') || c.id.endsWith('@c.us') ? cleanId : undefined);
+          const cleanPhone = phone && /^\d{7,16}$/.test(phone) ? phone : cleanId;
+          const contactJid = `${cleanPhone}@s.whatsapp.net`;
+
+          toUpsert.push({
+            sessionId: this.sessionId,
+            jid: contactJid,
+            phone: cleanPhone,
+            name: c.name || c.notify || c.verifiedName || undefined,
+            pushName: c.notify || undefined
+          });
+        }
+        if (toUpsert.length > 0) {
+          contactRepository.upsertBatch(toUpsert);
         }
       });
 
       this.socket.ev.on('contacts.update', (updatedContacts) => {
+        const toUpsert: any[] = [];
         for (const c of updatedContacts) {
           if (!c.id) continue;
-          let phone: string | undefined = undefined;
-          if (c.id.endsWith('@s.whatsapp.net') || c.id.endsWith('@c.us')) {
-            phone = c.id.split('@')[0].split(':')[0];
-          } else if (c.id.endsWith('@lid')) {
-            phone = this.resolveLidToPhone(c.id);
+          const cleanId = c.id.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+          if (!cleanId) continue;
+
+          const resolved = this.resolveLidToPhone(cleanId);
+          const isLid = c.id.endsWith('@lid') || (cleanId.length >= 14 && (cleanId.startsWith('1') || cleanId.startsWith('2') || cleanId.startsWith('98')));
+          if (isLid && !resolved) {
+            continue;
           }
-          if (phone && /^\d{7,16}$/.test(phone)) {
-            contactRepository.upsert({
-              sessionId: this.sessionId,
-              jid: `${phone}@s.whatsapp.net`,
-              phone,
-              name: c.name || c.notify || c.verifiedName || undefined,
-              pushName: c.notify || undefined
-            });
+
+          // Skip nameless contacts if not existing and has no name
+          const rawName = (c.name || c.notify || c.verifiedName || '').trim();
+          if (!rawName || rawName === '-' || rawName === '—') {
+            // Check if contact already exists in database before updating
+            const existing = contactRepository.findByPhone(this.sessionId, resolved || cleanId);
+            if (!existing) continue;
           }
+
+          const phone = resolved || (c.id.endsWith('@s.whatsapp.net') || c.id.endsWith('@c.us') ? cleanId : undefined);
+          const cleanPhone = phone && /^\d{7,16}$/.test(phone) ? phone : cleanId;
+          const contactJid = `${cleanPhone}@s.whatsapp.net`;
+
+          toUpsert.push({
+            sessionId: this.sessionId,
+            jid: contactJid,
+            phone: cleanPhone,
+            name: c.name || c.notify || c.verifiedName || undefined,
+            pushName: c.notify || undefined
+          });
+        }
+        if (toUpsert.length > 0) {
+          contactRepository.upsertBatch(toUpsert);
         }
       });
 
@@ -235,10 +306,13 @@ export class BaileysAdapter implements IWhatsAppEngine {
             // Clean auth state if logged out
             this.cleanupAuthFiles();
           } else if (shouldReconnect) {
-            if (this.reconnectAttempts < config.whatsapp.reconnectMaxRetries) {
+            const isRegistered = Boolean(this.phoneNumber || fs.existsSync(path.join(this.authPath, 'creds.json')));
+            const maxRetries = isRegistered ? 100 : config.whatsapp.reconnectMaxRetries;
+
+            if (this.reconnectAttempts < maxRetries) {
               this.reconnectAttempts++;
-              const delay = Math.min(3000 * this.reconnectAttempts, 15000);
-              logger.info({ sessionId: this.sessionId, attempt: this.reconnectAttempts, delay }, 'Reconnecting...');
+              const delay = Math.min(3000 * this.reconnectAttempts, 20000);
+              logger.info({ sessionId: this.sessionId, attempt: this.reconnectAttempts, delay, isRegistered }, 'Reconnecting...');
               setTimeout(() => this.connect(options), delay);
             } else {
               this.updateStatus('DISCONNECTED');
@@ -260,6 +334,22 @@ export class BaileysAdapter implements IWhatsAppEngine {
           this.updateStatus('CONNECTED');
           this.saveMetadata();
 
+          // Immediately announce active available presence so Meta delivers pushes realtime
+          try {
+            this.socket?.sendPresenceUpdate('available').catch(() => {});
+          } catch {
+            // ignore
+          }
+
+          // Resubscribe tracked chat presences upon reconnect
+          for (const jid of this.subscribedPresences) {
+            try {
+              this.socket?.presenceSubscribe(jid).catch(() => {});
+            } catch {
+              // ignore
+            }
+          }
+
           eventBus.emit('session.connected', {
             sessionId: this.sessionId,
             phone: this.phoneNumber,
@@ -270,42 +360,53 @@ export class BaileysAdapter implements IWhatsAppEngine {
         }
       });
 
-      // Sync contacts received from WhatsApp - REMOVED: duplicate 'contacts.upsert' listener
-      // (bug fix: was registered a second time below, causing double upserts per contact)
-
-      // Handle Incoming Messages & Sync History
+      // Handle Incoming Messages & Sync History (batched to prevent CPU lock & WebSocket storms)
       this.socket.ev.on('messaging-history.set', async (history) => {
         logger.info({ sessionId: this.sessionId, chatsCount: history.chats?.length, msgsCount: history.messages?.length }, 'Syncing messaging history from WhatsApp');
-        if (history.messages) {
+        if (history.messages && history.messages.length > 0) {
+          const historicalMsgs: NormalizedMessage[] = [];
           for (const msg of history.messages) {
             try {
               if (!msg.message) continue;
-              const normalized = await this.normalizeMessage(msg);
-              // Mark as historical so downstream automation does NOT auto-reply to old messages
-              normalized.isHistorical = true;
-              eventBus.emit('message.received', { sessionId: this.sessionId, message: normalized });
+              const normalized = this.normalizeMessage(msg);
+              if (normalized) {
+                normalized.isHistorical = true;
+                historicalMsgs.push(normalized);
+              }
             } catch (err) {
               logger.warn({ sessionId: this.sessionId, msgId: msg.key?.id, err }, 'Failed to normalize history message');
             }
           }
+          if (historicalMsgs.length > 0) {
+            messageRepository.saveBatch(historicalMsgs, 'DELIVERED');
+          }
         }
-        if (history.contacts) {
+        if (history.contacts && history.contacts.length > 0) {
+          const contactsToUpsert: any[] = [];
           for (const c of history.contacts) {
             try {
               if (!c.id) continue;
-              const phone = c.id.split('@')[0];
+              const cleanId = c.id.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+              if (!cleanId) continue;
+              const rawName = (c.name || c.notify || '').trim();
+              if (!rawName || rawName === '-' || rawName === '—') continue;
+              const resolved = this.resolveLidToPhone(cleanId);
+              const phone = resolved || cleanId;
               if (/^\d{7,16}$/.test(phone)) {
-                contactRepository.upsert({
+                contactsToUpsert.push({
                   sessionId: this.sessionId,
-                  jid: c.id,
+                  jid: `${phone}@s.whatsapp.net`,
                   name: c.name || undefined,
                   pushName: c.notify || undefined,
                   phone
                 });
               }
             } catch (err) {
-              logger.warn({ sessionId: this.sessionId, contactId: c.id, err }, 'Failed to upsert history contact');
+              logger.warn({ sessionId: this.sessionId, contactId: c.id, err }, 'Failed to parse history contact');
             }
+          }
+          if (contactsToUpsert.length > 0) {
+            contactRepository.upsertBatch(contactsToUpsert);
           }
         }
         eventBus.emit('session.history_synced', {
@@ -672,13 +773,9 @@ export class BaileysAdapter implements IWhatsAppEngine {
         if (p.phoneNumber && typeof p.phoneNumber === 'string') {
           phone = p.phoneNumber.replace(/[^0-9]/g, '');
         } else if (p.id) {
-          const cleanId = p.id.replace(/:[0-9]+@/, '@');
-          if (cleanId.includes('@lid')) {
-            const resolved = this.resolveLidToPhone(cleanId);
-            phone = resolved || cleanId.split('@')[0];
-          } else {
-            phone = cleanId.split('@')[0].replace(/[^0-9]/g, '');
-          }
+          const cleanId = p.id.replace(/:[0-9]+@/, '@').split('@')[0].replace(/[^0-9]/g, '');
+          const resolved = this.resolveLidToPhone(cleanId);
+          phone = resolved || cleanId;
         }
         return {
           jid: p.id,
@@ -734,19 +831,74 @@ export class BaileysAdapter implements IWhatsAppEngine {
     throw new EngineError(`Grup tidak ditemukan untuk ID ${groupJid}`);
   }
 
+  private ensureLidCache(): void {
+    if (this.lidCacheLoaded) return;
+    this.lidCacheLoaded = true;
+    try {
+      if (fs.existsSync(this.authPath)) {
+        const files = fs.readdirSync(this.authPath).filter(f => f.startsWith('lid-mapping-') && f.endsWith('_reverse.json'));
+        for (const file of files) {
+          const cleanLid = file.replace('lid-mapping-', '').replace('_reverse.json', '');
+          try {
+            const raw = fs.readFileSync(path.join(this.authPath, file), 'utf-8');
+            const phone = JSON.parse(raw);
+            if (typeof phone === 'string' && /^\d{7,16}$/.test(phone)) {
+              this.lidCache.set(cleanLid, phone);
+            }
+          } catch {
+            // ignore malformed
+          }
+        }
+      }
+    } catch (err) {
+      logger.warn({ sessionId: this.sessionId, err }, 'Failed to fully load LID cache');
+    }
+  }
+
   public resolveLidToPhone(lid: string): string | undefined {
     if (!lid) return undefined;
-    const cleanLid = lid.replace('@lid', '').trim();
+    const cleanLid = lid.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+    if (!cleanLid) return undefined;
+
+    this.ensureLidCache();
+    if (this.lidCache.has(cleanLid)) {
+      return this.lidCache.get(cleanLid);
+    }
+
     const filePath = path.join(this.authPath, `lid-mapping-${cleanLid}_reverse.json`);
     if (fs.existsSync(filePath)) {
       try {
         const raw = fs.readFileSync(filePath, 'utf-8');
         const phone = JSON.parse(raw);
-        if (typeof phone === 'string' && phone.length > 5) return phone;
+        if (typeof phone === 'string' && /^\d{7,16}$/.test(phone)) {
+          this.lidCache.set(cleanLid, phone);
+          return phone;
+        }
       } catch {
         // ignore
       }
     }
+
+    // Fallback: check other sessions in storage dir if multi-session
+    try {
+      const sessionsParent = path.dirname(this.authPath);
+      const allSessions = fs.readdirSync(path.dirname(sessionsParent));
+      for (const otherSession of allSessions) {
+        if (otherSession === this.sessionId) continue;
+        const otherFilePath = path.join(path.dirname(sessionsParent), otherSession, 'auth', `lid-mapping-${cleanLid}_reverse.json`);
+        if (fs.existsSync(otherFilePath)) {
+          const raw = fs.readFileSync(otherFilePath, 'utf-8');
+          const phone = JSON.parse(raw);
+          if (typeof phone === 'string' && /^\d{7,16}$/.test(phone)) {
+            this.lidCache.set(cleanLid, phone);
+            return phone;
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+
     return undefined;
   }
 
@@ -870,16 +1022,18 @@ export class BaileysAdapter implements IWhatsAppEngine {
     // Fast LID resolution for normalized message
     const rawChatJid = msg.key.remoteJid || '';
     let resolvedPhone: string | undefined;
-    if (rawChatJid.endsWith('@s.whatsapp.net') || rawChatJid.endsWith('@c.us')) {
-      resolvedPhone = rawChatJid.split('@')[0].split(':')[0];
+    const cleanChatId = rawChatJid.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+
+    // Check if cleanChatId is an LID
+    const resolvedFromLid = this.resolveLidToPhone(cleanChatId);
+    if (resolvedFromLid) {
+      resolvedPhone = resolvedFromLid;
+    } else if (rawChatJid.endsWith('@s.whatsapp.net') || rawChatJid.endsWith('@c.us')) {
+      resolvedPhone = cleanChatId;
     } else if (rawChatJid.endsWith('@lid')) {
-      resolvedPhone = this.resolveLidToPhone(rawChatJid);
-      if (!resolvedPhone) {
-        const cleanLid = rawChatJid.replace('@lid', '').trim();
-        const contact = contactRepository.findByJid(this.sessionId, rawChatJid) || contactRepository.findByPhone(this.sessionId, cleanLid);
-        if (contact?.phone) {
-          resolvedPhone = contact.phone;
-        }
+      const contact = contactRepository.findByJid(this.sessionId, rawChatJid) || contactRepository.findByPhone(this.sessionId, cleanChatId);
+      if (contact?.phone) {
+        resolvedPhone = contact.phone;
       }
     }
 
@@ -900,14 +1054,38 @@ export class BaileysAdapter implements IWhatsAppEngine {
   }
 
   private queueMediaDownload(msg: WAMessage, msgId: string, ext: string): void {
+    if (this.failedMediaDownloads.has(msgId)) return;
+
+    // Do not auto-download media for messages older than 24 hours (prevents mass ECONNRESETs during history sync)
+    const rawTs = (msg.messageTimestamp as any)?.low !== undefined
+      ? Number((msg.messageTimestamp as any).low)
+      : typeof msg.messageTimestamp === 'number'
+      ? msg.messageTimestamp
+      : Number(msg.messageTimestamp);
+    if (rawTs > 0 && Date.now() - (rawTs < 1e11 ? rawTs * 1000 : rawTs) > 24 * 60 * 60 * 1000) {
+      return;
+    }
+
     const mediaFileName = `${msgId}.${ext}`;
     const filePath = path.join(config.storage.mediaDir, mediaFileName);
+    if (fs.existsSync(filePath)) return;
 
-    setImmediate(async () => {
+    const task = async () => {
       try {
         if (!this.socket || fs.existsSync(filePath)) return;
 
-        const buffer = await downloadMediaMessage(
+        // Check if message has valid media content and mediaKey
+        const content = msg.message?.ephemeralMessage?.message || msg.message?.viewOnceMessage?.message || msg.message;
+        const mediaObj = content?.imageMessage || content?.videoMessage || content?.audioMessage || content?.documentMessage || content?.stickerMessage;
+        const mediaKey = mediaObj?.mediaKey;
+        if (!mediaKey || (Buffer.isBuffer(mediaKey) && mediaKey.length === 0) || (mediaKey instanceof Uint8Array && mediaKey.length === 0)) {
+          this.failedMediaDownloads.add(msgId);
+          logger.debug({ sessionId: this.sessionId, msgId }, 'Skipping async media download: empty media key');
+          return;
+        }
+
+        // Wrap with a 15-second timeout to prevent hung streams from crashing undici
+        const downloadPromise = downloadMediaMessage(
           msg,
           'buffer',
           {},
@@ -916,6 +1094,15 @@ export class BaileysAdapter implements IWhatsAppEngine {
             reuploadRequest: this.socket.updateMediaMessage
           }
         );
+
+        // Catch background errors so timed out or reset streams don't emit unhandled rejections
+        downloadPromise.catch(() => {});
+
+        const timeoutPromise = new Promise<null>((_, reject) =>
+          setTimeout(() => reject(new Error('Media download timed out')), 15000)
+        );
+
+        const buffer = (await Promise.race([downloadPromise, timeoutPromise])) as Buffer | null;
 
         if (buffer && buffer.length > 0) {
           await fs.promises.writeFile(filePath, buffer);
@@ -928,9 +1115,27 @@ export class BaileysAdapter implements IWhatsAppEngine {
           logger.debug({ sessionId: this.sessionId, msgId, mediaUrl }, 'Background media download finished');
         }
       } catch (err: any) {
+        this.failedMediaDownloads.add(msgId);
         logger.warn({ sessionId: this.sessionId, msgId, err: err?.message || 'Download failed' }, 'Async media download failed');
+      } finally {
+        this.activeMediaDownloads--;
+        this.processNextMediaDownload();
       }
-    });
+    };
+
+    this.mediaDownloadQueue.push(task);
+    this.processNextMediaDownload();
+  }
+
+  private processNextMediaDownload(): void {
+    if (this.activeMediaDownloads >= this.maxConcurrentMediaDownloads || this.mediaDownloadQueue.length === 0) {
+      return;
+    }
+    const nextTask = this.mediaDownloadQueue.shift();
+    if (nextTask) {
+      this.activeMediaDownloads++;
+      nextTask().catch(() => {});
+    }
   }
 
   public async getProfilePictureUrl(targetJid?: string, forceRefresh = false): Promise<string | null> {
@@ -955,79 +1160,127 @@ export class BaileysAdapter implements IWhatsAppEngine {
         jid = `${jid.replace('+', '')}@s.whatsapp.net`;
       }
 
+      // Fast-reject invalid or dummy JIDs
+      const cleanPhone = jid.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+      const isSpecial = jid.endsWith('@g.us') || jid.endsWith('@newsletter');
+      if (!isSpecial && (!cleanPhone || cleanPhone.length < 5 || cleanPhone === '0')) {
+        return null;
+      }
+
       // Check cache first
       if (!forceRefresh) {
         const cached = this.profilePicCache.get(jid);
         if (cached) {
-          // If we found a valid URL, cache for 15 minutes
-          if (cached.url && Date.now() - cached.timestamp < 15 * 60 * 1000) {
+          // If we found a valid URL, cache for 60 minutes
+          if (cached.url && Date.now() - cached.timestamp < 60 * 60 * 1000) {
             return cached.url;
           }
-          // If previous attempt returned null, throttle for only 15 seconds before retrying
-          if (!cached.url && Date.now() - cached.timestamp < 15 * 1000) {
+          // If previous attempt returned null (no avatar/privacy set), throttle for 30 minutes
+          if (!cached.url && Date.now() - cached.timestamp < 30 * 60 * 1000) {
             return null;
           }
         }
       }
 
-      let url: string | undefined = undefined;
-
-      // 1. If Newsletter / Channel, fetch metadata from Baileys newsletterMetadata
-      if (jid.endsWith('@newsletter')) {
-        try {
-          const meta: any = await (this.socket as any).newsletterMetadata?.('jid', jid);
-          const directPath = meta?.thread_metadata?.picture?.direct_path || meta?.thread_metadata?.preview?.direct_path;
-          if (directPath) {
-            url = directPath.startsWith('http') ? directPath : `https://pps.whatsapp.net${directPath}`;
-          }
-        } catch {
-          // ignore and fall back to standard lookup
-        }
+      // Check if an identical avatar query is already in-flight
+      const existingInFlight = this.avatarInFlight.get(jid);
+      if (existingInFlight) {
+        return await existingInFlight;
       }
 
-      // 2. If LID, attempt resolution to phone number first
-      if (!url && jid.endsWith('@lid')) {
-        let resolvedPhone = this.resolveLidToPhone(jid);
-        if (!resolvedPhone) {
-          const cleanLid = jid.replace('@lid', '').trim();
-          const contact = contactRepository.findByJid(this.sessionId, jid) || contactRepository.findByPhone(this.sessionId, cleanLid);
-          if (contact?.phone) {
-            resolvedPhone = contact.phone;
-          }
-        }
+      const queryPromise = (async (): Promise<string | null> => {
+        try {
+          if (!this.socket) return null;
+          const sock = this.socket;
+          let url: string | undefined = undefined;
 
-        if (resolvedPhone) {
-          const phoneJid = `${resolvedPhone}@s.whatsapp.net`;
-          try {
-            url = await this.socket.profilePictureUrl(phoneJid, 'image');
-          } catch {
+          const fetchWithTimeout = async (target: string, type: 'image' | 'preview'): Promise<string | undefined> => {
+            return await Promise.race([
+              sock.profilePictureUrl(target, type),
+              new Promise<undefined>((_, reject) =>
+                setTimeout(() => reject(new Error('Avatar query timeout')), 3500)
+              )
+            ]);
+          };
+
+          // 1. If Newsletter / Channel, fetch metadata from Baileys newsletterMetadata
+          if (jid.endsWith('@newsletter')) {
             try {
-              url = await this.socket.profilePictureUrl(phoneJid, 'preview');
+              const meta: any = await (sock as any).newsletterMetadata?.('jid', jid);
+              const directPath = meta?.thread_metadata?.picture?.direct_path || meta?.thread_metadata?.preview?.direct_path;
+              if (directPath) {
+                url = directPath.startsWith('http') ? directPath : `https://pps.whatsapp.net${directPath}`;
+              }
             } catch {
-              // ignore
+              // ignore and fall back to standard lookup
             }
           }
-        }
-      }
 
-      // 3. Query direct JID (handles groups @g.us, contacts @s.whatsapp.net, or direct LIDs)
-      if (!url) {
-        try {
-          url = await this.socket.profilePictureUrl(jid, 'image');
-        } catch {
-          try {
-            url = await this.socket.profilePictureUrl(jid, 'preview');
-          } catch {
-            // no picture or blocked
+          // 2. If LID, attempt resolution to phone number first
+          if (!url && jid.endsWith('@lid')) {
+            const resolvedPhone = this.resolveLidToPhone(jid);
+            if (resolvedPhone) {
+              const phoneJid = `${resolvedPhone}@s.whatsapp.net`;
+              try {
+                url = await fetchWithTimeout(phoneJid, 'image');
+              } catch {
+                try {
+                  url = await fetchWithTimeout(phoneJid, 'preview');
+                } catch {
+                  // ignore
+                }
+              }
+            }
           }
-        }
-      }
 
-      const finalUrl = url || null;
-      this.profilePicCache.set(jid, { url: finalUrl, timestamp: Date.now() });
-      return finalUrl;
+          // 3. Query direct JID (handles groups @g.us, contacts @s.whatsapp.net, or direct LIDs)
+          if (!url) {
+            try {
+              url = await fetchWithTimeout(jid, 'image');
+            } catch {
+              try {
+                url = await fetchWithTimeout(jid, 'preview');
+              } catch {
+                // no picture or blocked
+              }
+            }
+          }
+
+          const finalUrl = url || null;
+          this.profilePicCache.set(jid, { url: finalUrl, timestamp: Date.now() });
+          return finalUrl;
+        } catch {
+          this.profilePicCache.set(jid, { url: null, timestamp: Date.now() });
+          return null;
+        } finally {
+          this.avatarInFlight.delete(jid);
+        }
+      })();
+
+      this.avatarInFlight.set(jid, queryPromise);
+      return await queryPromise;
     } catch {
       return null;
+    }
+  }
+
+  public async subscribePresence(jid: string): Promise<void> {
+    if (!this.socket || this.status !== 'CONNECTED' || !jid) return;
+    try {
+      this.subscribedPresences.add(jid);
+      await this.socket.presenceSubscribe(jid);
+      logger.debug({ sessionId: this.sessionId, jid }, 'Presence subscribed');
+    } catch (err: any) {
+      logger.debug({ sessionId: this.sessionId, jid, err: err?.message }, 'Failed to subscribe presence');
+    }
+  }
+
+  public async sendPresenceUpdate(presence: 'available' | 'unavailable'): Promise<void> {
+    if (!this.socket || this.status !== 'CONNECTED') return;
+    try {
+      await this.socket.sendPresenceUpdate(presence);
+    } catch (err: any) {
+      logger.debug({ sessionId: this.sessionId, presence, err: err?.message }, 'Failed to send presence update');
     }
   }
 

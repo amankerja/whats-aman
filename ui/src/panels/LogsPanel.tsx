@@ -100,8 +100,8 @@ const LogsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
           </div>
           <p className="text-xs sm:text-sm text-on-surface-variant max-w-3xl">
             {lang === 'id'
-              ? 'Pantau riwayat eksekusi sistem, audit keamanan sesi, panggilan webhook API, dan jejak transmisi engine Baileys secara mendalam.'
-              : 'Monitor system execution history, session security audits, webhook callbacks, and Baileys socket traces in real time.'}
+              ? 'Pantau riwayat eksekusi sistem, audit keamanan sesi, panggilan webhook API, dan jejak transmisi engine Aman Gateway secara mendalam.'
+              : 'Monitor system execution history, session security audits, webhook callbacks, and Aman Gateway socket traces in real time.'}
           </p>
         </div>
 
@@ -328,7 +328,7 @@ const LogsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
           </div>
           <div className="flex items-center gap-2 text-[11px] text-on-surface-variant">
             <span className="w-1.5 h-1.5 rounded-full bg-primary-container"></span>
-            <span>Baileys Socket Gateway Engine</span>
+            <span>Aman Gateway Socket Engine</span>
           </div>
         </div>
 

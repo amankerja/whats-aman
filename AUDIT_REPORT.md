@@ -8,7 +8,7 @@
 
 ## 1. Ringkasan Eksekutif (Executive Summary)
 
-Aplikasi WhatsAman telah berhasil meletakkan dasar yang sangat solid, mengimplementasikan konsep "Single Engine" (Baileys) dengan antarmuka yang didekoneksi (Decoupled Engine via `IWhatsAppEngine`). Penggunaan `better-sqlite3` dengan mode WAL (Write-Ahead Logging) adalah pilihan tepat untuk konkurensi pada lingkungan lokal/portabel. Struktur modul (Services, Routes, Repositories) sudah tersusun rapi layaknya standar arsitektur monolitik modern.
+Aplikasi WhatsAman telah berhasil meletakkan dasar yang sangat solid, mengimplementasikan konsep "Single Engine" (Aman Gateway) dengan antarmuka yang didekoneksi (Decoupled Engine via `IWhatsAppEngine`). Penggunaan `better-sqlite3` dengan mode WAL (Write-Ahead Logging) adalah pilihan tepat untuk konkurensi pada lingkungan lokal/portabel. Struktur modul (Services, Routes, Repositories) sudah tersusun rapi layaknya standar arsitektur monolitik modern.
 
 Meskipun demikian, ada beberapa celah kritis pada manajemen memori (Memory Leak), validasi masukan (Input Validation), dan potensi _race conditions_ pada sistem _event listener_ yang perlu diperbaiki sebelum rilis produksi (M10).
 

@@ -198,7 +198,7 @@ print(res.json())`;
           <p className="text-sm text-on-surface-variant max-w-3xl">
             {lang === 'id'
               ? 'Uji kirim pesan teks, format media, dokumen, template spintax interaktif, serta inspeksi respon JSON endpoint API gateway WhatsApp secara langsung.'
-              : 'Test outgoing text, media formats, spintax templates, and inspect real-time JSON responses directly against the Baileys API gateway.'}
+              : 'Test outgoing text, media formats, spintax templates, and inspect real-time JSON responses directly against the Aman Gateway API gateway.'}
           </p>
         </div>
 
@@ -258,7 +258,7 @@ print(res.json())`;
             <div className="flex items-center gap-2 mt-1 text-xs text-on-surface-variant">
               <span>Latensi: <strong className="text-primary font-semibold">38 ms</strong></span>
               <span>•</span>
-              <span>Baileys Socket</span>
+              <span>Aman Gateway Socket</span>
             </div>
           </div>
         </div>
@@ -858,7 +858,7 @@ print(res.json())`;
                 <Zap size={18} />
               </div>
               <div className="flex flex-col">
-                <span className="text-xs font-bold text-on-surface">Status Buffer Baileys Gateway</span>
+                <span className="text-xs font-bold text-on-surface">Status Buffer Aman Gateway</span>
                 <span className="text-[11px] text-on-surface-variant">Buffer: 0 antrean pending • Socket ID: #live-socket</span>
               </div>
             </div>

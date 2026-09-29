@@ -46,4 +46,11 @@ export interface AppEvents {
 
   // Automation events
   'automation.triggered': { ruleId: string; ruleName: string; sessionId: string; messageId: string };
+
+  // Realtime Presence events (online, offline, typing)
+  'presence.update': {
+    sessionId: string;
+    jid: string;
+    presences: Record<string, { lastKnownPresence: 'available' | 'unavailable' | 'composing' | 'recording' | 'paused'; lastSeen?: number }>;
+  };
 }

@@ -71,25 +71,28 @@ export class MessageService {
         messageRepository.save(message, 'DELIVERED');
 
         // Auto-save/update contact in SQLite for 1-on-1 personal contacts (standard or LID)
-        if (!message.fromMe && message.chatJid) {
+        if (!message.fromMe && message.chatJid && !message.chatJid.endsWith('@g.us') && !message.chatJid.endsWith('@broadcast') && !message.chatJid.endsWith('@newsletter')) {
           const session = sessionManager.findSession(sessionId);
-          let phone: string | undefined = message.resolvedPhone;
+          const cleanId = message.chatJid.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+          let phone: string | undefined = message.resolvedPhone || (session ? (session as any).resolveLidToPhone?.(cleanId) : undefined);
 
           if (!phone) {
             if (message.chatJid.endsWith('@s.whatsapp.net') || message.chatJid.endsWith('@c.us')) {
-              phone = message.chatJid.split('@')[0];
-            } else if (message.chatJid.endsWith('@lid') && session) {
-              phone = session.resolveLidToPhone?.(message.chatJid);
+              phone = cleanId;
             }
           }
 
           if (phone && /^\d{7,16}$/.test(phone)) {
-            contactRepository.upsert({
-              sessionId,
-              jid: message.chatJid,
-              phone,
-              pushName: message.pushName
-            });
+            const trimmedPush = (message.pushName || '').trim();
+            // Only upsert to contact directory if there is a real pushName or it already exists in DB
+            if (trimmedPush && trimmedPush !== '-' && trimmedPush !== '—') {
+              contactRepository.upsert({
+                sessionId,
+                jid: `${phone}@s.whatsapp.net`,
+                phone,
+                pushName: trimmedPush
+              });
+            }
           }
         }
       } catch (err) {
@@ -239,7 +242,7 @@ export class MessageService {
     return sent;
   }
 
-  public getChatHistory(sessionId: string, chatJid: string, limit = 50, offset = 0) {
+  public getChatHistory(sessionId: string, chatJid: string, limit = 150, offset = 0) {
     const session = sessionManager.getSession(sessionId);
     const jidSet = new Set<string>([chatJid]);
 
@@ -251,13 +254,13 @@ export class MessageService {
       }
     } else if (chatJid.endsWith('@s.whatsapp.net')) {
       const phone = chatJid.split('@')[0];
-      const meta = session?.getMetadata();
-      if (meta?.phoneNumber && meta.phoneNumber === phone) {
+      if (session) {
         try {
           const db = getDatabase();
-          const selfLids = db.prepare(`SELECT DISTINCT chat_jid FROM messages WHERE session_id = ? AND chat_jid LIKE '%@lid'`).all(sessionId) as any[];
-          for (const row of selfLids) {
-            if (session?.resolveLidToPhone?.(row.chat_jid) === phone) {
+          // Find all LIDs that resolve to this phone
+          const lids = db.prepare(`SELECT DISTINCT chat_jid FROM messages WHERE session_id = ? AND chat_jid LIKE '%@lid'`).all(sessionId) as any[];
+          for (const row of lids) {
+            if (session.resolveLidToPhone?.(row.chat_jid) === phone) {
               jidSet.add(row.chat_jid);
             }
           }
@@ -294,10 +297,15 @@ export class MessageService {
 
     for (const c of chats) {
       let resolvedPhone: string | undefined = undefined;
-      if (c.chat_jid.endsWith('@s.whatsapp.net') || c.chat_jid.endsWith('@c.us')) {
-        resolvedPhone = c.chat_jid.split('@')[0];
+      const cleanId = c.chat_jid.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+      const lidResolved = session ? (session as any).resolveLidToPhone?.(cleanId) : undefined;
+
+      if (lidResolved) {
+        resolvedPhone = lidResolved;
+      } else if (c.chat_jid.endsWith('@s.whatsapp.net') || c.chat_jid.endsWith('@c.us')) {
+        resolvedPhone = cleanId;
       } else if (c.chat_jid.endsWith('@lid') && session) {
-        resolvedPhone = session.resolveLidToPhone?.(c.chat_jid);
+        resolvedPhone = (session as any).resolveLidToPhone?.(c.chat_jid);
       }
 
       let finalName = c.name;
@@ -356,6 +364,10 @@ export class MessageService {
     // Merge contacts from already batch-loaded contacts if not present in messages yet (no second query!)
     for (const c of allContacts) {
       if (!c.phone) continue;
+      // Skip raw unmapped LIDs from appearing as separate dummy chat items
+      if (c.phone.length >= 14 && (c.phone.startsWith('1') || c.phone.startsWith('2') || c.phone.startsWith('98')) && !c.name) {
+        continue;
+      }
       const isSelf = Boolean(sessionPhone && c.phone === sessionPhone);
       const dedupeKey = isSelf ? `self:${sessionPhone}` : `phone:${c.phone}`;
 

@@ -358,7 +358,7 @@ const SessionsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">{t.sessions.title}</h1>
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60 text-[11px] font-bold uppercase tracking-wider">
-              Baileys MultiDevice v6.5
+              Aman Gateway MultiDevice v6.5
             </span>
             <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-white text-emerald-700 text-xs font-semibold shadow-sm border border-slate-200/80">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -486,7 +486,7 @@ const SessionsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
               <span className="text-2xl font-bold text-slate-900">99.98%</span>
               <span className="text-xs text-slate-500">30 Hari</span>
             </div>
-            <p className="text-xs text-slate-500 mt-1">Baileys WebSocket multi-session running</p>
+            <p className="text-xs text-slate-500 mt-1">Aman Gateway WebSocket multi-session running</p>
           </div>
           <div className="flex items-center justify-between text-[11px] pt-1">
             <span className="text-emerald-700 font-semibold">Latency: &lt; 28ms</span>
@@ -697,7 +697,7 @@ const SessionsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
                   <div className="px-4 py-3 space-y-2 text-xs">
                     <div className="flex items-center justify-between py-1 border-b border-slate-100">
                       <span className="text-slate-500 font-medium">Engine Gateway</span>
-                      <span className="text-slate-800 font-semibold">Baileys (MultiDevice v6.5)</span>
+                      <span className="text-slate-800 font-semibold">Aman Gateway (MultiDevice v6.5)</span>
                     </div>
                     <div className="flex items-center justify-between py-1 border-b border-slate-100">
                       <span className="text-slate-500 font-medium">Nomor WhatsApp</span>
@@ -878,7 +878,7 @@ const SessionsPanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
                           {isConnected ? 'ONLINE' : s.status}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-slate-600">Baileys v6.5</td>
+                      <td className="py-3 px-4 text-slate-600">Aman Gateway v6.5</td>
                       <td className="py-3 px-4 text-slate-500">
                         {s.lastConnectedAt ? new Date(s.lastConnectedAt).toLocaleTimeString() : '—'}
                       </td>

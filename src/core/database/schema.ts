@@ -322,7 +322,7 @@ export function initializeDatabaseSchema(): void {
   }
 
   try {
-    db.exec("ALTER TABLE contacts ADD COLUMN pipeline_stage TEXT DEFAULT 'lead';");
+    db.exec("ALTER TABLE contacts ADD COLUMN pipeline_stage TEXT DEFAULT 'none';");
   } catch {
     // Column already exists
   }
@@ -337,6 +337,12 @@ export function initializeDatabaseSchema(): void {
 
   try {
     db.exec("ALTER TABLE contacts ADD COLUMN notes TEXT DEFAULT '';");
+  } catch {
+    // Column already exists
+  }
+
+  try {
+    db.exec('ALTER TABLE contacts ADD COLUMN deal_value REAL DEFAULT 0;');
   } catch {
     // Column already exists
   }
@@ -461,6 +467,27 @@ export function initializeDatabaseSchema(): void {
       runMigration();
       logger.info({ version: migration.version, name: migration.name }, 'Database migration applied');
     }
+  }
+
+  try {
+    db.exec(`
+      UPDATE contacts
+      SET name = NULL
+      WHERE name IS NOT NULL AND (
+        name = phone
+        OR name = '+' || phone
+        OR name LIKE '%@s.whatsapp.net'
+        OR name LIKE '%@c.us'
+        OR name LIKE '%@lid'
+        OR name GLOB '[0-9]*'
+        OR name GLOB '+[0-9]*'
+      );
+      UPDATE contacts
+      SET pipeline_stage = 'none'
+      WHERE pipeline_stage = 'lead' AND (deal_value IS NULL OR deal_value = 0) AND (notes IS NULL OR notes = '');
+    `);
+  } catch {
+    // ignore
   }
 
   logger.info(

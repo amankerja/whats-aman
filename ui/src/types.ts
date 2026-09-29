@@ -69,6 +69,7 @@ export interface Contact {
   push_name?: string;
   tags: string[];
   pipeline_stage?: 'lead' | 'prospect' | 'customer' | 'churned' | 'none';
+  deal_value?: number;
   notes?: string;
   opt_out: boolean;
   jid?: string;
@@ -112,6 +113,9 @@ export interface SalesAnalytics {
   inboundChats: number;
   repliedChats: number;
   stageCounts: { lead: number; prospect: number; customer: number; churned: number };
+  stageValues?: { lead: number; prospect: number; customer: number; churned: number };
+  totalPipelineValue?: number;
+  totalClosingValue?: number;
 }
 
 export interface AutoReplyConfig {

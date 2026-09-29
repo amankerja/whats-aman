@@ -41,6 +41,17 @@
   --radius: 12px;
 }
 
+.chat-avatar {
+  border-radius: 9999px !important;
+  overflow: hidden !important;
+  flex-shrink: 0;
+}
+
+.chat-avatar img {
+  border-radius: 9999px !important;
+  object-fit: cover !important;
+}
+
 [data-theme='dark'] {
   color-scheme: dark;
   /* Material 3 emerald analog (dark) */
@@ -1430,6 +1441,8 @@ table td,
 .message-bubble-wrapper {
   display: flex;
   width: 100%;
+  content-visibility: auto;
+  contain-intrinsic-size: 0 48px;
 }
 
 .message-bubble-wrapper.incoming {
@@ -2053,22 +2066,13 @@ table td,
 }
 
 /* ==================== AMAN CHAT PRO: GRANULAR PRIVACY BLUR MODE ==================== */
-.privacy-blur,
-.privacy-blur-pic,
-.privacy-blur-recent,
-.privacy-blur-name,
-.privacy-blur-message,
-.chat-avatar,
-.room-avatar,
-.chat-item-name,
-.chat-item-snippet,
-.message-bubble .message-text,
-.message-bubble .chat-image-media,
-.message-bubble .chat-sticker-media,
-.message-bubble .chat-audio-media,
-.message-bubble .chat-video-media,
-.message-bubble .chat-document-media {
-  transition: filter 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+/* High-performance privacy blur: only apply transition when privacy blur is actually enabled */
+.privacy-blur-pics-active .privacy-blur-pic,
+.privacy-blur-pics-active .chat-avatar,
+.privacy-blur-recents-active .privacy-blur-recent,
+.privacy-blur-names-active .privacy-blur-name,
+.privacy-blur-messages-active .privacy-blur-message {
+  transition: filter 0.15s ease-out;
 }
 
 /* 1. Blur Contact Pics (Avatars & Profile Images) */

@@ -10,6 +10,7 @@ import { config } from '../config';
 import { logger } from '../utils/logger';
 import { AppError } from '../utils/errors';
 import { eventBus } from '../core/events/event-bus';
+import { sessionManager } from '../core/engine/session.manager';
 import { swaggerDocument } from './swagger';
 
 // Routes
@@ -134,6 +135,17 @@ export function createServer(): { app: express.Application; server: http.Server 
       if (state) state.isAlive = true;
     });
 
+    ws.on('message', async (raw) => {
+      try {
+        const data = JSON.parse(raw.toString());
+        if (data.action === 'subscribe_presence' && data.sessionId && data.jid) {
+          await sessionManager.subscribePresence(data.sessionId, data.jid);
+        }
+      } catch {
+        // ignore malformed ws messages
+      }
+    });
+
     ws.on('error', (err) => {
       logger.debug({ err: err.message }, 'WebSocket client error');
       clients.delete(ws);
@@ -188,6 +200,7 @@ export function createServer(): { app: express.Application; server: http.Server 
   eventBus.on('message.sent', (data) => broadcastEvent('message.sent', data));
   eventBus.on('message.updated', (data) => broadcastEvent('message.updated', data));
   eventBus.on('message.ack', (data) => broadcastEvent('message.ack', data));
+  eventBus.on('presence.update', (data) => broadcastEvent('presence.update', data));
   eventBus.on('campaign.updated', (data) => broadcastEvent('campaign.updated', data));
   eventBus.on('automation.triggered', (data) => broadcastEvent('automation.triggered', data));
 

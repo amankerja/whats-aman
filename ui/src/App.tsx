@@ -216,7 +216,7 @@ function AppShell() {
 
   // Core data states
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
-  const [selectedSessionId, setSelectedSessionId] = useState<string>('');
+  const [selectedSessionId, setSelectedSessionId] = useState<string>(() => localStorage.getItem('whatsaman_selected_session') || '');
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -234,6 +234,7 @@ function AppShell() {
   // Live Chat & Inbox State
   const [chats, setChats] = useState<ChatItem[]>([]);
   const [activeChatJid, setActiveChatJid] = useState<string | null>(null);
+  const [presenceMap, setPresenceMap] = useState<Record<string, { status: string; lastSeen?: number }>>({});
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatSearchQuery, setChatSearchQuery] = useState('');
   const [chatsSidebarTab, setChatsSidebarTab] = useState<'chats' | 'contacts' | 'groups' | 'channels'>('chats');
@@ -490,10 +491,15 @@ function AppShell() {
   const [abHealth, setAbHealth] = useState<Record<string, { stats: any; events: any[] }>>({});
   const [abResetting, setAbResetting] = useState<string | null>(null);
 
+  const [isWsConnected, setIsWsConnected] = useState<boolean>(false);
+  const isWsConnectedRef = useRef<boolean>(false);
+  const activeTabRef = useRef<string>(activeTab);
   const wsRef = useRef<WebSocket | null>(null);
   const selectedSessionIdRef = useRef<string>(selectedSessionId);
   const activeChatJidRef = useRef<string | null>(activeChatJid);
   const chatsRef = useRef<ChatItem[]>(chats);
+  isWsConnectedRef.current = isWsConnected;
+  activeTabRef.current = activeTab;
   selectedSessionIdRef.current = selectedSessionId;
   activeChatJidRef.current = activeChatJid;
   chatsRef.current = chats;
@@ -572,8 +578,14 @@ function AppShell() {
       const data = await res.json();
       if (data.success) {
         setSessions(data.data);
-        if (!selectedSessionId && data.data.length > 0) {
-          setSelectedSessionId(data.data[0].id);
+        const saved = localStorage.getItem('whatsaman_selected_session');
+        const exists = data.data.some((s: any) => s.id === saved);
+        if (!selectedSessionId) {
+          if (saved && exists) {
+            setSelectedSessionId(saved);
+          } else if (data.data.length > 0) {
+            setSelectedSessionId(data.data[0].id);
+          }
         }
       }
     } catch (err) {
@@ -619,7 +631,7 @@ function AppShell() {
   const fetchContacts = async (sessionId: string) => {
     if (!sessionId) return;
     try {
-      const res = await fetch(`/api/v1/contacts?sessionId=${sessionId}`);
+      const res = await fetch(`/api/v1/contacts?sessionId=${sessionId}&limit=10000`);
       const data = await res.json();
       if (data.success) {
         setContacts(data.data);
@@ -958,16 +970,25 @@ function AppShell() {
 
     const connectWs = () => {
       if (!isMounted) return;
-      const isDev = window.location.port === '5173';
-      const wsPort = isDev ? '3000' : (window.location.port || (window.location.protocol === 'https:' ? '443' : '80'));
+      const isLocal =
+        window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1' ||
+        window.location.hostname === 'tauri.localhost' ||
+        window.location.protocol === 'tauri:' ||
+        window.location.port === '5173';
+
+      // Always connect explicitly to IPv4 127.0.0.1:3000 when local to prevent Windows IPv6 (::1) ECONNREFUSED
+      const wsHost = isLocal ? '127.0.0.1:3000' : (window.location.host || '127.0.0.1:3000');
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.hostname}:${wsPort}/ws`;
+      const wsUrl = `${protocol}//${wsHost}/ws`;
 
       try {
         ws = new WebSocket(wsUrl);
         wsRef.current = ws;
 
         ws.onopen = () => {
+          setIsWsConnected(true);
+          isWsConnectedRef.current = true;
           addLog('WebSocket terhubung ke WhatsAman Core Engine', 'success');
           // Reconnection recovery: automatically catch up on missed chats and messages
           const curSession = selectedSessionIdRef.current;
@@ -1067,8 +1088,21 @@ function AppShell() {
                 if (isCurrentActive) {
                   // DELTA: append directly without heavy HTTP round-trip
                   setChatMessages(prev => {
-                    if (prev.some(m => m.id === newMsg.id || m.message_id === newMsg.id)) {
-                      return prev;
+                    const existingIndex = prev.findIndex(m => 
+                      m.id === newMsg.id || 
+                      m.message_id === newMsg.id || 
+                      (m.status === 'PENDING' && m.from_me === 1 && m.content_text === newMsg.text)
+                    );
+                    if (existingIndex !== -1) {
+                      const updated = [...prev];
+                      updated[existingIndex] = {
+                        ...updated[existingIndex],
+                        id: newMsg.id,
+                        message_id: newMsg.id,
+                        status: newMsg.fromMe ? 'SENT' : 'DELIVERED',
+                        timestamp: newMsg.timestamp || updated[existingIndex].timestamp
+                      };
+                      return updated;
                     }
                     const incomingMsg: ChatMessage = {
                       id: newMsg.id,
@@ -1089,7 +1123,7 @@ function AppShell() {
 
                   setTimeout(() => {
                     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-                  }, 50);
+                  }, 30);
                 }
 
                 // DELTA: update sidebar chat preview in-place and bubble to top
@@ -1151,6 +1185,22 @@ function AppShell() {
               }
             }
 
+            if (msg.event === 'presence.update') {
+              const { jid, presences } = msg.payload || {};
+              if (jid && presences) {
+                const p = presences[jid] || Object.values(presences)[0] as any;
+                if (p) {
+                  setPresenceMap(prev => ({
+                    ...prev,
+                    [jid]: {
+                      status: p.lastKnownPresence || 'unavailable',
+                      lastSeen: p.lastSeen
+                    }
+                  }));
+                }
+              }
+            }
+
             if (msg.event === 'campaign.updated') {
               fetchCampaigns();
             }
@@ -1160,14 +1210,20 @@ function AppShell() {
         };
 
         ws.onclose = () => {
+          setIsWsConnected(false);
+          isWsConnectedRef.current = false;
           if (!isMounted) return;
           reconnectTimeout = setTimeout(connectWs, 3000);
         };
 
         ws.onerror = () => {
+          setIsWsConnected(false);
+          isWsConnectedRef.current = false;
           ws?.close();
         };
       } catch (e) {
+        setIsWsConnected(false);
+        isWsConnectedRef.current = false;
         if (isMounted) {
           reconnectTimeout = setTimeout(connectWs, 3000);
         }
@@ -1178,6 +1234,18 @@ function AppShell() {
 
     const interval = setInterval(() => {
       fetchSystemStatus();
+
+      // Fallback synchronization if WebSocket is disconnected or recovering
+      if (!isWsConnectedRef.current) {
+        const curSession = selectedSessionIdRef.current;
+        const curChat = activeChatJidRef.current;
+        if (curSession) {
+          fetchChats(curSession);
+          if (curChat && activeTabRef.current === 'chats') {
+            fetchChatMessages(curSession, curChat);
+          }
+        }
+      }
     }, 5000);
 
     return () => {
@@ -1195,6 +1263,27 @@ function AppShell() {
       clearInterval(interval);
     };
   }, []);
+
+  // AMAN CHAT Pro: Auto-subscribe to presence for active conversation
+  useEffect(() => {
+    if (!selectedSessionId || !activeChatJid) return;
+    try {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({
+          action: 'subscribe_presence',
+          sessionId: selectedSessionId,
+          jid: activeChatJid
+        }));
+      }
+      fetch(`/api/v1/sessions/${encodeURIComponent(selectedSessionId)}/presence/subscribe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jid: activeChatJid })
+      }).catch(() => {});
+    } catch {
+      // ignore
+    }
+  }, [selectedSessionId, activeChatJid]);
 
   // AMAN CHAT Pro: Keyboard shortcut Alt + P for Instant Privacy Mode
   useEffect(() => {
@@ -1528,7 +1617,7 @@ function AppShell() {
     }
   };
 
-  const handleUpdateContactStage = async (phone: string, stage: 'lead' | 'prospect' | 'customer' | 'churned') => {
+  const handleUpdateContactStage = async (phone: string, stage: 'lead' | 'prospect' | 'customer' | 'churned' | 'none') => {
     try {
       setContacts(prev => prev.map(c => c.phone === phone ? { ...c, pipeline_stage: stage } : c));
       await fetch(`/api/v1/contacts/${phone}/stage`, {
@@ -1539,6 +1628,24 @@ function AppShell() {
       fetchContacts(selectedSessionId);
       fetchSalesAnalytics(selectedSessionId, crmTimeRange);
       addLog(`Status pipeline kontak ${phone} diubah menjadi ${stage.toUpperCase()}`, 'info');
+    } catch (err: any) {
+      showToast(err.message, 'error');
+      fetchContacts(selectedSessionId);
+    }
+  };
+
+  const handleUpdateDealValue = async (phone: string, dealValue: number) => {
+    try {
+      setContacts(prev => prev.map(c => c.phone === phone ? { ...c, deal_value: dealValue } : c));
+      await fetch(`/api/v1/contacts/${phone}/deal-value`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: selectedSessionId, dealValue })
+      });
+      fetchContacts(selectedSessionId);
+      fetchSalesAnalytics(selectedSessionId, crmTimeRange);
+      addLog(`Nilai deal kontak ${phone} diperbarui menjadi Rp ${dealValue.toLocaleString('id-ID')}`, 'info');
+      showToast(`Nilai deal berhasil diperbarui`, 'success');
     } catch (err: any) {
       showToast(err.message, 'error');
       fetchContacts(selectedSessionId);
@@ -1565,6 +1672,7 @@ function AppShell() {
   // crmTimeRange changed. Split: session-scoped data vs analytics-only.
   useEffect(() => {
     if (selectedSessionId) {
+      localStorage.setItem('whatsaman_selected_session', selectedSessionId);
       fetchContacts(selectedSessionId);
       fetchGroups(selectedSessionId);
       fetchChats(selectedSessionId);
@@ -1577,9 +1685,28 @@ function AppShell() {
     }
   }, [selectedSessionId]);
 
-  // Refresh anti-blocking health whenever session list/status changes (cheap call)
+  // Refresh anti-blocking health whenever session list/status changes in a single batched update
   useEffect(() => {
-    sessions.forEach(s => fetchAntiBlockingHealth(s.id));
+    if (sessions.length === 0) return;
+    let isCancelled = false;
+    Promise.all(
+      sessions.map(s =>
+        fetch(`/api/v1/system/anti-blocking/stats?sessionId=${encodeURIComponent(s.id)}`)
+          .then(r => r.json())
+          .then(data => (data.success ? { id: s.id, data: data.data } : null))
+          .catch(() => null)
+      )
+    ).then(results => {
+      if (isCancelled) return;
+      const updates: Record<string, any> = {};
+      results.forEach(r => {
+        if (r) updates[r.id] = r.data;
+      });
+      if (Object.keys(updates).length > 0) {
+        setAbHealth(prev => ({ ...prev, ...updates }));
+      }
+    });
+    return () => { isCancelled = true; };
   }, [sessions.map(s => `${s.id}:${s.status}`).join(',')]);
 
   useEffect(() => {
@@ -1695,11 +1822,51 @@ function AppShell() {
     addLog(`Menghubungkan sesi ${id}...`, 'info');
   };
 
-  // Direct Chat Send
+  // Direct Chat Send with Optimistic Realtime UI
   const handleSendChatMessage = useCallback(async (textOverride?: string) => {
     const textToSend = (typeof textOverride === 'string' ? textOverride : chatReplyText).trim();
     if (!selectedSessionId || !activeChatJid || !textToSend) return;
     setChatReplyText('');
+
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const now = Date.now();
+
+    // 1. Instant Optimistic Delta Append
+    const optimisticMsg: ChatMessage = {
+      id: tempId,
+      session_id: selectedSessionId,
+      message_id: tempId,
+      chat_jid: activeChatJid,
+      sender_jid: '',
+      from_me: 1,
+      content_text: textToSend,
+      status: 'PENDING',
+      timestamp: now
+    };
+
+    setChatMessages(prev => [...prev, optimisticMsg]);
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 20);
+
+    // 2. Instant Sidebar Update to Top
+    setChats(prevChats => {
+      const targetIndex = prevChats.findIndex(c => isSameChat(c.chat_jid, activeChatJid));
+      if (targetIndex !== -1) {
+        const target = prevChats[targetIndex];
+        const updatedChat: ChatItem = {
+          ...target,
+          last_message: textToSend,
+          last_from_me: 1,
+          last_status: 'PENDING',
+          timestamp: now
+        };
+        const remaining = prevChats.filter((_, idx) => idx !== targetIndex);
+        return [updatedChat, ...remaining];
+      }
+      return prevChats;
+    });
+
     try {
       const res = await fetch('/api/v1/messages/text', {
         method: 'POST',
@@ -1712,12 +1879,17 @@ function AppShell() {
       });
       const data = await res.json();
       if (data.success) {
-        fetchChatMessages(selectedSessionId, activeChatJid);
-        fetchChats(selectedSessionId);
+        const serverMsgId = data.data?.messageId || data.data?.id;
+        if (serverMsgId) {
+          setChatMessages(prev => prev.map(m => m.id === tempId ? { ...m, id: serverMsgId, message_id: serverMsgId, status: 'SENT' } : m));
+          setChats(prev => prev.map(c => isSameChat(c.chat_jid, activeChatJid) ? { ...c, last_status: 'SENT' } : c));
+        }
       } else {
+        setChatMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: 'FAILED' } : m));
         showToast(data.message || 'Gagal mengirim pesan', 'error');
       }
     } catch (err: any) {
+      setChatMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: 'FAILED' } : m));
       showToast(err.message, 'error');
     }
   }, [selectedSessionId, activeChatJid, chatReplyText]);
@@ -2382,6 +2554,7 @@ function AppShell() {
     setChats,
     activeChatJid,
     setActiveChatJid,
+    presenceMap,
     chatMessages,
     setChatMessages,
     chatSearchQuery,
@@ -2510,6 +2683,7 @@ function AppShell() {
     handleDeleteContact,
     handleImportGroupToContacts,
     handleUpdateContactStage,
+    handleUpdateDealValue,
     handleOpenChatWithContact,
     isNewCampaignModal,
     setIsNewCampaignModal,
@@ -2938,14 +3112,23 @@ function AppShell() {
             {!isCollapsed && <span className="text-xs font-medium">{theme === 'dark' ? t.common.lightTheme : t.common.darkTheme}</span>}
           </button>
 
-          {/* Core Status Pill */}
+          {/* Core Status & Real-Time Sync Pills */}
           {!isCollapsed && (
-            <div className="flex items-center justify-between pt-1 px-1 text-[11px] text-slate-400 font-medium">
-              <span>Core Gateway</span>
-              <span className={`inline-flex items-center gap-1 font-semibold ${isGlobalConnected ? 'text-emerald-600' : 'text-slate-500'}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${isGlobalConnected ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                {isGlobalConnected ? 'Online' : 'Standby'}
-              </span>
+            <div className="flex flex-col gap-1 pt-1 px-1 text-[11px] text-slate-400 font-medium">
+              <div className="flex items-center justify-between">
+                <span>Core Gateway</span>
+                <span className={`inline-flex items-center gap-1 font-semibold ${isGlobalConnected ? 'text-emerald-600' : 'text-slate-500'}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${isGlobalConnected ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                  {isGlobalConnected ? 'Online' : 'Standby'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Real-Time Sync</span>
+                <span className={`inline-flex items-center gap-1 font-semibold ${isWsConnected ? 'text-emerald-600' : 'text-amber-500'}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${isWsConnected ? 'bg-emerald-500' : 'bg-amber-400 animate-pulse'}`} />
+                  {isWsConnected ? 'Aktif (Live)' : 'Reconnecting...'}
+                </span>
+              </div>
             </div>
           )}
           </div>

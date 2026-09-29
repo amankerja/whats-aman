@@ -164,7 +164,7 @@ const InfrastructurePanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
             </div>
           </div>
           <div className="flex items-center justify-between pt-3 mt-3 border-t border-outline-variant/20">
-            <span className="text-[11px] text-on-surface-variant">Baileys Core WS Engine v6.5.0</span>
+            <span className="text-[11px] text-on-surface-variant">Aman Gateway Core WS Engine v6.5.0</span>
             <Activity size={15} className="text-primary" />
           </div>
         </div>
@@ -211,7 +211,7 @@ const InfrastructurePanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
             </p>
           </div>
           <div className="flex items-center justify-between pt-3 mt-3 border-t border-outline-variant/20">
-            <span className="text-[11px] text-on-surface-variant">Socket Baileys Aktif</span>
+            <span className="text-[11px] text-on-surface-variant">Socket Aman Gateway Aktif</span>
             <CheckCircle2 size={15} className="text-primary" />
           </div>
         </div>
@@ -396,7 +396,7 @@ const InfrastructurePanel: React.FC<{ ctx: PanelCtx }> = ({ ctx }) => {
                 <div className="flex items-center gap-2">
                   <Wifi size={15} className="text-primary" />
                   <div className="flex flex-col">
-                    <span className="text-xs font-bold text-on-surface">WebSocket Baileys</span>
+                    <span className="text-xs font-bold text-on-surface">WebSocket Aman Gateway</span>
                     <span className="text-[10px] text-on-surface-variant">Koneksi Multi-Device</span>
                   </div>
                 </div>

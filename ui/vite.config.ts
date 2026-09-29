@@ -24,20 +24,25 @@ export default defineConfig({
         // so app code changes no longer invalidate the whole bundle and the initial
         // parse cost drops (previously one 500+ kB monolithic JS chunk).
         manualChunks(id: string) {
-          if (!id.includes('node_modules')) {
-            return undefined;
+          const norm = id.replace(/\\/g, '/');
+          if (norm.includes('node_modules')) {
+            if (norm.includes('/react/') || norm.includes('/react-dom/') || norm.includes('/scheduler/')) {
+              return 'vendor-react';
+            }
+            if (norm.includes('/lucide-react/')) {
+              return 'vendor-icons';
+            }
+            return 'vendor-misc';
           }
-          // React core: needed immediately at boot
-          if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('/scheduler/')) {
-            return 'vendor-react';
+          if (norm.includes('/ui/src/panels/ChatsPanel')) {
+            return 'panel-chats';
           }
-          // Icon library ships thousands of icons; only the imported ones end up in
-          // the chunk, but keeping them separate lets React + app code stay cacheable.
-          if (id.includes('/lucide-react/')) {
-            return 'vendor-icons';
+          if (norm.includes('/ui/src/panels/ContactsPanel') || norm.includes('/ui/src/panels/CrmPanel')) {
+            return 'panel-crm';
           }
-          // Everything else (tiny libs) — merged into one vendor chunk
-          return 'vendor-misc';
+          if (norm.includes('/ui/src/i18n')) {
+            return 'app-i18n';
+          }
         }
       }
     }

@@ -1,11 +1,189 @@
+import fs from 'fs';
+import path from 'path';
 import xlsx from 'xlsx';
 import { contactRepository, ContactRecord } from '../database/repositories/contact.repository';
 import { getDatabase } from '../database/connection';
 import { sessionManager } from '../engine/session.manager';
+import { config } from '../../config';
 import { logger } from '../../utils/logger';
 
 export class ContactService {
+  public resolveAndCleanLidContacts(targetSessionId?: string): {
+    resolvedCount: number;
+    mergedDuplicates: number;
+    updatedCount: number;
+    messagesUpdated: number;
+  } {
+    const db = getDatabase();
+    const sessionsDir = config.storage.sessionsDir;
+
+    // 1. Collect all reverse mappings from disk
+    const lidMap = new Map<string, string>();
+    try {
+      if (fs.existsSync(sessionsDir)) {
+        const sessionDirs = fs.readdirSync(sessionsDir);
+        for (const sDir of sessionDirs) {
+          const authDir = path.join(sessionsDir, sDir, 'auth');
+          if (fs.existsSync(authDir)) {
+            const files = fs.readdirSync(authDir).filter(f => f.startsWith('lid-mapping-') && f.endsWith('_reverse.json'));
+            for (const file of files) {
+              const lid = file.replace('lid-mapping-', '').replace('_reverse.json', '');
+              try {
+                const raw = fs.readFileSync(path.join(authDir, file), 'utf-8');
+                const phone = JSON.parse(raw);
+                if (typeof phone === 'string' && /^\d{7,16}$/.test(phone)) {
+                  lidMap.set(lid, phone);
+                }
+              } catch {
+                // ignore
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      logger.warn({ err }, 'Error scanning sessions auth directory for LID mappings');
+    }
+
+    let resolvedCount = 0;
+    let mergedDuplicates = 0;
+    let updatedCount = 0;
+    let messagesUpdated = 0;
+
+    // 2. Process contacts table
+    const contactSql = targetSessionId
+      ? `SELECT * FROM contacts WHERE session_id = ?`
+      : `SELECT * FROM contacts`;
+    const contacts = targetSessionId
+      ? (db.prepare(contactSql).all(targetSessionId) as ContactRecord[])
+      : (db.prepare(contactSql).all() as ContactRecord[]);
+
+    const deleteStmt = db.prepare(`DELETE FROM contacts WHERE id = ?`);
+    const updateStmt = db.prepare(`
+      UPDATE contacts 
+      SET id = ?, jid = ?, phone = ?, name = COALESCE(name, ?), push_name = COALESCE(push_name, ?), updated_at = ?
+      WHERE id = ?
+    `);
+    const mergeStmt = db.prepare(`
+      UPDATE contacts
+      SET 
+        name = CASE WHEN (name IS NULL OR name = '' OR name = '-') AND @name IS NOT NULL AND @name != '' AND @name != '-' THEN @name ELSE name END,
+        push_name = COALESCE(push_name, @push_name),
+        notes = CASE WHEN (notes IS NULL OR notes = '') AND @notes IS NOT NULL THEN @notes ELSE notes END,
+        deal_value = CASE WHEN (deal_value IS NULL OR deal_value = 0) AND @deal_value > 0 THEN @deal_value ELSE deal_value END,
+        pipeline_stage = CASE WHEN (pipeline_stage IS NULL OR pipeline_stage = 'lead') AND @pipeline_stage != 'lead' THEN @pipeline_stage ELSE pipeline_stage END
+      WHERE id = @target_id
+    `);
+
+    const findNameInMessagesStmt = db.prepare(`
+      SELECT push_name FROM messages 
+      WHERE session_id = ? AND (sender_jid LIKE ? OR chat_jid LIKE ?)
+        AND push_name IS NOT NULL AND TRIM(push_name) != ''
+      LIMIT 1
+    `);
+
+    const runInTransaction = db.transaction(() => {
+      for (const c of contacts) {
+        const cleanPhone = (c.phone || '').replace(/[^0-9]/g, '');
+        const cleanJid = (c.jid || '').split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+
+        const isLid = lidMap.has(cleanPhone) || lidMap.has(cleanJid) || cleanPhone.length >= 14 || (cleanPhone.length >= 12 && cleanPhone.startsWith('10'));
+        if (!isLid) continue;
+
+        const realPhone = lidMap.get(cleanPhone) || lidMap.get(cleanJid);
+        if (realPhone) {
+          resolvedCount++;
+          // Check if contact already exists with this realPhone in same session
+          const existing = db.prepare(`
+            SELECT * FROM contacts 
+            WHERE session_id = ? AND (phone = ? OR jid = ?) AND id != ?
+          `).get(c.session_id, realPhone, `${realPhone}@s.whatsapp.net`, c.id) as any;
+
+          if (existing) {
+            // Merge metadata and delete duplicate
+            mergeStmt.run({
+              name: c.name,
+              push_name: c.push_name,
+              notes: c.notes,
+              deal_value: c.deal_value || 0,
+              pipeline_stage: c.pipeline_stage || 'lead',
+              target_id: existing.id
+            });
+            deleteStmt.run(c.id);
+            mergedDuplicates++;
+          } else {
+            // Update to real phone
+            let recoveredName = c.name;
+            let recoveredPushName = c.push_name;
+            if (!recoveredName) {
+              const msg = findNameInMessagesStmt.get(c.session_id, `%${cleanPhone}%`, `%${cleanPhone}%`) as any;
+              if (msg && msg.push_name) {
+                recoveredName = msg.push_name;
+                recoveredPushName = msg.push_name;
+              }
+            }
+            const newCanonicalJid = `${realPhone}@s.whatsapp.net`;
+            const newId = `${c.session_id}:${newCanonicalJid}`;
+            updateStmt.run(newId, newCanonicalJid, realPhone, recoveredName || null, recoveredPushName || null, Date.now(), c.id);
+            updatedCount++;
+          }
+        } else {
+          // Unresolvable anonymous LID without phone number (e.g. Community member with phone privacy):
+          // Remove from CRM contacts table so it doesn't clutter the user's contact book with unusable records
+          deleteStmt.run(c.id);
+          mergedDuplicates++;
+        }
+      }
+
+      // 3. Migrate messages table chat_jid and sender_jid that end with @lid
+      const msgChatUpdateStmt = db.prepare(`UPDATE messages SET chat_jid = ? WHERE id = ?`);
+      const msgSenderUpdateStmt = db.prepare(`UPDATE messages SET sender_jid = ? WHERE id = ?`);
+
+      const msgsWithLid = (targetSessionId
+        ? db.prepare(`SELECT id, session_id, chat_jid, sender_jid FROM messages WHERE session_id = ? AND (chat_jid LIKE '%@lid' OR sender_jid LIKE '%@lid')`).all(targetSessionId)
+        : db.prepare(`SELECT id, session_id, chat_jid, sender_jid FROM messages WHERE chat_jid LIKE '%@lid' OR sender_jid LIKE '%@lid'`).all()) as any[];
+
+      for (const m of msgsWithLid) {
+        let updated = false;
+        if (m.chat_jid && m.chat_jid.endsWith('@lid')) {
+          const cleanLid = m.chat_jid.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+          const realPhone = lidMap.get(cleanLid);
+          if (realPhone) {
+            msgChatUpdateStmt.run(`${realPhone}@s.whatsapp.net`, m.id);
+            updated = true;
+          }
+        }
+        if (m.sender_jid && m.sender_jid.endsWith('@lid')) {
+          const cleanLid = m.sender_jid.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+          const realPhone = lidMap.get(cleanLid);
+          if (realPhone) {
+            msgSenderUpdateStmt.run(`${realPhone}@s.whatsapp.net`, m.id);
+            updated = true;
+          }
+        }
+        if (updated) {
+          messagesUpdated++;
+        }
+      }
+    });
+
+    runInTransaction();
+
+    logger.info({
+      targetSessionId,
+      resolvedCount,
+      mergedDuplicates,
+      updatedCount,
+      messagesUpdated
+    }, 'Completed LID contacts and messages migration');
+
+    return { resolvedCount, mergedDuplicates, updatedCount, messagesUpdated };
+  }
+
   public syncContactsFromMessagesAndGroups(sessionId: string): number {
+    // Run LID clean & migration first
+    this.resolveAndCleanLidContacts(sessionId);
+
     const db = getDatabase();
     const msgs = db.prepare(`
       SELECT chat_jid, push_name 
@@ -29,19 +207,29 @@ export class ContactService {
       seen.add(m.chat_jid);
 
       let phone: string | undefined = undefined;
-      if (m.chat_jid.endsWith('@s.whatsapp.net') || m.chat_jid.endsWith('@c.us')) {
-        phone = m.chat_jid.split('@')[0];
+      const cleanId = m.chat_jid.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+
+      // Check if cleanId is an LID
+      const resolvedLid = session ? (session as any).resolveLidToPhone?.(cleanId) : undefined;
+      if (resolvedLid) {
+        phone = resolvedLid;
+      } else if (m.chat_jid.endsWith('@s.whatsapp.net') || m.chat_jid.endsWith('@c.us')) {
+        phone = cleanId;
       } else if (m.chat_jid.endsWith('@lid') && session) {
-        phone = session.resolveLidToPhone?.(m.chat_jid);
+        phone = (session as any).resolveLidToPhone?.(m.chat_jid);
       }
 
       if (phone && /^\d{7,16}$/.test(phone)) {
+        const trimmedPush = (m.push_name || '').trim();
+        if (!trimmedPush || trimmedPush === '-' || trimmedPush === '—') {
+          continue;
+        }
         contactRepository.upsert({
           sessionId,
           jid: `${phone}@s.whatsapp.net`,
           phone,
-          name: m.push_name,
-          pushName: m.push_name
+          name: trimmedPush,
+          pushName: trimmedPush
         });
         count++;
       }
@@ -49,6 +237,12 @@ export class ContactService {
 
     logger.info({ sessionId, count }, 'Synchronized contacts from messages and session');
     return count;
+  }
+
+  public cleanUnnamedContacts(sessionId: string): { count: number } {
+    const count = contactRepository.cleanUnnamed(sessionId);
+    logger.info({ sessionId, count }, 'Cleaned unnamed contacts');
+    return { count };
   }
 
   public addOrUpdateContact(data: {
@@ -59,6 +253,7 @@ export class ContactService {
     tags?: string[];
     customFields?: Record<string, any>;
     pipelineStage?: 'lead' | 'prospect' | 'customer' | 'churned';
+    dealValue?: number;
     notes?: string;
     optOut?: boolean;
   }): void {
@@ -79,12 +274,13 @@ export class ContactService {
       tags: data.tags,
       customFields: data.customFields,
       pipelineStage: data.pipelineStage,
+      dealValue: data.dealValue,
       notes: data.notes,
       optOut: data.optOut
     });
   }
 
-  public getContacts(sessionId: string, limit = 100, offset = 0): { data: ContactRecord[]; total: number } {
+  public getContacts(sessionId: string, limit = 10000, offset = 0): { data: ContactRecord[]; total: number } {
     const data = contactRepository.findAll(sessionId, limit, offset);
     const total = contactRepository.count(sessionId);
     return { data, total };
@@ -106,7 +302,7 @@ export class ContactService {
     return contactRepository.batchDelete(sessionId, phones);
   }
 
-  public batchUpdateStage(sessionId: string, phones: string[], stage: 'lead' | 'prospect' | 'customer' | 'churned'): number {
+  public batchUpdateStage(sessionId: string, phones: string[], stage: 'lead' | 'prospect' | 'customer' | 'churned' | 'none'): number {
     return contactRepository.batchUpdateStage(sessionId, phones, stage);
   }
 
@@ -134,8 +330,12 @@ export class ContactService {
     contactRepository.updateTags(sessionId, phone, tags);
   }
 
-  public updatePipelineStage(sessionId: string, phone: string, stage: 'lead' | 'prospect' | 'customer' | 'churned'): void {
+  public updatePipelineStage(sessionId: string, phone: string, stage: 'lead' | 'prospect' | 'customer' | 'churned' | 'none'): void {
     contactRepository.updateStage(sessionId, phone, stage);
+  }
+
+  public updateDealValue(sessionId: string, phone: string, dealValue: number): void {
+    contactRepository.updateDealValue(sessionId, phone, dealValue);
   }
 
   public updateNotes(sessionId: string, phone: string, notes: string): void {
@@ -208,6 +408,7 @@ export class ContactService {
       'Nama Kontak': c.name || '',
       'Push Name (WA)': c.push_name || '',
       'Pipeline Stage': (c.pipeline_stage || 'lead').toUpperCase(),
+      'Deal Value (Rp)': c.deal_value || 0,
       'Group / Tags': c.tags.join(', '),
       'Status Opt-Out': c.opt_out ? 'OPT-OUT (BLOKIR)' : 'OPT-IN AKTIF',
       'Catatan CRM': c.notes || ''

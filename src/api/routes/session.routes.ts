@@ -101,13 +101,29 @@ const TRANSPARENT_1X1_GIF = Buffer.from(
 sessionRouter.get('/:id/avatar', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const sessionId = String(req.params.id);
-    const jid = req.query.jid ? String(req.query.jid) : undefined;
+    const jid = req.query.jid ? String(req.query.jid).trim() : undefined;
+
+    // Fast-reject invalid or dummy JIDs without querying WhatsApp socket
+    if (jid) {
+      const cleanPhone = jid.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+      const isSpecial = jid.endsWith('@g.us') || jid.endsWith('@newsletter');
+      if (!isSpecial && (!cleanPhone || cleanPhone.length < 5 || cleanPhone === '0')) {
+        res.setHeader('Content-Type', 'image/gif');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        res.setHeader('X-Avatar-Status', 'not-found');
+        res.status(200).send(TRANSPARENT_1X1_GIF);
+        return;
+      }
+    }
+
     const forceRefresh = req.query.refresh === 'true' || req.query.refresh === '1';
     const url = await sessionManager.getProfilePictureUrl(sessionId, jid, forceRefresh);
 
     if (!url) {
       res.setHeader('Content-Type', 'image/gif');
-      res.setHeader('Cache-Control', 'public, max-age=86400');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
       res.setHeader('X-Avatar-Status', 'not-found');
       res.status(200).send(TRANSPARENT_1X1_GIF);
       return;
@@ -124,7 +140,7 @@ sessionRouter.get('/:id/avatar', async (req: Request, res: Response, next: NextF
         const buffer = Buffer.from(await imgRes.arrayBuffer());
         const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
         res.setHeader('Content-Type', contentType);
-        res.setHeader('Cache-Control', 'public, max-age=86400');
+        res.setHeader('Cache-Control', 'public, max-age=3600');
         res.setHeader('X-Avatar-Status', 'found');
         res.send(buffer);
         return;
@@ -136,7 +152,9 @@ sessionRouter.get('/:id/avatar', async (req: Request, res: Response, next: NextF
     res.redirect(url);
   } catch (err) {
     res.setHeader('Content-Type', 'image/gif');
-    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.setHeader('X-Avatar-Status', 'not-found');
     res.status(200).send(TRANSPARENT_1X1_GIF);
   }
@@ -181,6 +199,22 @@ sessionRouter.post('/:id/profile-picture/batch', async (req: Request, res: Respo
     );
 
     res.json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/v1/sessions/:id/presence/subscribe - Subscribe to presence updates for JID
+sessionRouter.post('/:id/presence/subscribe', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const sessionId = String(req.params.id);
+    const { jid } = req.body;
+    if (!jid) {
+      res.status(400).json({ success: false, message: 'jid is required' });
+      return;
+    }
+    await sessionManager.subscribePresence(sessionId, String(jid));
+    res.json({ success: true, message: 'Subscribed to presence' });
   } catch (err) {
     next(err);
   }
